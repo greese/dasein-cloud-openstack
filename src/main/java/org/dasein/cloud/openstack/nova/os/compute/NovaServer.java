@@ -19,7 +19,6 @@
 package org.dasein.cloud.openstack.nova.os.compute;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,10 +34,12 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.Platform;
+import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineProduct;
 import org.dasein.cloud.compute.VirtualMachineSupport;
@@ -50,10 +51,12 @@ import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.util.CalendarWrapper;
+import org.dasein.util.uom.storage.Gigabyte;
+import org.dasein.util.uom.storage.Megabyte;
+import org.dasein.util.uom.storage.Storage;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
 
 public class NovaServer implements VirtualMachineSupport {
     private NovaOpenStack provider;
@@ -86,6 +89,11 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
+    public int getMaximumVirtualMachineCount() throws CloudException, InternalException {
+        return -2;
+    }
+
+    @Override
     public @Nullable VirtualMachineProduct getProduct(@Nonnull String productId) throws InternalException, CloudException {
         Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
         
@@ -94,7 +102,7 @@ public class NovaServer implements VirtualMachineSupport {
         }
         try {
             for( VirtualMachineProduct product : listProducts(Architecture.I64) ) {
-                if( product.getProductId().equals(productId) ) {
+                if( product.getProviderProductId().equals(productId) ) {
                     return product;
                 }
             }
@@ -160,74 +168,103 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
+    public @Nonnull Requirement identifyPasswordRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyRootVolumeRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyShellKeyRequirement() throws CloudException, InternalException {
+        if( provider.getIdentityServices().getShellKeySupport() == null ) {
+            return Requirement.NONE;
+        }
+        return Requirement.OPTIONAL;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyVlanRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public boolean isAPITerminationPreventable() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isBasicAnalyticsSupported() throws CloudException, InternalException {
+        return true;
+    }
+
+    @Override
+    public boolean isExtendedAnalyticsSupported() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         return (provider.testContext() != null);
     }
 
     @Override
-    public @Nonnull VirtualMachine launch(@Nonnull String fromMachineImageId, @Nonnull VirtualMachineProduct product, @Nullable String dataCenterId, @Nonnull String name, @Nonnull String description, @Nullable String withKeypairId, @Nullable String inVlanId, boolean withAnalytics, boolean asSandbox, @Nullable String... firewallIds) throws InternalException, CloudException {
-        return launch(fromMachineImageId, product, dataCenterId, name, description, withKeypairId, inVlanId, withAnalytics, asSandbox, firewallIds, new Tag[0]);
+    public boolean isUserDataSupported() throws CloudException, InternalException {
+        return true;
     }
 
     @Override
-    public @Nonnull VirtualMachine launch(@Nonnull String fromMachineImageId, @Nonnull VirtualMachineProduct product, @Nullable String dataCenterId, @Nonnull String name, @Nonnull String description, @Nullable String withKeypairId, @Nullable String inVlanId, boolean withAnalytics, boolean asSandbox, @Nullable String[] firewallIds, @Nullable Tag... tags) throws InternalException, CloudException {
+    public @Nonnull VirtualMachine launch(VMLaunchOptions options) throws CloudException, InternalException {
         Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
-        
+
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaServer.class.getName() + ".launch(" + fromMachineImageId + "," + product + "," + dataCenterId + "," + name + "," + description + "," + withKeypairId + "," + inVlanId + "," + withAnalytics + "," + asSandbox + "," + Arrays.toString(firewallIds) + "," + Arrays.toString(tags) + ")");
+            logger.trace("enter - " + NovaServer.class.getName() + ".launch(" + options + ")");
         }
         try {
-            MachineImage targetImage = provider.getComputeServices().getImageSupport().getMachineImage(fromMachineImageId);
+            MachineImage targetImage = provider.getComputeServices().getImageSupport().getMachineImage(options.getMachineImageId());
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
             HashMap<String,Object> json = new HashMap<String,Object>();
             NovaMethod method = new NovaMethod(provider);
 
-            json.put("name", name);
+            json.put("name", options.getHostName());
             if( provider.getMinorVersion() == 0 && provider.getMajorVersion() == 1 ) {
-                json.put("imageId", String.valueOf(fromMachineImageId));                
-                json.put("flavorId", String.valueOf(product.getProductId()));
+                json.put("imageId", String.valueOf(options.getMachineImageId()));
+                json.put("flavorId", options.getStandardProductId());
             }
             else {
                 if( provider.getProviderName().equals("HP") ) {
-                    json.put("imageRef", fromMachineImageId);
+                    json.put("imageRef", options.getMachineImageId());
                 }
                 else {
-                    json.put("imageRef", provider.getComputeServices().getImageSupport().getImageRef(fromMachineImageId));
+                    json.put("imageRef", provider.getComputeServices().getImageSupport().getImageRef(options.getMachineImageId()));
                 }
-                json.put("flavorRef", getFlavorRef(product.getProductId()));
+                json.put("flavorRef", getFlavorRef(options.getStandardProductId()));
             }
-            if( withKeypairId != null ) {
-                json.put("key_name", withKeypairId);
+            if( options.getBootstrapKey() != null ) {
+                json.put("key_name", options.getBootstrapKey());
             }
-            if( firewallIds != null && firewallIds.length > 0 ) {
+            if( options.getFirewallIds().length > 0 ) {
                 ArrayList<HashMap<String,Object>> firewalls = new ArrayList<HashMap<String,Object>>();
-                
-                for( String id : firewallIds ) {
+
+                for( String id : options.getFirewallIds() ) {
                     Firewall firewall = provider.getNetworkServices().getFirewallSupport().getFirewall(id);
 
                     if( firewall != null ) {
                         HashMap<String,Object> fw = new HashMap<String, Object>();
-                    
+
                         fw.put("name", firewall.getName());
                         firewalls.add(fw);
                     }
                 }
                 json.put("security_groups", firewalls);
             }
-            HashMap<String,Object> metaData = new HashMap<String,Object>();
-
-            if( tags != null ) {
-                for( Tag tag : tags ) {
-                    if( tag.getKey() != null && tag.getValue() != null ) {
-                        metaData.put(tag.getKey(), tag.getValue());
-                    }
-                }
-            }
             if( !targetImage.getPlatform().equals(Platform.UNKNOWN) ) {
-                metaData.put("dsnPlatform", targetImage.getPlatform().name());
+                options.getMetaData().put("dsnPlatform", targetImage.getPlatform().name());
             }
-            metaData.put("dsnDescription", description);
-            json.put("metadata", metaData);
+            options.getMetaData().put("dsnDescription", options.getDescription());
+            json.put("metadata", options.getMetaData());
             wrapper.put("server", json);
             JSONObject result = method.postServers("/servers", null, new JSONObject(wrapper), true);
 
@@ -235,7 +272,7 @@ public class NovaServer implements VirtualMachineSupport {
                 try {
                     JSONObject server = result.getJSONObject("server");
                     VirtualMachine vm = toVirtualMachine(server);
-                    
+
                     if( vm != null ) {
                         return vm;
                     }
@@ -255,8 +292,43 @@ public class NovaServer implements VirtualMachineSupport {
         finally {
             if( logger.isTraceEnabled() ) {
                 logger.trace("exit - " + NovaServer.class.getName() + ".launch()");
-            }            
+            }
         }
+    }
+
+    @Override
+    public @Nonnull VirtualMachine launch(@Nonnull String fromMachineImageId, @Nonnull VirtualMachineProduct product, @Nullable String dataCenterId, @Nonnull String name, @Nonnull String description, @Nullable String withKeypairId, @Nullable String inVlanId, boolean withAnalytics, boolean asSandbox, @Nullable String... firewallIds) throws InternalException, CloudException {
+        return launch(fromMachineImageId, product, dataCenterId, name, description, withKeypairId, inVlanId, withAnalytics, asSandbox, firewallIds, new Tag[0]);
+    }
+
+    @Override
+    public @Nonnull VirtualMachine launch(@Nonnull String fromMachineImageId, @Nonnull VirtualMachineProduct product, @Nullable String dataCenterId, @Nonnull String name, @Nonnull String description, @Nullable String withKeypairId, @Nullable String inVlanId, boolean withAnalytics, boolean asSandbox, @Nullable String[] firewallIds, @Nullable Tag... tags) throws InternalException, CloudException {
+        VMLaunchOptions options = VMLaunchOptions.getInstance(product.getProviderProductId(), fromMachineImageId, name, description);
+
+        if( inVlanId == null && dataCenterId != null ) {
+            options.inDataCenter(dataCenterId);
+        }
+        else if( inVlanId != null && dataCenterId != null ) { // TODO: when vlans are supported in OpenStack proper...
+            options.inVlan(null, dataCenterId, inVlanId);
+        }
+        if( withKeypairId != null ) {
+            options.withBoostrapKey(withKeypairId);
+        }
+        if( withAnalytics ) {
+            options.withExtendedAnalytics();
+        }
+        if( firewallIds != null ) {
+            options.behindFirewalls(firewallIds);
+        }
+        if( tags != null && tags.length > 0 ) {
+            HashMap<String,Object> md = new HashMap<String, Object>();
+
+            for( Tag t : tags ) {
+                md.put(t.getKey(), t.getValue());
+            }
+            options.withMetaData(md);
+        }
+        return launch(options);
     }
 
     @Override
@@ -418,6 +490,11 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
+    public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
+        return Collections.singletonList(Architecture.I64);
+    }
+
+    @Override
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
         Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
         
@@ -542,7 +619,7 @@ public class NovaServer implements VirtualMachineSupport {
             VirtualMachineProduct product = new VirtualMachineProduct();
             
             if( json.has("id") ) {
-                product.setProductId(json.getString("id"));
+                product.setProviderProductId(json.getString("id"));
             }
             if( json.has("name") ) {
                 product.setName(json.getString("name"));
@@ -551,17 +628,17 @@ public class NovaServer implements VirtualMachineSupport {
                 product.setDescription(json.getString("description"));
             }
             if( json.has("ram") ) {
-                product.setRamInMb(json.getInt("ram"));
+                product.setRamSize(new Storage<Megabyte>(json.getInt("ram"), Storage.MEGABYTE));
             }
             if( json.has("disk") ) {
-                product.setDiskSizeInGb(json.getInt("disk"));
+                product.setRootVolumeSize(new Storage<Gigabyte>(json.getInt("disk"), Storage.GIGABYTE));
             }
             product.setCpuCount(1);
-            if( product.getProductId() == null ) {
+            if( product.getProviderProductId() == null ) {
                 return null;
             }
             if( product.getName() == null ) {
-                product.setName(product.getProductId());
+                product.setName(product.getProviderProductId());
             }
             if( product.getDescription() == null ) {
                 product.setDescription(product.getName());
@@ -662,11 +739,11 @@ public class NovaServer implements VirtualMachineSupport {
                 JSONObject f = server.getJSONObject("flavor");
                 
                 if( f.has("id") ) {
-                    vm.setProduct(getProduct(f.getString("id")));
+                    vm.setProductId(f.getString("id"));
                 }
             }
             else if( server.has("flavorId") ) {
-                vm.setProduct(getProduct(server.getString("flavorId")));
+                vm.setProductId(server.getString("flavorId"));
             }
             if( server.has("adminPass") ) {
                 vm.setRootPassword("adminPass");

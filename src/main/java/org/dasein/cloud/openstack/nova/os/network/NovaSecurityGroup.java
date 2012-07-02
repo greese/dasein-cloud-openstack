@@ -64,20 +64,28 @@ public class NovaSecurityGroup implements FirewallSupport {
 
     @Override
     public @Nonnull String authorize(@Nonnull String firewallId, @Nullable String cidr, @Nonnull Protocol protocol, int beginPort, int endPort) throws CloudException, InternalException {
+        if( cidr == null ) {
+            cidr = "0.0.0.0/0";
+        }
+        return authorize(firewallId, Direction.INGRESS, cidr, protocol, beginPort, endPort);
+    }
+
+    @Override
+    public @Nonnull String authorize(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull String cidr, @Nonnull Protocol protocol, int beginPort, int endPort) throws CloudException, InternalException {
         Logger logger = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
 
         if( logger.isTraceEnabled() ) {
-            logger.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".authorize(" + firewallId + "," + cidr + "," + protocol + "," + beginPort + "," + endPort + ")");
+            logger.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".authorize(" + firewallId + "," + direction + "," + cidr + "," + protocol + "," + beginPort + "," + endPort + ")");
         }
         try {
+            if( direction.equals(Direction.EGRESS) ) {
+                throw new OperationNotSupportedException(provider.getCloudName() + " does not support egress rules.");
+            }
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
                 logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
-            }
-            if( cidr == null ) {
-                cidr = "0.0.0.0/0";
             }
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
             HashMap<String,Object> json = new HashMap<String,Object>();
@@ -94,7 +102,7 @@ public class NovaSecurityGroup implements FirewallSupport {
             if( result != null && result.has("security_group_rule") ) {
                 try {
                     JSONObject rule = result.getJSONObject("security_group_rule");
-                
+
                     return rule.getString("id");
                 }
                 catch( JSONException e ) {
@@ -359,6 +367,7 @@ public class NovaSecurityGroup implements FirewallSupport {
         }
     }
     
+    @SuppressWarnings("SimplifiableIfStatement")
     @Override
     public boolean isSubscribed() throws InternalException, CloudException {
         if( provider.getMajorVersion() > 1 && provider.getComputeServices().getVirtualMachineSupport().isSubscribed() ) {
@@ -429,12 +438,20 @@ public class NovaSecurityGroup implements FirewallSupport {
 
     @Override
     public void revoke(@Nonnull String firewallId, @Nonnull String cidr, @Nonnull Protocol protocol, int beginPort, int endPort) throws CloudException, InternalException {
+        revoke(firewallId, Direction.INGRESS, cidr, protocol, beginPort, endPort);
+    }
+
+    @Override
+    public void revoke(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull String cidr, @Nonnull Protocol protocol, int beginPort, int endPort) throws CloudException, InternalException {
         Logger std = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
 
         if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".revoke(" + firewallId + "," + cidr + "," + protocol + "," + beginPort + "," + endPort + ")");
+            std.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".revoke(" + firewallId + "," + direction + "," + cidr + "," + protocol + "," + beginPort + "," + endPort + ")");
         }
         try {
+            if( direction.equals(Direction.EGRESS) ) {
+                throw new OperationNotSupportedException(provider.getCloudName() + " does not support egress rules.");
+            }
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
@@ -482,7 +499,12 @@ public class NovaSecurityGroup implements FirewallSupport {
             }
         }
     }
-    
+
+    @Override
+    public boolean supportsRules(@Nonnull Direction direction, boolean inVlan) throws CloudException, InternalException {
+        return (direction.equals(Direction.INGRESS) && !inVlan);
+    }
+
     private @Nullable Firewall toFirewall(@Nonnull ProviderContext ctx, @Nonnull JSONObject json) throws JSONException {
         Firewall fw = new Firewall();
         String id = null, name = null;

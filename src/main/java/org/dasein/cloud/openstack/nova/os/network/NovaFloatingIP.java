@@ -26,6 +26,7 @@ import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.network.AddressType;
+import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.IpAddress;
 import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.IpForwardingRule;
@@ -42,8 +43,10 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -88,6 +91,11 @@ public class NovaFloatingIP implements IpAddressSupport {
                 logger.trace("EXIT: " + NovaFloatingIP.class.getName() + ".assign()");
             }
         }
+    }
+
+    @Override
+    public void assignToNetworkInterface(@Nonnull String addressId, @Nonnull String nicId) throws InternalException, CloudException {
+        throw new OperationNotSupportedException(provider.getCloudName() + " does not support network interfaces.");
     }
 
     @Override
@@ -138,9 +146,8 @@ public class NovaFloatingIP implements IpAddressSupport {
         }
     }
 
-    @Nonnull
     @Override
-    public String getProviderTermForIpAddress(@Nonnull Locale locale) {
+    public @Nonnull String getProviderTermForIpAddress(@Nonnull Locale locale) {
         return "floating IP";
     }
 
@@ -150,13 +157,28 @@ public class NovaFloatingIP implements IpAddressSupport {
     }
 
     @Override
+    public boolean isAssigned(@Nonnull IPVersion version) throws CloudException, InternalException {
+        return getVersions().contains(version);
+    }
+
+    @Override
     public boolean isForwarding() {
+        return false;
+    }
+
+    @Override
+    public boolean isForwarding(IPVersion version) throws CloudException, InternalException {
         return false;
     }
 
     @Override
     public boolean isRequestable(@Nonnull AddressType type) {
         return type.equals(AddressType.PUBLIC);
+    }
+
+    @Override
+    public boolean isRequestable(@Nonnull IPVersion version) throws CloudException, InternalException {
+        return getVersions().contains(version);
     }
 
     private boolean verifySupport() throws InternalException, CloudException {
@@ -174,6 +196,7 @@ public class NovaFloatingIP implements IpAddressSupport {
         }
     }
 
+    @SuppressWarnings("SimplifiableIfStatement")
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         if( provider.getMajorVersion() > 1 && provider.getComputeServices().getVirtualMachineSupport().isSubscribed() ) {
@@ -185,15 +208,18 @@ public class NovaFloatingIP implements IpAddressSupport {
         return false;
     }
 
-    @Nonnull
     @Override
-    public Iterable<IpAddress> listPrivateIpPool(boolean unassignedOnly) throws InternalException, CloudException {
+    public @Nonnull Iterable<IpAddress> listPrivateIpPool(boolean unassignedOnly) throws InternalException, CloudException {
         return Collections.emptyList();
     }
 
-    @Nonnull
     @Override
-    public Iterable<IpAddress> listPublicIpPool(boolean unassignedOnly) throws InternalException, CloudException {
+    public @Nonnull Iterable<IpAddress> listPublicIpPool(boolean unassignedOnly) throws InternalException, CloudException {
+        return listIpPool(IPVersion.IPV4, unassignedOnly);
+    }
+
+    @Override
+    public @Nonnull Iterable<IpAddress> listIpPool(@Nonnull IPVersion version, boolean unassignedOnly) throws InternalException, CloudException {
         Logger std = NovaOpenStack.getLogger(NovaFloatingIP.class, "std");
 
         if( std.isTraceEnabled() ) {
@@ -234,7 +260,7 @@ public class NovaFloatingIP implements IpAddressSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("list(): Unable to identify expected values in JSON: " + e.getMessage());                
+                std.error("list(): Unable to identify expected values in JSON: " + e.getMessage());
                 e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for floating IP in " + ob.toString());
             }
@@ -247,10 +273,27 @@ public class NovaFloatingIP implements IpAddressSupport {
         }
     }
 
-    @Nonnull
     @Override
-    public Iterable<IpForwardingRule> listRules(@Nonnull String addressId) throws InternalException, CloudException {
+    public @Nonnull Iterable<IpForwardingRule> listRules(@Nonnull String addressId) throws InternalException, CloudException {
         throw new OperationNotSupportedException("Forwarding not supported");
+    }
+
+    static private volatile List<IPVersion> versions;
+
+    private Collection<IPVersion> getVersions() {
+        if( versions == null ) {
+            ArrayList<IPVersion> tmp = new ArrayList<IPVersion>();
+
+            tmp.add(IPVersion.IPV4);
+            //tmp.add(IPVersion.IPV6);     TODO: when there's API support for IPv6
+            versions = Collections.unmodifiableList(tmp);
+        }
+        return versions;
+    }
+
+    @Override
+    public @Nonnull Iterable<IPVersion> listSupportedIPVersions() throws CloudException, InternalException {
+        return getVersions();
     }
 
     @Override
@@ -331,18 +374,22 @@ public class NovaFloatingIP implements IpAddressSupport {
         }
     }
 
-    @Nonnull
     @Override
-    public String request(@Nonnull AddressType typeOfAddress) throws InternalException, CloudException {
+    public @Nonnull String request(@Nonnull AddressType typeOfAddress) throws InternalException, CloudException {
+        if( typeOfAddress.equals(AddressType.PRIVATE) ) {
+            throw new OperationNotSupportedException("Requesting private IP addresses is not supported by OpenStack");
+        }
+        return request(IPVersion.IPV4);
+    }
+
+    @Override
+    public @Nonnull String request(@Nonnull IPVersion version) throws InternalException, CloudException {
         Logger logger = NovaOpenStack.getLogger(NovaFloatingIP.class, "std");
 
         if( logger.isTraceEnabled() ) {
-            logger.trace("ENTER: " + NovaFloatingIP.class.getName() + ".request(" + typeOfAddress + ")");
+            logger.trace("ENTER: " + NovaFloatingIP.class.getName() + ".request(" + version + ")");
         }
         try {
-            if( typeOfAddress.equals(AddressType.PRIVATE) ) {
-                throw new OperationNotSupportedException("Requesting private IP addresses is not supported by OpenStack");
-            }
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
@@ -383,10 +430,20 @@ public class NovaFloatingIP implements IpAddressSupport {
     }
 
     @Override
+    public @Nonnull String requestForVLAN(IPVersion version) throws InternalException, CloudException {
+        throw new OperationNotSupportedException(provider.getCloudName() + " does not support static IP addresses for VLANs");
+    }
+
+    @Override
     public void stopForward(@Nonnull String ruleId) throws InternalException, CloudException {
         throw new OperationNotSupportedException("Forwarding not supported");
     }
-    
+
+    @Override
+    public boolean supportsVLANAddresses(@Nonnull IPVersion ofVersion) throws InternalException, CloudException {
+        return false;
+    }
+
     private IpAddress toIP(ProviderContext ctx, JSONObject json) throws JSONException {
         if(json == null ) {
             return null;
@@ -417,6 +474,7 @@ public class NovaFloatingIP implements IpAddressSupport {
         if( id == null || ip == null ) {
             return null;
         }
+        address.setVersion(IPVersion.IPV4);
         return address;
     }
 }

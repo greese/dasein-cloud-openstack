@@ -27,6 +27,7 @@ import java.util.Map;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.identity.SSHKeypair;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.identity.ShellKeySupport;
@@ -41,6 +42,7 @@ import javax.annotation.Nonnull;
 
 public class NovaSSHKeys implements ShellKeySupport {
     static public final String CREATE_KEY_PAIR    = "CreateKeyPair";
+    static public final String IMPORT_KEY_PAIR    = "ImportKeyPair";
     static public final String DELETE_KEY_PAIR    = "DeleteKeyPair";
 	static public final String DESCRIBE_KEY_PAIRS = "DescribeKeyPairs";
 	
@@ -169,6 +171,11 @@ public class NovaSSHKeys implements ShellKeySupport {
 	}
 
     @Override
+    public Requirement getKeyImportSupport() throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
+    }
+
+    @Override
     public SSHKeypair getKeypair(String name) throws InternalException,	CloudException {
         ProviderContext ctx = provider.getContext();
 
@@ -236,6 +243,67 @@ public class NovaSSHKeys implements ShellKeySupport {
 	public String getProviderTermForKeypair(Locale locale) {
 		return "keypair";
 	}
+
+    @Override
+    public @Nonnull SSHKeypair importKeypair(@Nonnull String name, @Nonnull String material) throws InternalException, CloudException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new CloudException("No context was established for this call.");
+        }
+        String regionId = ctx.getRegionId();
+
+        if( regionId == null ) {
+            throw new CloudException("No region was set for this request.");
+        }
+        Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), IMPORT_KEY_PAIR);
+        NovaMethod method;
+        NodeList blocks;
+        Document doc;
+
+        parameters.put("KeyName", name);
+        parameters.put("PublicKeyMaterial", material);
+        method = new NovaMethod(provider, provider.getEc2Url(), parameters);
+        try {
+            doc = method.invoke();
+        }
+        catch( NovaException e ) {
+            throw new CloudException(e);
+        }
+        String fingerprint = null;
+
+        blocks = doc.getElementsByTagName("ImportKeyPairResponse");
+        for( int i=0; i<blocks.getLength(); i++ ) {
+            Node item = blocks.item(i);
+            NodeList attrs = item.getChildNodes();
+
+            for( int j=0; j<attrs.getLength(); j++ ) {
+                Node attr = attrs.item(j);
+
+                if( attr.getNodeName().equalsIgnoreCase("keyFingerPrint")) {
+                    fingerprint = attr.getFirstChild().getNodeValue();
+
+                }
+            }
+        }
+        if( fingerprint == null ) {
+            throw new CloudException("Invalid response to attempt to create the keypair");
+        }
+        SSHKeypair key = new SSHKeypair();
+
+        try {
+            key.setPrivateKey(material.getBytes("utf-8"));
+        }
+        catch( UnsupportedEncodingException e ) {
+            throw new InternalException(e);
+        }
+        key.setFingerprint(fingerprint);
+        key.setName(name);
+        key.setProviderKeypairId(name);
+        key.setProviderOwnerId(ctx.getAccountNumber());
+        key.setProviderRegionId(regionId);
+        return key;
+    }
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {

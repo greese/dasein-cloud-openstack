@@ -23,13 +23,18 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
+import org.dasein.cloud.compute.VolumeCreateOptions;
+import org.dasein.cloud.compute.VolumeProduct;
 import org.dasein.cloud.compute.VolumeState;
 import org.dasein.cloud.compute.VolumeSupport;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.util.uom.storage.Gigabyte;
+import org.dasein.util.uom.storage.Storage;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -38,6 +43,7 @@ import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -90,10 +96,20 @@ public class HPBlockStorage implements VolumeSupport {
 
     @Override
     public @Nonnull String create(@Nullable String fromSnapshot, @Nonnegative int sizeInGb, @Nonnull String inZone) throws InternalException, CloudException {
+        if( fromSnapshot != null ) {
+            return createVolume(VolumeCreateOptions.getInstanceForSnapshot(fromSnapshot, new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE), "volume-" + System.currentTimeMillis(), "dsn-auto-volume").inDataCenter(inZone));
+        }
+        else {
+            return createVolume(VolumeCreateOptions.getInstance(new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE), "volume-" + System.currentTimeMillis(), "dsn-auto-volume").inDataCenter(inZone));
+        }
+    }
+
+    @Override
+    public @Nonnull String createVolume(@Nonnull VolumeCreateOptions options) throws InternalException, CloudException {
         Logger logger = NovaOpenStack.getLogger(HPBlockStorage.class, "std");
 
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPBlockStorage.class.getName() + ".create(" + fromSnapshot + "," + sizeInGb + "," + inZone + ")");
+            logger.trace("enter - " + HPBlockStorage.class.getName() + ".createVolume(" + options + ")");
         }
         try {
             ProviderContext ctx = provider.getContext();
@@ -107,11 +123,11 @@ public class HPBlockStorage implements VolumeSupport {
             HashMap<String,Object> json = new HashMap<String,Object>();
             NovaMethod method = new NovaMethod(provider);
 
-            json.put("display_name", "volume-" + System.currentTimeMillis());
-            json.put("display_description", json.get("display_name"));
-            json.put("size", sizeInGb);
-            if( fromSnapshot != null ) {
-                json.put("snapshot_id", fromSnapshot);
+            json.put("display_name", options.getName());
+            json.put("display_description", options.getDescription());
+            json.put("size", options.getVolumeSize().intValue());
+            if( options.getSnapshotId() != null ) {
+                json.put("snapshot_id", options.getSnapshotId());
             }
             wrapper.put("volume", json);
             JSONObject result = method.postString(SERVICE, RESOURCE, null, new JSONObject(wrapper), true);
@@ -177,6 +193,22 @@ public class HPBlockStorage implements VolumeSupport {
     }
 
     @Override
+    public int getMaximumVolumeCount() throws InternalException, CloudException {
+        return -2;
+    }
+
+    @Override
+    public Storage<Gigabyte> getMaximumVolumeSize() throws InternalException, CloudException {
+        return new Storage<Gigabyte>(1024, Storage.GIGABYTE);
+    }
+
+    @Nonnull
+    @Override
+    public Storage<Gigabyte> getMinimumVolumeSize() throws InternalException, CloudException {
+        return new Storage<Gigabyte>(1, Storage.GIGABYTE);
+    }
+
+    @Override
     public @Nonnull String getProviderTermForVolume(@Nonnull Locale locale) {
         return "volume";
     }
@@ -220,6 +252,16 @@ public class HPBlockStorage implements VolumeSupport {
     }
 
     @Override
+    public @Nonnull Requirement getVolumeProductRequirement() throws InternalException, CloudException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public boolean isVolumeSizeDeterminedByProduct() throws InternalException, CloudException {
+        return false;
+    }
+
+    @Override
     public @Nonnull Iterable<String> listPossibleDeviceIds(@Nonnull Platform platform) throws InternalException, CloudException {
         ArrayList<String> list = new ArrayList<String>();
 
@@ -238,6 +280,11 @@ public class HPBlockStorage implements VolumeSupport {
             list.add("/dev/sdj");
         }
         return list;
+    }
+
+    @Override
+    public @Nonnull Iterable<VolumeProduct> listVolumeProducts() throws InternalException, CloudException {
+        return Collections.emptyList();
     }
 
     @Override
@@ -293,7 +340,7 @@ public class HPBlockStorage implements VolumeSupport {
     }
 
     @Override
-    public void remove(String volumeId) throws InternalException, CloudException {
+    public void remove(@Nonnull String volumeId) throws InternalException, CloudException {
         Logger logger = NovaOpenStack.getLogger(HPBlockStorage.class, "std");
 
         if( logger.isTraceEnabled() ) {
@@ -405,7 +452,7 @@ public class HPBlockStorage implements VolumeSupport {
             volume.setProviderSnapshotId(snapshotId);
             volume.setProviderVirtualMachineId(vmId);
             volume.setProviderVolumeId(volumeId);
-            volume.setSizeInGigabytes(size);
+            volume.setSize(new Storage<Gigabyte>(size, Storage.GIGABYTE));
     
             return volume;
         }

@@ -24,19 +24,25 @@ import java.util.Map;
 
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
+import org.dasein.cloud.compute.VolumeCreateOptions;
+import org.dasein.cloud.compute.VolumeProduct;
 import org.dasein.cloud.compute.VolumeState;
 import org.dasein.cloud.compute.VolumeSupport;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.ec2.NovaEC2;
 import org.dasein.cloud.openstack.nova.ec2.NovaException;
 import org.dasein.cloud.openstack.nova.ec2.NovaMethod;
+import org.dasein.util.uom.storage.Gigabyte;
+import org.dasein.util.uom.storage.Storage;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public class NovaVolume implements VolumeSupport {
 	static public final String ATTACH_VOLUME    = "AttachVolume";
@@ -70,33 +76,45 @@ public class NovaVolume implements VolumeSupport {
 	}
 
 	@Override
-	public String create(String fromSnapshot, int sizeInGb, String inZone) throws InternalException, CloudException {
-		Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), CREATE_VOLUME);
-		NovaMethod method;
-        NodeList blocks;
-		Document doc;
-
-		if( fromSnapshot != null ) {
-		    parameters.put("SnapshotId", fromSnapshot);
-		}
-		parameters.put("Size", String.valueOf(sizeInGb));
-		parameters.put("AvailabilityZone", inZone);
-		method = new NovaMethod(provider, provider.getEc2Url(), parameters);
-        try {
-        	doc = method.invoke();
+	public @Nonnull String create(@Nullable String fromSnapshot, int sizeInGb, @Nonnull String inZone) throws InternalException, CloudException {
+        if( fromSnapshot != null ) {
+            return createVolume(VolumeCreateOptions.getInstanceForSnapshot(fromSnapshot, new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE), "volume-" + System.currentTimeMillis(), "dsn-auto-volume").inDataCenter(inZone));
         }
-        catch( NovaException e ) {
-        	NovaEC2.getLogger(NovaVolume.class, "std").error(e.getSummary());
-        	throw new CloudException(e);
-        };
-        blocks = doc.getElementsByTagName("volumeId");
-        if( blocks.getLength() > 0 ) {
-        	return blocks.item(0).getFirstChild().getNodeValue().trim();
+        else {
+            return createVolume(VolumeCreateOptions.getInstance(new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE), "volume-" + System.currentTimeMillis(), "dsn-auto-volume").inDataCenter(inZone));
         }
-        return null;
 	}
 
-	@Override
+    @Override
+    public @Nonnull String createVolume(@Nonnull VolumeCreateOptions options) throws InternalException, CloudException {
+        Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), CREATE_VOLUME);
+        NovaMethod method;
+        NodeList blocks;
+        Document doc;
+
+        if( options.getSnapshotId() != null ) {
+            parameters.put("SnapshotId", options.getSnapshotId());
+        }
+        parameters.put("Size", String.valueOf(options.getVolumeSize().intValue()));
+        if( options.getDataCenterId() != null ) { 
+            parameters.put("AvailabilityZone", options.getDataCenterId());
+        }
+        method = new NovaMethod(provider, provider.getEc2Url(), parameters);
+        try {
+            doc = method.invoke();
+        }
+        catch( NovaException e ) {
+            NovaEC2.getLogger(NovaVolume.class, "std").error(e.getSummary());
+            throw new CloudException(e);
+        }
+        blocks = doc.getElementsByTagName("volumeId");
+        if( blocks.getLength() > 0 ) {
+            return blocks.item(0).getFirstChild().getNodeValue().trim();
+        }
+        throw new CloudException("Operation succeeded but no volume was specified");
+    }
+
+    @Override
 	public void remove(String volumeId) throws InternalException, CloudException {
 		Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), DELETE_VOLUME);
 		NovaMethod method;
@@ -144,7 +162,23 @@ public class NovaVolume implements VolumeSupport {
         }
 	}
 
-	@Override
+    @Override
+    public int getMaximumVolumeCount() throws InternalException, CloudException {
+        return 0;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public Storage<Gigabyte> getMaximumVolumeSize() throws InternalException, CloudException {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Nonnull
+    @Override
+    public Storage<Gigabyte> getMinimumVolumeSize() throws InternalException, CloudException {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
 	public String getProviderTermForVolume(Locale locale) {
 		return "volume";
 	}
@@ -174,8 +208,14 @@ public class NovaVolume implements VolumeSupport {
         }
         return list;
     }
-    
-	@Override
+
+    @Nonnull
+    @Override
+    public Iterable<VolumeProduct> listVolumeProducts() throws InternalException, CloudException {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
 	public Volume getVolume(String volumeId) throws InternalException, CloudException {
 		Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), DESCRIBE_VOLUMES);
 		NovaMethod method;
@@ -215,7 +255,18 @@ public class NovaVolume implements VolumeSupport {
         return null;
 	}
 
-	@Override
+    @Nonnull
+    @Override
+    public Requirement getVolumeProductRequirement() throws InternalException, CloudException {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
+    public boolean isVolumeSizeDeterminedByProduct() throws InternalException, CloudException {
+        return false;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Override
 	public Iterable<Volume> listVolumes() throws InternalException, CloudException {
 		Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), DESCRIBE_VOLUMES);
 		ArrayList<Volume> list = new ArrayList<Volume>();
@@ -272,7 +323,7 @@ public class NovaVolume implements VolumeSupport {
 			else if( name.equals("size") ) {
 				int size = Integer.parseInt(attr.getFirstChild().getNodeValue().trim());
 				
-				volume.setSizeInGigabytes(size);
+				volume.setSize(new Storage<Gigabyte>(size, Storage.GIGABYTE));
 			}
 			else if( name.equals("snapshotId") ) {
 				NodeList values = attr.getChildNodes();

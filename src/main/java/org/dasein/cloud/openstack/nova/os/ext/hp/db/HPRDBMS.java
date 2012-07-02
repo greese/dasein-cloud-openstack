@@ -41,6 +41,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -331,6 +332,62 @@ public class HPRDBMS implements RelationalDatabaseSupport {
     
     @Override
     public Iterable<DatabaseProduct> getDatabaseProducts(DatabaseEngine forEngine) throws CloudException, InternalException {
+        /*
+        if( DatabaseEngine.MYSQL55.equals(forEngine) ) {
+            Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
+
+            if( std.isTraceEnabled() ) {
+                std.trace("ENTER: " + HPRDBMS.class.getName() + ".getDatabaseProducts()");
+            }
+            try {
+                ProviderContext ctx = provider.getContext();
+
+                if( ctx == null ) {
+                    std.error("No context exists for this request");
+                    throw new InternalException("No context exists for this request");
+                }
+                NovaMethod method = new NovaMethod(provider);
+
+                JSONObject json = method.getResource(SERVICE, "/flavors", null, false);
+
+                ArrayList<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
+
+                if( json != null && json.has("flavors") ) {
+                    try {
+                        JSONArray flavors = json.getJSONArray("flavors");
+
+                        for( int i=0; i<flavors.length(); i++ ) {
+                            JSONObject flavor = flavors.getJSONObject(i);
+
+                            if( flavor != null ) {
+                                for( int size : new int[] { 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 } ) {
+                                    DatabaseProduct product = toProduct(ctx, size, flavor);
+
+                                    if( product != null ) {
+                                        products.add(product);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch( JSONException e ) {
+                        std.error("getDatabaseProducts(): Unable to identify expected values in JSON: " + e.getMessage());
+                        e.printStackTrace();
+                        throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors in " + json.toString());
+                    }
+                }
+                return products;
+            }
+            finally {
+                if( std.isTraceEnabled() ) {
+                    std.trace("exit - " + HPRDBMS.class.getName() + ".getDatabaseProducts()");
+                }
+            }
+        }
+        else {
+            return Collections.emptyList();
+        }
+*/
         // TODO: HP needs to provide a flavor lookup API call before this can be considered ready
         DatabaseProduct product = new DatabaseProduct("medium");
 
@@ -835,6 +892,55 @@ public class HPRDBMS implements RelationalDatabaseSupport {
             snapshot.setStorageInGigabytes(0);
             snapshot.setAdminUser(null);
             return snapshot;
+        }
+        catch( JSONException e ) {
+            throw new CloudException(e);
+        }
+    }
+
+    private @Nullable DatabaseProduct toProduct(@Nonnull ProviderContext ctx, @Nonnegative int size, @Nullable JSONObject json) throws CloudException, InternalException {
+        if( json == null ) {
+            return null;
+        }
+        try {
+            String id = (json.has("id") ? json.getString("id") : null);
+
+            if( id == null ) {
+                return null;
+            }
+
+            String name = (json.has("name") ? json.getString("name") : null);
+
+            if( name == null ) {
+                name = id + " (" + size + " GB)";
+            }
+            else {
+                name = name + " [" + size + " GB]";
+            }
+            id = id + ":" + size;
+
+            String regionId = ctx.getRegionId();
+
+            if( regionId == null ) {
+                throw new InternalException("No region is associated with this request");
+            }
+            DatabaseProduct product = new DatabaseProduct(id, name);
+
+            if( regionId.equals("LON") ) {
+                product.setCurrency("GBP");
+            }
+            else {
+                product.setCurrency("USD");
+            }
+            product.setEngine(DatabaseEngine.MYSQL55);
+            product.setHighAvailability(false);
+            product.setProviderDataCenterId(regionId + "-1");
+            product.setStandardHourlyRate(0.0f);
+            product.setStandardIoRate(0.0f);
+            product.setStandardStorageRate(0.0f);
+            product.setStorageInGigabytes(size);
+
+            return product;
         }
         catch( JSONException e ) {
             throw new CloudException(e);

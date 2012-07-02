@@ -25,12 +25,14 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.parsers.DocumentBuilderFactory;
 
@@ -38,9 +40,11 @@ import org.apache.commons.codec.binary.Base64;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.Platform;
+import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineProduct;
 import org.dasein.cloud.compute.VirtualMachineSupport;
@@ -50,6 +54,9 @@ import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.ec2.NovaEC2;
 import org.dasein.cloud.openstack.nova.ec2.NovaException;
 import org.dasein.cloud.openstack.nova.ec2.NovaMethod;
+import org.dasein.util.uom.storage.Gigabyte;
+import org.dasein.util.uom.storage.Megabyte;
+import org.dasein.util.uom.storage.Storage;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -89,9 +96,9 @@ public class NovaServer implements VirtualMachineSupport {
                     boolean x64 = prd.getAttributes().getNamedItem("x64").getNodeValue().trim().equalsIgnoreCase("true");
                     
                     product = new VirtualMachineProduct();
-                    product.setProductId(prd.getAttributes().getNamedItem("productId").getNodeValue().trim());
-                    product.setDiskSizeInGb(Integer.parseInt(prd.getAttributes().getNamedItem("diskSizeInGb").getNodeValue().trim()));
-                    product.setRamInMb(Integer.parseInt(prd.getAttributes().getNamedItem("ramInMb").getNodeValue().trim()));
+                    product.setProviderProductId(prd.getAttributes().getNamedItem("productId").getNodeValue().trim());
+                    product.setRootVolumeSize(new Storage<Gigabyte>(Integer.parseInt(prd.getAttributes().getNamedItem("diskSizeInGb").getNodeValue().trim()), Storage.GIGABYTE));
+                    product.setRamSize(new Storage<Megabyte>(Integer.parseInt(prd.getAttributes().getNamedItem("ramInMb").getNodeValue().trim()), Storage.MEGABYTE));
                     product.setCpuCount(Integer.parseInt(prd.getAttributes().getNamedItem("cpuCount").getNodeValue().trim()));
                     
                     NodeList attrs = prd.getChildNodes();
@@ -125,48 +132,48 @@ public class NovaServer implements VirtualMachineSupport {
             VirtualMachineProduct product = new VirtualMachineProduct();
             
             product = new VirtualMachineProduct();
-            product.setProductId("m1.small");
+            product.setProviderProductId("m1.small");
             product.setName("Small Instance (m1.small)");
             product.setDescription("Small Instance (m1.small)");
             product.setCpuCount(1);
-            product.setDiskSizeInGb(160);
-            product.setRamInMb(1700);
+            product.setRootVolumeSize(new Storage<Gigabyte>(160, Storage.GIGABYTE));
+            product.setRamSize(new Storage<Megabyte>(1700, Storage.MEGABYTE));
             sizes.add(product);        
     
             product = new VirtualMachineProduct();
-            product.setProductId("c1.medium");
+            product.setProviderProductId("c1.medium");
             product.setName("High-CPU Medium Instance (c1.medium)");
             product.setDescription("High-CPU Medium Instance (c1.medium)");
             product.setCpuCount(5);
-            product.setDiskSizeInGb(350);
-            product.setRamInMb(1700);
+            product.setRootVolumeSize(new Storage<Gigabyte>(350, Storage.GIGABYTE));
+            product.setRamSize(new Storage<Megabyte>(1700, Storage.MEGABYTE));
             sizes.add(product);   
     
             product = new VirtualMachineProduct();
-            product.setProductId("m1.large");
+            product.setProviderProductId("m1.large");
             product.setName("Large Instance (m1.large)");
             product.setDescription("Large Instance (m1.large)");
             product.setCpuCount(4);
-            product.setDiskSizeInGb(850);
-            product.setRamInMb(7500);
+            product.setRootVolumeSize(new Storage<Gigabyte>(850, Storage.GIGABYTE));
+            product.setRamSize(new Storage<Megabyte>(7500, Storage.MEGABYTE));
             sizes.add(product); 
             
             product = new VirtualMachineProduct();
-            product.setProductId("m1.xlarge");
+            product.setProviderProductId("m1.xlarge");
             product.setName("Extra Large Instance (m1.xlarge)");
             product.setDescription("Extra Large Instance (m1.xlarge)");
             product.setCpuCount(8);
-            product.setDiskSizeInGb(1690);
-            product.setRamInMb(15000);
+            product.setRootVolumeSize(new Storage<Gigabyte>(1690, Storage.GIGABYTE));
+            product.setRamSize(new Storage<Megabyte>(15000, Storage.MEGABYTE));
             sizes.add(product); 
             
             product = new VirtualMachineProduct();
-            product.setProductId("c1.xlarge");
+            product.setProviderProductId("c1.xlarge");
             product.setName("High-CPU Extra Large Instance (c1.xlarge)");
             product.setDescription("High-CPU Extra Large Instance (c1.xlarge)");
             product.setCpuCount(20);
-            product.setDiskSizeInGb(1690);
-            product.setRamInMb(7000);
+            product.setRootVolumeSize(new Storage<Gigabyte>(1690, Storage.GIGABYTE));
+            product.setRamSize(new Storage<Megabyte>(7000, Storage.MEGABYTE));
             sizes.add(product); 
             
             thirtyTwos = Collections.unmodifiableList(sizes);
@@ -302,7 +309,12 @@ public class NovaServer implements VirtualMachineSupport {
 		}
 	}
 
-	@Override
+    @Override
+    public int getMaximumVirtualMachineCount() throws CloudException, InternalException {
+        return -2;
+    }
+
+    @Override
 	public Iterable<String> listFirewalls(String instanceId) throws InternalException, CloudException {
 		Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), DESCRIBE_INSTANCES);
 		ArrayList<String> firewalls = new ArrayList<String>();
@@ -396,12 +408,12 @@ public class NovaServer implements VirtualMachineSupport {
 	public VirtualMachineProduct getProduct(String sizeId) {
         System.out.println("Looking for: " + sizeId + " among " + get64s());
         for( VirtualMachineProduct product : get64s() ) {
-            if( product.getProductId().equals(sizeId) ) {
+            if( product.getProviderProductId().equals(sizeId) ) {
                 return product;
             }
         }
         for( VirtualMachineProduct product : get32s() ) {
-            if( product.getProductId().equals(sizeId) ) {
+            if( product.getProviderProductId().equals(sizeId) ) {
                 return product;
             }
         }
@@ -443,7 +455,42 @@ public class NovaServer implements VirtualMachineSupport {
     public Iterable<VmStatistics> getVMStatisticsForPeriod(String instanceId, long startTimestamp, long endTimestamp) throws InternalException, CloudException {
         return Collections.emptyList();
     }
-    
+
+    @Override
+    public @Nonnull Requirement identifyPasswordRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyRootVolumeRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyShellKeyRequirement() throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyVlanRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public boolean isAPITerminationPreventable() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isBasicAnalyticsSupported() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isExtendedAnalyticsSupported() throws CloudException, InternalException {
+        return false;
+    }
+
     @Override
     public boolean isSubscribed() throws InternalException, CloudException {
         Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), DESCRIBE_INSTANCES);
@@ -466,7 +513,175 @@ public class NovaServer implements VirtualMachineSupport {
             throw new CloudException(e);
         }
     }
-    
+
+    @Override
+    public boolean isUserDataSupported() throws CloudException, InternalException {
+        return true;
+    }
+
+    @Nonnull
+    @Override
+    public VirtualMachine launch(VMLaunchOptions options) throws CloudException, InternalException {
+        Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), RUN_INSTANCES);
+        NovaMethod method;
+        NodeList blocks;
+        Document doc;
+
+        parameters.put("ImageId", options.getMachineImageId());
+        parameters.put("MinCount", "1");
+        parameters.put("MaxCount", "1");
+        parameters.put("InstanceType", options.getStandardProductId());
+        if( options.getFirewallIds().length > 0 ) {
+            int i = 1;
+
+            for( String id : options.getFirewallIds() ) {
+                parameters.put("SecurityGroup." + (i++), id);
+            }
+        }
+        if( options.getDataCenterId() != null ) {
+            parameters.put("Placement.AvailabilityZone", options.getDataCenterId());
+        }
+        if( options.getBootstrapKey() != null ) {
+            parameters.put("KeyName", options.getBootstrapKey());
+        }
+        if( options.getVlanId() != null ) {
+            parameters.put("SubnetId", options.getVlanId());
+        }
+        method = new NovaMethod(provider, provider.getEc2Url(), parameters);
+        try {
+            doc = method.invoke();
+        }
+        catch( NovaException e ) {
+            String code = e.getCode();
+
+            if( code != null && code.equals("InsufficientInstanceCapacity") ) {
+                return null;
+            }
+            NovaEC2.getLogger(NovaServer.class, "std").error(e.getSummary());
+            throw new CloudException(e);
+        }
+        blocks = doc.getElementsByTagName("instancesSet");
+        VirtualMachine server = null;
+        for( int i=0; i<blocks.getLength(); i++ ) {
+            NodeList instances = blocks.item(i).getChildNodes();
+
+            for( int j=0; j<instances.getLength(); j++ ) {
+                Node instance = instances.item(j);
+
+                if( instance.getNodeName().equals("item") ) {
+                    server = toVirtualMachine(instance);
+                    if( server != null ) {
+                        break;
+                    }
+                }
+            }
+        }
+        if( server != null && options.getBootstrapKey() != null ) {
+            try {
+                final String sid = server.getProviderVirtualMachineId();
+
+                Callable<String> pwMethod = new Callable<String>() {
+                    public String call() throws CloudException {
+                        try {
+                            Map<String,String> params = provider.getStandardParameters(provider.getContext(), GET_PASSWORD_DATA);
+                            NovaMethod m;
+
+                            params.put("InstanceId", sid);
+                            m = new NovaMethod(provider, provider.getEc2Url(), params);
+
+                            Document doc = m.invoke();
+                            NodeList blocks = doc.getElementsByTagName("passwordData");
+
+                            if( blocks.getLength() > 0 ) {
+                                Node pw = blocks.item(0);
+
+                                if( pw.hasChildNodes() ) {
+                                    String password = pw.getFirstChild().getNodeValue();
+
+                                    provider.release();
+                                    return password;
+                                }
+                                return null;
+                            }
+                            return null;
+                        }
+                        catch( Throwable t ) {
+                            throw new CloudException("Unable to retrieve password for " + sid + ", Let's hope it's Unix: " + t.getMessage());
+                        }
+                    }
+                };
+
+                provider.hold();
+                try {
+                    String password = pwMethod.call();
+
+                    if( password == null ) {
+                        server.setRootPassword(null);
+                        server.setPasswordCallback(pwMethod);
+                    }
+                    else {
+                        server.setRootPassword(password);
+                    }
+                    server.setPlatform(Platform.WINDOWS);
+                }
+                catch( CloudException e ) {
+                    NovaEC2.getLogger(NovaServer.class, "std").warn(e.getMessage());
+                }
+            }
+            catch( Throwable t ) {
+                NovaEC2.getLogger(NovaServer.class, "std").warn("Unable to retrieve password for " + server.getProviderVirtualMachineId() + ", Let's hope it's Unix: " + t.getMessage());
+            }
+        }
+        Map<String,Object> meta = options.getMetaData();
+        Tag[] toCreate;
+        int i = 0;
+
+        if( meta.isEmpty() ) {
+            toCreate = new Tag[2];
+        }
+        else {
+            int count = 0;
+
+            for( Map.Entry<String,Object> entry : meta.entrySet() ) {
+                if( entry.getKey().equalsIgnoreCase("name") || entry.getKey().equalsIgnoreCase("description") ) {
+                    continue;
+                }
+                count++;
+            }
+            toCreate = new Tag[count + 2];
+            for( Map.Entry<String,Object> entry : meta.entrySet() ) {
+                if( entry.getKey().equalsIgnoreCase("name") || entry.getKey().equalsIgnoreCase("description") ) {
+                    continue;
+                }
+                toCreate[i++] = new Tag(entry.getKey(), entry.getValue().toString());
+            }
+        }
+        Tag t = new Tag();
+
+        t.setKey("Name");
+        t.setValue(options.getFriendlyName());
+        toCreate[i++] = t;
+        t = new Tag();
+        t.setKey("Description");
+        t.setValue(options.getDescription());
+        toCreate[i] = t;
+        provider.createTags(server.getProviderVirtualMachineId(), toCreate);
+        while( server.getProviderDataCenterId().equals("unknown zone") ) {
+            try { Thread.sleep(1000L); }
+            catch( InterruptedException e ) { }
+            try {
+                server = getVirtualMachine(server.getProviderVirtualMachineId());
+                if( server == null ) {
+                    return null;
+                }
+            }
+            catch( Throwable ignore ) {
+                // ignore
+            }
+        }
+        return server;
+    }
+
     private List<VirtualMachineProduct> get64s() {
         return sixtyFours;
     }
@@ -487,8 +702,13 @@ public class NovaServer implements VirtualMachineSupport {
 		default: return Collections.emptyList();
 		}
 	}
-	
-	private String guess(String privateDnsAddress) {
+
+    @Override
+    public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    private String guess(String privateDnsAddress) {
 	    String dnsAddress = privateDnsAddress;
 	    String[] parts = dnsAddress.split("\\.");
 	    
@@ -508,164 +728,33 @@ public class NovaServer implements VirtualMachineSupport {
 	}
 
 	@Override
-	public VirtualMachine launch(String imageId, VirtualMachineProduct size, String inZoneId, String name, String description, String keypair, String inVlanId, boolean withMonitoring, boolean asImageSandbox, String[] protectedByFirewalls, Tag ... tags) throws CloudException, InternalException {
-		Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), RUN_INSTANCES);
-		NovaMethod method;
-        NodeList blocks;
-		Document doc;
-        
-        parameters.put("ImageId", imageId);
-        parameters.put("MinCount", "1");
-        parameters.put("MaxCount", "1");
-        parameters.put("InstanceType", size.getProductId());
-        if( protectedByFirewalls != null && protectedByFirewalls.length > 0 ) {
-        	int i = 1;
-        	
-        	for( String id : protectedByFirewalls ) {
-        		parameters.put("SecurityGroup." + (i++), id);
-        	}
+	public @Nonnull VirtualMachine launch(@Nonnull String imageId, @Nonnull VirtualMachineProduct size, @Nullable String inZoneId, @Nonnull String name, @Nonnull String description, String keypair, String inVlanId, boolean withMonitoring, boolean asImageSandbox, String[] firewallIds, Tag ... tags) throws CloudException, InternalException {
+        VMLaunchOptions options = VMLaunchOptions.getInstance(size.getProviderProductId(), imageId, name, description);
+
+        if( inVlanId == null && inZoneId != null ) {
+            options.inDataCenter(inZoneId);
         }
-        if( inZoneId != null ) {
-        	parameters.put("Placement.AvailabilityZone", inZoneId);
+        else if( inVlanId != null && inZoneId != null ) {
+            options.inVlan(null, inZoneId, inVlanId);
         }
         if( keypair != null ) {
-        	parameters.put("KeyName", keypair);
+            options.withBoostrapKey(keypair);
         }
-        if( inVlanId != null ) {
-        	parameters.put("SubnetId", inVlanId);
+        if( withMonitoring ) {
+            options.withExtendedAnalytics();
         }
-        method = new NovaMethod(provider, provider.getEc2Url(), parameters);
-        try {
-        	doc = method.invoke();
+        if( firewallIds != null ) {
+            options.behindFirewalls(firewallIds);
         }
-        catch( NovaException e ) {
-            String code = e.getCode();
-            
-            if( code != null && code.equals("InsufficientInstanceCapacity") ) {
-                return null;
-            }
-        	NovaEC2.getLogger(NovaServer.class, "std").error(e.getSummary());
-        	throw new CloudException(e);
-        }
-        blocks = doc.getElementsByTagName("instancesSet");
-        VirtualMachine server = null;
-        for( int i=0; i<blocks.getLength(); i++ ) {
-        	NodeList instances = blocks.item(i).getChildNodes();
-        	
-            for( int j=0; j<instances.getLength(); j++ ) {
-            	Node instance = instances.item(j);
-            	
-            	if( instance.getNodeName().equals("item") ) {
-            		server = toVirtualMachine(instance);
-            		if( server != null ) {
-            			break;
-            		}
-            	}
-            }
-        }
-        if( server != null && keypair != null ) {
-        	try {
-                final String sid = server.getProviderVirtualMachineId();
-                
-        	    Callable<String> pwMethod = new Callable<String>() {
-        	        public String call() throws CloudException {
-        	            try {
-        	                Map<String,String> params = provider.getStandardParameters(provider.getContext(), GET_PASSWORD_DATA);
-        	                NovaMethod m;
-        	                
-        	                params.put("InstanceId", sid);
-        	                m = new NovaMethod(provider, provider.getEc2Url(), params);
-        	                
-        	                Document doc = m.invoke();
-        	                NodeList blocks = doc.getElementsByTagName("passwordData");
-        	                
-        	                if( blocks.getLength() > 0 ) {
-        	                    Node pw = blocks.item(0);
+        if( tags != null && tags.length > 0 ) {
+            HashMap<String,Object> md = new HashMap<String, Object>();
 
-        	                    if( pw.hasChildNodes() ) {
-        	                        String password = pw.getFirstChild().getNodeValue();
-        	                    
-        	                        provider.release();
-        	                        return password;
-        	                    }
-        	                    return null;
-        	                }
-        	                return null;
-        	            }
-        	            catch( Throwable t ) {
-        	                throw new CloudException("Unable to retrieve password for " + sid + ", Let's hope it's Unix: " + t.getMessage());                       	                
-        	            }
-        	        }
-        	    };
-                
-        	    provider.hold();
-        	    try {
-        	        String password = pwMethod.call();
-        	    
-                    if( password == null ) {
-                        server.setRootPassword(null);
-                        server.setPasswordCallback(pwMethod);
-                    }
-                    else {
-                        server.setRootPassword(password);
-                    }
-                    server.setPlatform(Platform.WINDOWS);
-        	    }
-        	    catch( CloudException e ) {
-        	        NovaEC2.getLogger(NovaServer.class, "std").warn(e.getMessage());
-        	    }
-        	}
-        	catch( Throwable t ) {
-                NovaEC2.getLogger(NovaServer.class, "std").warn("Unable to retrieve password for " + server.getProviderVirtualMachineId() + ", Let's hope it's Unix: " + t.getMessage());               
-        	}
-        }
-        Tag[] toCreate;
-        int i = 0;
-        
-        if( tags == null ) {
-            toCreate = new Tag[2];
-        }
-        else {
-            int count = 0;
-            
             for( Tag t : tags ) {
-                if( t.getKey().equalsIgnoreCase("name") || t.getKey().equalsIgnoreCase("description") ) {
-                    continue;
-                }
-                count++;
+                md.put(t.getKey(), t.getValue());
             }
-            toCreate = new Tag[count + 2];
-            for( Tag t : tags ) {
-                if( t.getKey().equalsIgnoreCase("name") || t.getKey().equalsIgnoreCase("description") ) {
-                    continue;
-                }
-                toCreate[i++] = t;
-            }
+            options.withMetaData(md);
         }
-        Tag t = new Tag();
-        
-        t.setKey("Name");
-        t.setValue(name);
-        toCreate[i++] = t;
-        t = new Tag();
-        t.setKey("Description");
-        t.setValue(description);
-        toCreate[i++] = t;
-        provider.createTags(server.getProviderVirtualMachineId(), toCreate);
-        while( server.getProviderDataCenterId().equals("unknown zone") ) {
-            try { Thread.sleep(1000L); }
-            catch( InterruptedException e ) { }
-            try { 
-                server = getVirtualMachine(server.getProviderVirtualMachineId());           
-                if( server == null ) {
-                    return null;
-                }
-            }
-            catch( Throwable ignore ) {
-                // ignore
-            }
-        }
-        return server;
+        return launch(options);
 	}
 
 	@Override
@@ -787,6 +876,7 @@ public class NovaServer implements VirtualMachineSupport {
 		server.setCurrentState(VmState.PENDING);
 		server.setName(null);
 		server.setDescription(null);
+        server.setArchitecture(Architecture.I64);
 		for( int i=0; i<attrs.getLength(); i++ ) {
 			Node attr = attrs.item(i);
 			String name;
@@ -903,15 +993,8 @@ public class NovaServer implements VirtualMachineSupport {
             }
 			else if( name.equals("instanceType") && attr.hasChildNodes()) {
 				String value = attr.getFirstChild().getNodeValue().trim();
-				VirtualMachineProduct product = getProduct(value);
-				
-				server.setProduct(product);
-                if( product == null ) {
-                    server.setArchitecture(Architecture.I64);
-                }
-                else {
-                    server.setArchitecture(getArchitecture(product.getProductId()));
-                }
+
+				server.setProductId(value);
 			}
 			else if( name.equals("launchTime") ) {
 				String value = attr.getFirstChild().getNodeValue().trim();
@@ -949,9 +1032,7 @@ public class NovaServer implements VirtualMachineSupport {
             server.setName(server.getProviderVirtualMachineId());
         }
         if( server.getDescription() == null ) {
-            VirtualMachineProduct p = server.getProduct();
-            
-            server.setDescription(server.getName() + " (" + (p == null ? "unknown" : p.getName()) + ")");
+            server.setDescription(server.getName());
         }
 		return server;
 	}

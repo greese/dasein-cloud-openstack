@@ -1,8 +1,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
-  <artifactId>dasein-cloud-nova</artifactId>
-  <version>2012.04.2-SNAPSHOT</version>
+  <artifactId>dasein-cloud-openstack</artifactId>
+  <version>2012.07-SNAPSHOT</version>
   <name>Dasein Cloud Nova</name>
   <description>Dasein Cloud implementation for the Nova APIs</description>
   
@@ -40,14 +40,14 @@
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2012.04</version>
+        <version>2012.07-SNAPSHOT</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency> 
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-test</artifactId>
-        <version>2012.04.2</version>
+        <version>2012.07-SNAPSHOT</version>
         <scope>test</scope>
         <optional>false</optional>
     </dependency>      
@@ -57,23 +57,22 @@
         <version>2012.01</version>
         <scope>compile</scope>
         <optional>false</optional>
-    </dependency>  
-    <dependency>
-      <groupId>org.json</groupId>
-      <artifactId>json</artifactId>
-      <version>20090211</version>
-      <scope>compile</scope>
-    </dependency>     
+    </dependency>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
-      <version>4.8.2</version>
+      <version>4.9</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>commons-httpclient</groupId>
+        <artifactId>commons-httpclient</artifactId>
+        <version>3.1</version>
     </dependency>
     <dependency>
         <groupId>log4j</groupId>
         <artifactId>log4j</artifactId>
-        <version>1.2.16</version>
+        <version>1.2.17</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>  
@@ -84,6 +83,12 @@
     	<type>jar</type>
     	<scope>compile</scope>
     </dependency>
+      <dependency>
+          <groupId>org.json</groupId>
+          <artifactId>json</artifactId>
+          <version>20090211</version>
+          <scope>compile</scope>
+      </dependency>
   </dependencies>
   
   <build>
@@ -173,6 +178,7 @@
         <version>2.6</version>
         <configuration>
             <systemProperties>
+                <!--
                 <property>
                     <name>endpoint</name>
                     <value>${org.dasein.cloud.openstack.nova.ec2.endpoint}</value>
@@ -217,7 +223,7 @@
                     <name>test.product</name>
                     <value>${org.dasein.cloud.openstack.nova.ec2.test.product}</value>
                 </property>
-<!--
+                -->
                 <property>
                     <name>endpoint</name>
                     <value>${org.dasein.cloud.openstack.nova.os.endpoint}</value>
@@ -262,11 +268,10 @@
                     <name>test.product</name>
                     <value>${org.dasein.cloud.openstack.nova.os.test.product}</value>
                 </property>
-                -->
-            </systemProperties> 
+            </systemProperties>
           <includes>
-            <include>**/NovaEC2TestSuite.java</include>
-            <!-- <include>**/NovaOpenStackTestSuite.java</include> -->
+            <!-- <include>**/NovaEC2TestSuite.java</include> -->
+            <include>**/NovaOpenStackTestSuite.java</include>
           </includes>
         </configuration>
       </plugin>     
