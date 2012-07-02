@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<products>
+  <product productId="standard.xsmall" x32="false" x64="true" cpuCount="1" diskSizeInGb="40" ramInMb="1024">
+    <name>Standard/xSmall</name>
+    <description>
+      Standard/xSmall
+    </description>
+  </product>
+  <product productId="m1.small" x32="false" x64="true" cpuCount="2" diskSizeInGb="80" ramInMb="2048">
+    <name>Standard/Small</name>
+    <description>
+      Standard/Small
+    </description>
+  </product>
+  <product productId="standard.medium" x32="false" x64="true" cpuCount="2" diskSizeInGb="160" ramInMb="4096">
+    <name>Standard/Medium</name>
+    <description>
+      Standard/Medium
+    </description>
+  </product>  
+  <product productId="m1.large" x32="false" x64="true" cpuCount="4" diskSizeInGb="320" ramInMb="8192">
+    <name>Standard/Large</name>
+    <description>
+      Standard/Large
+    </description>
+  </product>    
+</products>
