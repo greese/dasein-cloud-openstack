@@ -47,7 +47,7 @@
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-test</artifactId>
-        <version>2012.09-SNAPSHOT</version>
+        <version>2012.09</version>
         <scope>test</scope>
         <optional>false</optional>
     </dependency>      
@@ -271,7 +271,7 @@
             </systemProperties>
           <includes>
             <!-- <include>**/NovaEC2TestSuite.java</include> -->
-            <include>**/NovaOpenStackTestSuite.java</include>
+            <!-- <include>**/NovaOpenStackTestSuite.java</include> -->
           </includes>
         </configuration>
       </plugin>     
