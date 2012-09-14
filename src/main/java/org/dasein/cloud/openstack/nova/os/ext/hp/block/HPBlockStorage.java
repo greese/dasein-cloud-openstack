@@ -54,7 +54,7 @@ import java.util.Locale;
  * @version 2012.04.1
  */
 public class HPBlockStorage implements VolumeSupport {
-    static public final String SERVICE  = "hpext:blockstore";
+    static public final String SERVICE  = "volume";
     static public final String RESOURCE = "/os-volumes";
     
     private NovaOpenStack provider;

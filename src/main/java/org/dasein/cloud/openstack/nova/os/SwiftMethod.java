@@ -93,7 +93,7 @@ public class SwiftMethod extends AbstractMethod {
     }
     
     @SuppressWarnings("unused")
-    public @Nonnull Map<String,String> head(@Nonnull String bucket) throws CloudException, InternalException {
+    public @Nullable Map<String,String> head(@Nonnull String bucket) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getStorageUrl();
 
@@ -103,7 +103,7 @@ public class SwiftMethod extends AbstractMethod {
         return head(context.getAuthToken(), endpoint, "/" + bucket);
     }
     
-    public @Nonnull Map<String,String> head(@Nonnull String bucket, @Nonnull String object) throws CloudException, InternalException {
+    public @Nullable Map<String,String> head(@Nonnull String bucket, @Nonnull String object) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getStorageUrl();
 

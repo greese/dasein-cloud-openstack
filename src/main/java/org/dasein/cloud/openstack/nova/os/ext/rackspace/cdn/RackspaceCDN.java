@@ -78,7 +78,7 @@ public class RackspaceCDN implements CDNSupport {
         }
         NovaMethod method = new NovaMethod(provider);
         Map<String,String> metaData = method.headResource(SERVICE, RESOURCE, distributionId);
-        
+
         if( metaData == null ) {
             return null;
         }
@@ -86,16 +86,29 @@ public class RackspaceCDN implements CDNSupport {
             
         distribution.setActive(true);
         distribution.setAliases(new String[0]);
+
+        String dnsName = null, cdnUri = null;
+        boolean enabled = false;
+
+        for( String key : metaData.keySet() ) {
+            if( key.equalsIgnoreCase("X-CDN-Enabled") ) {
+                String value = metaData.get(key);
+
+                enabled = (value != null && value.equalsIgnoreCase("true"));
+            }
+            else if( key.equalsIgnoreCase("X-CDN-SSL-URI") ) {
+                dnsName = metaData.get(key);
+            }
+            else if( key.equalsIgnoreCase("X-CDN-URI") ) {
+                cdnUri = metaData.get(key);
+            }
+        }
+        distribution.setDeployed(enabled);
         
-        String enabled = metaData.get("X-CDN-Enabled");
-        
-        distribution.setDeployed(enabled != null && enabled.equalsIgnoreCase("true"));
-        
-        String dnsName = metaData.get("X-CDN-SSL-URI");
         String prefix = "http://";
         
         if( dnsName == null ) {
-            dnsName = metaData.get("X-CDN-URI");
+            dnsName = cdnUri;
             if( dnsName == null ) {
                 return null;
             }

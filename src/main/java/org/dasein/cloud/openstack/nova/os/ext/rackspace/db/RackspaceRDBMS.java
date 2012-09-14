@@ -304,7 +304,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                 }
                 NovaMethod method = new NovaMethod(provider);
 
-                JSONObject json = method.getResource(SERVICE, "/flavors", "detail", false);
+                JSONObject json = method.getResource(SERVICE, "/flavors", null, false);
                 
                 ArrayList<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
                 
@@ -478,6 +478,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
             JSONObject json = method.getResource(SERVICE, RESOURCE, "detail", false);
 
+            System.out.println("JSON=" + json);
             if( json != null && json.has("instances") ) {
                 try {
                     JSONArray list = json.getJSONArray("instances");

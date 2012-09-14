@@ -572,7 +572,7 @@ public class RackspaceCloudDNS implements DNSSupport {
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        return (provider.getProviderName().equals("Rackspace") && provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        return (provider.getCloudName().contains("Rackspace") && provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
 
     }
 

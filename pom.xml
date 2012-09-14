@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-openstack</artifactId>
-  <version>2012.07-SNAPSHOT</version>
+  <version>2012.09-SNAPSHOT</version>
   <name>Dasein Cloud Nova</name>
   <description>Dasein Cloud implementation for the Nova APIs</description>
   
@@ -20,15 +20,15 @@
   </licenses>
   
   <organization>
-    <name>enStratus Networks LLC</name>
+    <name>enStratus Networks Inc</name>
     <url>http://www.enstratus.com</url>
   </organization>
-  
-  <scm>
-    <connection>scm:svn:https://dasein-cloud.svn.sourceforge.net/svnroot/dasein-cloud/trunk/dasein-cloud-nova</connection>
-    <developerConnection>scm:svn:https://dasein-cloud.svn.sourceforge.net/svnroot/dasein-cloud/trunk/dasein-cloud-nova</developerConnection>
-    <url>https://dasein-cloud.svn.sourceforge.net/svnroot/dasein-cloud/trunk/dasein-cloud-nova</url>
-  </scm>
+
+    <scm>
+        <connection>scm:git:git://github.com/greese/dasein-cloud-openstack.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/greese/dasein-cloud-openstack.git</developerConnection>
+        <url>http://github.com/greese/dasein-cloud-openstack</url>
+    </scm>
     
   <parent>
     <groupId>org.sonatype.oss</groupId>
@@ -40,21 +40,21 @@
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2012.07-SNAPSHOT</version>
+        <version>2012.09</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency> 
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-test</artifactId>
-        <version>2012.07-SNAPSHOT</version>
+        <version>2012.09-SNAPSHOT</version>
         <scope>test</scope>
         <optional>false</optional>
     </dependency>      
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-util</artifactId>
-        <version>2012.01</version>
+        <version>2012.08</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>

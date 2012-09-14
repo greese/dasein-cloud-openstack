@@ -42,10 +42,13 @@ import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.ec2.NovaEC2;
 import org.dasein.cloud.openstack.nova.ec2.NovaException;
 import org.dasein.cloud.openstack.nova.ec2.NovaMethod;
-import org.dasein.cloud.storage.CloudStoreObject;
+import org.dasein.cloud.storage.Blob;
+import org.dasein.cloud.storage.BlobStoreSupport;
+import org.dasein.cloud.storage.StorageServices;
 import org.dasein.util.Jiterator;
 import org.dasein.util.JiteratorPopulator;
 import org.dasein.util.PopulatorThread;
+import org.dasein.util.uom.storage.Storage;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -70,12 +73,26 @@ public class NovaImage implements MachineImageSupport {
 
     @Override
     public void downloadImage(String machineImageId, OutputStream toOutput) throws CloudException, InternalException {
-        CloudStoreObject manifest = getManifest(machineImageId);
-        
+        StorageServices services = provider.getStorageServices();
+
+        if( services == null ) {
+            throw new OperationNotSupportedException("No storage services");
+        }
+        BlobStoreSupport support = services.getBlobStoreSupport();
+
+        if( support == null ) {
+            throw new OperationNotSupportedException("No image store");
+        }
+        Blob manifest = getManifest(support, machineImageId);
+
         if( manifest == null ) {
             throw new CloudException("No such image manifest: " + machineImageId);
         }
-        String name = manifest.getName();
+        String name = manifest.getObjectName();
+
+        if( name == null ) {
+            throw new CloudException("Nonsense manifest: " + manifest);
+        }
         int idx = name.indexOf(".manifest.xml");
         
         if( idx < 1 ) {
@@ -85,9 +102,9 @@ public class NovaImage implements MachineImageSupport {
         idx = 0;
         while( true ) {
             String postfix = ".part." + (idx < 10 ? ("0" + idx) : String.valueOf(idx));
-            long len = provider.getStorageServices().getBlobStoreSupport().exists(manifest.getDirectory(), name + postfix, false);
+            Storage<org.dasein.util.uom.storage.Byte> len = support.getObjectSize(manifest.getBucketName(), name + postfix);
 
-            if( len < 1 ) {
+            if( len == null || len.getQuantity().longValue() < 1L ) {
                 return;
             }
             // TODO: get source file
@@ -151,18 +168,13 @@ public class NovaImage implements MachineImageSupport {
         return null;
     }
     
-	private CloudStoreObject getManifest(String imageId) throws CloudException, InternalException {
+	private Blob getManifest(BlobStoreSupport support, String imageId) throws CloudException, InternalException {
         String location = getImageLocation(imageId);
         
         if( location != null ) {
-	        String[] parts = location.split("/");
-	        CloudStoreObject file = new CloudStoreObject();
-	        
-	        file.setContainer(false);
-	        file.setDirectory(parts[0]);
-	        file.setLocation(location);
-	        file.setName(parts[1]);
-	        return file;
+            String[] parts = location.split("/");
+
+            return support.getObject(parts[0], parts[1]);
         }
         return null;
 	}		

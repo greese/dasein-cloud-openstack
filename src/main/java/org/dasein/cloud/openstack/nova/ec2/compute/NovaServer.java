@@ -18,7 +18,6 @@
 
 package org.dasein.cloud.openstack.nova.ec2.compute;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
@@ -188,7 +187,7 @@ public class NovaServer implements VirtualMachineSupport {
 	}
 
 	@Override
-	public void boot(String instanceId) throws InternalException, CloudException {
+	public void start(@Nonnull String instanceId) throws InternalException, CloudException {
         Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), START_INSTANCES);
         NovaMethod method;
         
@@ -360,12 +359,12 @@ public class NovaServer implements VirtualMachineSupport {
 	}
 	
 	@Override
-	public String getProviderTermForServer(Locale locale) {
+	public @Nonnull String getProviderTermForServer(@Nonnull Locale locale) {
 		return "instance";
 	}
 
 	@Override
-	public VirtualMachine getVirtualMachine(String instanceId) throws InternalException, CloudException {
+	public @Nullable VirtualMachine getVirtualMachine(@Nonnull String instanceId) throws InternalException, CloudException {
 		Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), DESCRIBE_INSTANCES);
 		NovaMethod method;
         NodeList blocks;
@@ -793,7 +792,7 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
 	@Override
-	public void pause(String instanceId) throws InternalException, CloudException {
+	public void stop(@Nonnull String instanceId) throws InternalException, CloudException {
         Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), STOP_INSTANCES);
         NovaMethod method;
         
@@ -824,7 +823,12 @@ public class NovaServer implements VirtualMachineSupport {
         }
 	}
 
-	private String resolve(String dnsName) {
+    @Override
+    public void resume(@Nonnull String vmId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Pause/resume is not supported by the EC2 api");
+    }
+
+    private String resolve(String dnsName) {
         if( dnsName != null && dnsName.length() > 0 ) {
             InetAddress[] addresses;
             
@@ -850,8 +854,33 @@ public class NovaServer implements VirtualMachineSupport {
     public boolean supportsAnalytics() throws CloudException, InternalException {
         return false;
     }
-    
-	@Override
+
+    @Override
+    public boolean supportsPauseUnpause(@Nonnull VirtualMachine vm) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsStartStop(@Nonnull VirtualMachine vm) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsSuspendResume(@Nonnull VirtualMachine vm) {
+        return false;
+    }
+
+    @Override
+    public void pause(@Nonnull String vmId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Pause/unpause is not supported by the EC2 API");
+    }
+
+    @Override
+    public void suspend(@Nonnull String vmId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Suspend/resume is not supported by the EC2 API");
+    }
+
+    @Override
 	public void terminate(String instanceId) throws InternalException, CloudException {
 		Map<String,String> parameters = provider.getStandardParameters(provider.getContext(), TERMINATE_INSTANCES);
 		NovaMethod method;
@@ -867,7 +896,12 @@ public class NovaServer implements VirtualMachineSupport {
         }
 	}
 
-	private VirtualMachine toVirtualMachine(Node instance) throws CloudException {
+    @Override
+    public void unpause(@Nonnull String vmId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("Pause/Unpause is not supported by the EC2 API");
+    }
+
+    private VirtualMachine toVirtualMachine(Node instance) throws CloudException {
 		NodeList attrs = instance.getChildNodes();
 		VirtualMachine server = new VirtualMachine();
 

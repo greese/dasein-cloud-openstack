@@ -62,11 +62,6 @@ public class NovaServer implements VirtualMachineSupport {
     private NovaOpenStack provider;
     
     NovaServer(NovaOpenStack provider) { this.provider = provider; }
-    
-    @Override
-    public void boot(@Nonnull String vmId) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Rackspace does not support pausing/booting of servers.");
-    }
 
     @Override
     public @Nonnull VirtualMachine clone(@Nonnull String vmId, @Nullable String intoDcId, @Nonnull String name, @Nonnull String description, boolean powerOn, @Nullable String... firewallIds) throws InternalException, CloudException {
@@ -224,6 +219,10 @@ public class NovaServer implements VirtualMachineSupport {
         }
         try {
             MachineImage targetImage = provider.getComputeServices().getImageSupport().getMachineImage(options.getMachineImageId());
+
+            if( targetImage == null ) {
+                throw new CloudException("No such machine image: " + options.getMachineImageId());
+            }
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
             HashMap<String,Object> json = new HashMap<String,Object>();
             NovaMethod method = new NovaMethod(provider);
@@ -536,7 +535,188 @@ public class NovaServer implements VirtualMachineSupport {
 
     @Override
     public void pause(@Nonnull String vmId) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("OpenStack does not allow VM pausing.");
+        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
+
+        if( logger.isTraceEnabled() ) {
+            logger.trace("enter - " + NovaServer.class.getName() + ".pause(" + vmId + ")");
+        }
+        try {
+            VirtualMachine vm = getVirtualMachine(vmId);
+
+            if( vm == null ) {
+                throw new CloudException("No such virtual machine: " + vmId);
+            }
+            if( !supportsPauseUnpause(vm) ) {
+                throw new OperationNotSupportedException("Pause/unpause is not supported in " + provider.getCloudName());
+            }
+            HashMap<String,Object> json = new HashMap<String,Object>();
+
+            json.put("pause", null);
+
+            NovaMethod method = new NovaMethod(provider);
+
+            method.postServers("/servers", vmId, new JSONObject(json), true);
+        }
+        finally {
+            if( logger.isTraceEnabled() ) {
+                logger.trace("exit - " + NovaServer.class.getName() + ".pause()");
+            }
+        }
+    }
+
+    @Override
+    public void resume(@Nonnull String vmId) throws InternalException, CloudException {
+        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
+
+        if( logger.isTraceEnabled() ) {
+            logger.trace("enter - " + NovaServer.class.getName() + ".pause(" + vmId + ")");
+        }
+        try {
+            VirtualMachine vm = getVirtualMachine(vmId);
+
+            if( vm == null ) {
+                throw new CloudException("No such virtual machine: " + vmId);
+            }
+            if( !supportsSuspendResume(vm) ) {
+                throw new OperationNotSupportedException("Suspend/resume is not supported in " + provider.getCloudName());
+            }
+            HashMap<String,Object> json = new HashMap<String,Object>();
+
+            json.put("resume", null);
+
+            NovaMethod method = new NovaMethod(provider);
+
+            method.postServers("/servers", vmId, new JSONObject(json), true);
+        }
+        finally {
+            if( logger.isTraceEnabled() ) {
+                logger.trace("exit - " + NovaServer.class.getName() + ".pause()");
+            }
+        }
+    }
+
+    @Override
+    public void start(@Nonnull String vmId) throws InternalException, CloudException {
+        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
+
+        if( logger.isTraceEnabled() ) {
+            logger.trace("enter - " + NovaServer.class.getName() + ".start(" + vmId + ")");
+        }
+        try {
+            VirtualMachine vm = getVirtualMachine(vmId);
+
+            if( vm == null ) {
+                throw new CloudException("No such virtual machine: " + vmId);
+            }
+            if( !supportsStartStop(vm) ) {
+                throw new OperationNotSupportedException("Start/stop is not supported in " + provider.getCloudName());
+            }
+            HashMap<String,Object> json = new HashMap<String,Object>();
+
+            json.put("os-start", null);
+
+            NovaMethod method = new NovaMethod(provider);
+
+            method.postServers("/servers", vmId, new JSONObject(json), true);
+        }
+        finally {
+            if( logger.isTraceEnabled() ) {
+                logger.trace("exit - " + NovaServer.class.getName() + ".start()");
+            }
+        }
+    }
+
+    @Override
+    public void stop(@Nonnull String vmId) throws InternalException, CloudException {
+        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
+
+        if( logger.isTraceEnabled() ) {
+            logger.trace("enter - " + NovaServer.class.getName() + ".stop(" + vmId + ")");
+        }
+        try {
+            VirtualMachine vm = getVirtualMachine(vmId);
+
+            if( vm == null ) {
+                throw new CloudException("No such virtual machine: " + vmId);
+            }
+            if( !supportsStartStop(vm) ) {
+                throw new OperationNotSupportedException("Start/stop is not supported in " + provider.getCloudName());
+            }
+            HashMap<String,Object> json = new HashMap<String,Object>();
+
+            json.put("os-stop", null);
+
+            NovaMethod method = new NovaMethod(provider);
+
+            method.postServers("/servers", vmId, new JSONObject(json), true);
+        }
+        finally {
+            if( logger.isTraceEnabled() ) {
+                logger.trace("exit - " + NovaServer.class.getName() + ".stop()");
+            }
+        }
+    }
+
+    @Override
+    public void suspend(@Nonnull String vmId) throws InternalException, CloudException {
+        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
+
+        if( logger.isTraceEnabled() ) {
+            logger.trace("enter - " + NovaServer.class.getName() + ".suspend(" + vmId + ")");
+        }
+        try {
+            VirtualMachine vm = getVirtualMachine(vmId);
+
+            if( vm == null ) {
+                throw new CloudException("No such virtual machine: " + vmId);
+            }
+            if( !supportsSuspendResume(vm) ) {
+                throw new OperationNotSupportedException("Suspend/resume is not supported in " + provider.getCloudName());
+            }
+            HashMap<String,Object> json = new HashMap<String,Object>();
+
+            json.put("suspend", null);
+
+            NovaMethod method = new NovaMethod(provider);
+
+            method.postServers("/servers", vmId, new JSONObject(json), true);
+        }
+        finally {
+            if( logger.isTraceEnabled() ) {
+                logger.trace("exit - " + NovaServer.class.getName() + ".suspend()");
+            }
+        }
+    }
+
+    @Override
+    public void unpause(@Nonnull String vmId) throws InternalException, CloudException {
+        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
+
+        if( logger.isTraceEnabled() ) {
+            logger.trace("enter - " + NovaServer.class.getName() + ".unpause(" + vmId + ")");
+        }
+        try {
+            VirtualMachine vm = getVirtualMachine(vmId);
+
+            if( vm == null ) {
+                throw new CloudException("No such virtual machine: " + vmId);
+            }
+            if( !supportsPauseUnpause(vm) ) {
+                throw new OperationNotSupportedException("Pause/unpause is not supported in " + provider.getCloudName());
+            }
+            HashMap<String,Object> json = new HashMap<String,Object>();
+
+            json.put("unpause", null);
+
+            NovaMethod method = new NovaMethod(provider);
+
+            method.postServers("/servers", vmId, new JSONObject(json), true);
+        }
+        finally {
+            if( logger.isTraceEnabled() ) {
+                logger.trace("exit - " + NovaServer.class.getName() + ".unpause()");
+            }
+        }
     }
 
     @Override
@@ -572,6 +752,21 @@ public class NovaServer implements VirtualMachineSupport {
     @Override
     public boolean supportsAnalytics() throws CloudException, InternalException {
         return false;
+    }
+
+    @Override
+    public boolean supportsPauseUnpause(@Nonnull VirtualMachine vm) {
+        return (!provider.isHP() && (!provider.isRackspace() || !provider.getCloudName().contains("Rackspace")));
+    }
+
+    @Override
+    public boolean supportsStartStop(@Nonnull VirtualMachine vm) {
+        return (!provider.isHP() && (!provider.isRackspace() || !provider.getCloudName().contains("Rackspace")));
+    }
+
+    @Override
+    public boolean supportsSuspendResume(@Nonnull VirtualMachine vm) {
+        return (!provider.isHP() && (!provider.isRackspace() || !provider.getCloudName().contains("Rackspace")));
     }
 
     @Override
@@ -761,7 +956,22 @@ public class NovaServer implements VirtualMachineSupport {
                     vm.setCurrentState(VmState.TERMINATED);
                 }
                 else if( s.equals("suspended") ) {
+                    vm.setCurrentState(VmState.SUSPENDED);
+                }
+                else if( s.equalsIgnoreCase("paused") ) {
                     vm.setCurrentState(VmState.PAUSED);
+                }
+                else if( s.equalsIgnoreCase("stopped") ) {
+                    vm.setCurrentState(VmState.STOPPED);
+                }
+                else if( s.equalsIgnoreCase("stopping") ) {
+                    vm.setCurrentState(VmState.STOPPING);
+                }
+                else if( s.equalsIgnoreCase("pausing") ) {
+                    vm.setCurrentState(VmState.PAUSING);
+                }
+                else if( s.equalsIgnoreCase("suspending") ) {
+                    vm.setCurrentState(VmState.SUSPENDING);
                 }
                 else if( s.equals("error") ) {
                     return null;

@@ -26,6 +26,8 @@ import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
@@ -340,11 +342,20 @@ public abstract class AbstractMethod {
                                     if( url != null ) {
                                         String version = test.optString("versionId");
 
+                                        if( version == null || version.equals("") ) {
+                                            std.debug("No versionId parameter... Parsing URL " + url + " for best guess.  (vSadTrombone)");
+                                            Pattern p = Pattern.compile("/v(.+?)/|/v(.+?)$");
+                                            Matcher m = p.matcher(url);
+                                            if (m.find()) {
+                                                version = m.group(1);
+                                                if (version == null)
+                                                    version = m.group(2);
+                                            } else {
+                                                version = "1.0";
+                                            }
+                                        }
                                         if( std.isDebugEnabled() ) {
                                             std.debug("authenticateKeystone(): version[" + j + "]=" + version);
-                                        }
-                                        if( version == null || version.equals("") ) {
-                                            version = "1.0";
                                         }
                                         if( NovaOpenStack.isSupported(version) ) {
                                             String regionId = (test.has("region") ? test.getString("region") : null);
@@ -2175,19 +2186,19 @@ public abstract class AbstractMethod {
         }
 		//Assumes only x.x granularity.   Anything more will require rewrite of this component.
 		try {
-			String majorStr1 = ver1.substring(0,ver1.indexOf("."));
-			String minorStr1 = ver1.substring(ver1.indexOf(".")+1);
-			String majorStr2 = ver2.substring(0,ver1.indexOf("."));
-			String minorStr2 = ver2.substring(ver1.indexOf(".")+1);
-			int major1 = Integer.parseInt(majorStr1);
-			int minor1 = Integer.parseInt(minorStr1);
-			int major2 = Integer.parseInt(majorStr2);
-			int minor2 = Integer.parseInt(minorStr2);
-			result = major1 - major2;
-			if (result==0) 
-				result = minor1 - minor2;
+            String majorStr1 = ver1.contains(".") ? ver1.substring(0,ver1.indexOf(".")) : ver1;
+            String minorStr1 = ver1.contains(".") ? ver1.substring(ver1.indexOf(".")+1) : "0";
+            String majorStr2 = ver2.contains(".") ? ver2.substring(0,ver2.indexOf(".")) : ver2;
+            String minorStr2 = ver2.contains(".") ? ver2.substring(ver2.indexOf(".")+1) : "0";
+            int major1 = Integer.parseInt(majorStr1);
+            int minor1 = Integer.parseInt(minorStr1);
+            int major2 = Integer.parseInt(majorStr2);
+            int minor2 = Integer.parseInt(minorStr2);
+            result = major1 - major2;
+            if (result==0)
+                result = minor1 - minor2;
 		} catch (Exception e) {
-			// Something really stupid showed up in the version string... 
+			// Something really stupid showed up in the version string...
             throw new InternalException(e);
 		}
         finally {

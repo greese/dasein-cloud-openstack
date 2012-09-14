@@ -261,6 +261,14 @@ public class NovaOpenStack extends AbstractCloud {
         return new NovaNetworkServices(this);
     }
 
+    public boolean isHP() {
+        return getProviderName().equalsIgnoreCase("hp");
+    }
+
+    public boolean isRackspace() {
+        return getProviderName().equalsIgnoreCase("rackspace");
+    }
+
     public boolean isPostCactus() throws CloudException, InternalException {
         return (getMajorVersion() > 1 || getMinorVersion() > 0);
     }
