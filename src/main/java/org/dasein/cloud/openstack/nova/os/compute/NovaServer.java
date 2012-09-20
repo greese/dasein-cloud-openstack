@@ -961,7 +961,7 @@ public class NovaServer implements VirtualMachineSupport {
                 else if( s.equalsIgnoreCase("paused") ) {
                     vm.setCurrentState(VmState.PAUSED);
                 }
-                else if( s.equalsIgnoreCase("stopped") ) {
+                else if( s.equalsIgnoreCase("stopped") || s.equalsIgnoreCase("shutoff")) {
                     vm.setCurrentState(VmState.STOPPED);
                 }
                 else if( s.equalsIgnoreCase("stopping") ) {
