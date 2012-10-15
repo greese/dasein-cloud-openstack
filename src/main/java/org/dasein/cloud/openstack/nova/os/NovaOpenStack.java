@@ -151,7 +151,7 @@ public class NovaOpenStack extends AbstractCloud {
                 AuthenticationContext ctx = getAuthenticationContext();
                 
                 if( ctx.getStorageUrl() == null ) {
-                    return super.getStorageServices();
+                    return null;
                 }
             }
             catch( CloudException e ) {
@@ -164,7 +164,7 @@ public class NovaOpenStack extends AbstractCloud {
             }
             return new SwiftStorageServices(this);
         }
-        return super.getStorageServices();
+        return new SwiftStorageServices(this);
     }
     
     

@@ -33,13 +33,15 @@ public class AuthenticationContext {
     private String                         authToken;
     private Map<String,Map<String,String>> endpoints;
     private String                         myRegion;
+    private String                         storageToken;
     private String                         tenantId;
 
-    public AuthenticationContext(@Nonnull String regionId, @Nonnull String token, @Nonnull String tenantId, @Nonnull Map<String,Map<String,String>> services) {
+    public AuthenticationContext(@Nonnull String regionId, @Nonnull String token, @Nonnull String tenantId, @Nonnull Map<String,Map<String,String>> services, @Nullable String storageToken) {
         myRegion = regionId;
         authToken = token;
         endpoints = services;
         this.tenantId = tenantId;
+        this.storageToken = storageToken;
     }
 
     public @Nonnull String getAuthToken() {
@@ -55,6 +57,13 @@ public class AuthenticationContext {
         return map.get(myRegion);
     }
     
+    public String getStorageToken() {
+        if( storageToken == null ) {
+            return getAuthToken();
+        }
+        return storageToken;
+    }
+        
     public @Nullable String getStorageUrl() {
         return getServiceUrl("object-store");
     }

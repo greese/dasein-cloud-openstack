@@ -89,6 +89,9 @@ public abstract class AbstractMethod {
             else {
                 if( endpoint.endsWith("1.0") || endpoint.endsWith("1.0/") || endpoint.endsWith("1.1") || endpoint.endsWith("1.1/")) {
                     auth = authenticateStandard(endpoint);
+                    if (auth == null) {
+                    	auth = authenticateSwift(endpoint);
+                    }
                     if( auth == null ) {
                         auth = authenticateKeystone(endpoint);
                     }
@@ -97,6 +100,9 @@ public abstract class AbstractMethod {
                     auth = authenticateKeystone(endpoint);
                     if( auth == null ) {
                         auth = authenticateStandard(endpoint);
+                    }
+                    if (auth == null) {
+                    	auth = authenticateSwift(endpoint);
                     }
                 }
             }
@@ -427,7 +433,7 @@ public abstract class AbstractMethod {
                             endpoints.put("region-a.geo-1", "https://region-a.geo-1.dbaas-mysql.hpcloudsvc.com:8779/v1.0/66565797737008");
                             services.put(HPRDBMS.SERVICE, endpoints);
                         }
-                        return new AuthenticationContext(myRegionId, id, tenantId, services);
+                        return new AuthenticationContext(myRegionId, id, tenantId, services, null);
                     }
                 }
             }
@@ -589,27 +595,28 @@ public abstract class AbstractMethod {
                             
                             if( map == null ) {
                                 map = new HashMap<String,String>();
-                                services.put("compute", map);
+                                map.put(thisRegion, computeUrl);
                             }
-                            map.put(thisRegion, computeUrl);
+                            services.put("compute", map);
                         }
                         if( objectUrl != null ) {
                             Map<String,String> map = services.get("object-store");
                             
                             if( map == null ) {
                                 map = new HashMap<String,String>();
-                                services.put("object-store", map);
+                                map.put(thisRegion, objectUrl);                     
                             }
-                            map.put(thisRegion, objectUrl);
+                            services.put("object-store", map);
                         }
                         if( cdnUrl != null ) {
                             Map<String,String> map = services.get("cdn");
 
                             if( map == null ) {
                                 map = new HashMap<String,String>();
-                                services.put("cdn", map);
+                                map.put(thisRegion, cdnUrl);
+                                
                             }
-                            map.put(thisRegion, cdnUrl);
+                            services.put("cdn", map);
                         }
                     }
                 }
@@ -624,12 +631,184 @@ public abstract class AbstractMethod {
                 std.warn("authenticateStandard(): No authentication token in response");
                 throw new CloudException("No authentication token in cloud response");
             }
-            return new AuthenticationContext(myRegion, authToken, tenantId, services);
+            return new AuthenticationContext(myRegion, authToken, tenantId, services, null);
         }
         finally {
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".authenticateStandard()");
             }           
+        }
+    }
+    
+    
+    private @Nullable AuthenticationContext authenticateSwift(@Nonnull String endpoint) throws CloudException, InternalException {
+        Logger std = NovaOpenStack.getLogger(NovaOpenStack.class, "std");
+        Logger wire = NovaOpenStack.getLogger(NovaOpenStack.class, "wire");
+        
+        if( std.isTraceEnabled() ) {
+            std.trace("enter - " + AbstractMethod.class.getName() + ".authenticate()");
+        }
+        String tenantId = provider.getContext().getAccountNumber();
+        String authToken = null, storageToken = null, myRegion = provider.getContext().getRegionId();
+        String thisRegion = toRegion(endpoint);
+        
+        if( myRegion == null ) {
+            myRegion = thisRegion;
+        }
+        if( wire.isDebugEnabled() ) {
+            wire.debug("--------------------------------------------------------> " + endpoint);
+            wire.debug("");
+        }
+        try {
+            HttpClient client = getClient();
+            GetMethod get = new GetMethod(endpoint);
+            
+            try {
+                ProviderContext ctx = provider.getContext();
+                String account;
+            
+                if( ctx.getAccessPublic().length < 1 ) {
+                    account = ctx.getAccountNumber();
+                }
+                else {
+                    String pk = new String(ctx.getAccessPublic(), "utf-8");
+                    
+                    if( pk.equals("-----") ) {
+                        account = ctx.getAccountNumber();                        
+                    }
+                    else {
+                        account = ctx.getAccountNumber() + ":" + new String(ctx.getAccessPublic(), "utf-8");
+                    }
+                }
+                get.addRequestHeader("Content-Type", "application/json");
+                get.addRequestHeader("X-Auth-User", account);
+                get.addRequestHeader("X-Auth-Key", new String(ctx.getAccessPrivate(), "utf-8"));
+            }
+            catch( UnsupportedEncodingException e ) {
+                std.error("authenticate(): Unsupported encoding when building request headers: " + e.getMessage());
+                if( std.isTraceEnabled() ) {
+                    e.printStackTrace();
+                }
+                throw new InternalException(e);
+            }
+            get.getParams().setCookiePolicy(CookiePolicy.IGNORE_COOKIES);
+            if( wire.isDebugEnabled() ) {
+                wire.debug("GET " + get.getPath());
+                for( Header header : get.getRequestHeaders() ) {
+                    wire.debug(header.getName() + ": " + header.getValue());
+                }
+                wire.debug("");
+            }
+            int code;
+            
+            try {
+                code = client.executeMethod(get);
+            }
+            catch( IOException e ) {
+                std.error("authenticate(): Failed to execute HTTP request due to a cloud I/O error: " + e.getMessage());
+                if( std.isTraceEnabled() ) {
+                    e.printStackTrace();
+                }
+                throw new CloudException(e);
+            }
+            if( std.isDebugEnabled() ) {
+                std.debug("authenticate(): HTTP Status " + code);
+            }
+            Header[] headers = get.getResponseHeaders();
+            
+            if( wire.isDebugEnabled() ) {
+                wire.debug(get.getStatusLine().toString());
+                for( Header h : headers ) {
+                    if( h.getValue() != null ) {
+                        wire.debug(h.getName() + ": " + h.getValue().trim());
+                    }
+                    else {
+                        wire.debug(h.getName() + ":");
+                    }
+                }
+            }
+            if( code != HttpServletResponse.SC_NO_CONTENT && code != HttpServletResponse.SC_OK ) {
+                if( code == HttpServletResponse.SC_FORBIDDEN || code == HttpServletResponse.SC_UNAUTHORIZED ) {
+                    return null;
+                }
+                std.error("authenticate(): Expected NO CONTENT for an authentication request, got " + code);
+                String response;
+                
+                try {
+                    response = get.getResponseBodyAsString();
+                }
+                catch( IOException e ) {
+                    std.error("authenticate(): Failed to read response error due to a cloud I/O error: " + e.getMessage());
+                    if( std.isTraceEnabled() ) {
+                        e.printStackTrace();
+                    }
+                    throw new CloudException(e);                    
+                }
+                if( wire.isDebugEnabled() ) {
+                    wire.debug(response);
+                }
+                wire.debug("");
+                NovaException.ExceptionItems items = NovaException.parseException(code, response);
+                
+                if( items.type.equals(CloudErrorType.AUTHENTICATION) ) {
+                    return null;
+                }
+                std.error("authenticate(): [" +  code + " : " + items.message + "] " + items.details);
+                throw new NovaException(items);
+            }
+            else {
+                HashMap<String,Map<String,String>> services = new HashMap<String,Map<String,String>>();
+                
+                for( Header h : headers ) {
+                    if( h.getName().equalsIgnoreCase("x-auth-token") ) {
+                    	authToken = h.getValue().trim();
+                    }
+                    else if( h.getName().equalsIgnoreCase("x-server-management-url") ) {
+                        Map<String,String> map = services.get("compute");
+                        
+                        if( map == null ) {
+                            map = new HashMap<String,String>();
+                            map.put(thisRegion, h.getValue().trim());
+                        }
+                        services.put("compute", map);
+                    }
+                    else if( h.getName().equalsIgnoreCase("x-storage-url") ) {
+                        Map<String,String> map = services.get("object-store");
+                        
+                        if( map == null ) {
+                            map = new HashMap<String,String>();
+                            map.put(thisRegion, h.getValue().trim());
+                        }
+                        services.put("object-store", map);
+                    }
+                    else if( h.getName().equalsIgnoreCase("x-cdn-management-url") ) {
+                        Map<String,String> map = services.get("cdn");
+
+                        if( map == null ) {
+                            map = new HashMap<String,String>();
+                            map.put(thisRegion, h.getValue().trim());
+                        }
+                        services.put("cdn", map);
+                    }
+                    else if( h.getName().equalsIgnoreCase("x-storage-token") ) {
+                    	storageToken = h.getValue().trim();
+                    }
+                }
+                if( authToken == null ) {
+                    std.warn("authenticate(): No authentication token in response");
+                    throw new CloudException("No authentication token in cloud response");
+                }
+                return new AuthenticationContext(thisRegion, authToken, tenantId, services, storageToken);
+            }
+        }
+        finally {
+            if( std.isTraceEnabled() ) {
+                std.trace("exit - " + AbstractMethod.class.getName() + ".authenticate()");
+            }
+            if( wire.isDebugEnabled() ) {
+                wire.debug("");
+                wire.debug("--------------------------------------------------------> " + endpoint);
+            }            
         }
     }
 
