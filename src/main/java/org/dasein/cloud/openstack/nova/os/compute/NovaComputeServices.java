@@ -22,11 +22,8 @@ import org.dasein.cloud.compute.AbstractComputeServices;
 import org.dasein.cloud.compute.SnapshotSupport;
 import org.dasein.cloud.compute.VolumeSupport;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
-import org.dasein.cloud.openstack.nova.os.ext.hp.block.HPBlockStorage;
-import org.dasein.cloud.openstack.nova.os.ext.hp.block.HPVolumeSnapshot;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 public class NovaComputeServices extends AbstractComputeServices {
     private NovaOpenStack provider;
@@ -44,18 +41,12 @@ public class NovaComputeServices extends AbstractComputeServices {
     }
 
     @Override
-    public @Nullable SnapshotSupport getSnapshotSupport() {
-        if( provider.getProviderName().equals("HP") ) {
-            return new HPVolumeSnapshot(provider);
-        }
-        return null;
+    public @Nonnull SnapshotSupport getSnapshotSupport() {
+        return new CinderSnapshot(provider);
     }
 
     @Override
-    public @Nullable VolumeSupport getVolumeSupport() {
-        if( provider.getProviderName().equals("HP") ) {
-            return new HPBlockStorage(provider);
-        }
-        return null;
+    public @Nonnull VolumeSupport getVolumeSupport() {
+        return new CinderVolume(provider);
     }
 }

@@ -1,22 +1,20 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * ========= CONFIDENTIAL =========
+ *
+ * Copyright (C) 2012 enStratus Networks Inc - ALL RIGHTS RESERVED
  *
  * ====================================================================
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  NOTICE: All information contained herein is, and remains the
+ *  property of enStratus Networks Inc. The intellectual and technical
+ *  concepts contained herein are proprietary to enStratus Networks Inc
+ *  and may be covered by U.S. and Foreign Patents, patents in process,
+ *  and are protected by trade secret or copyright law. Dissemination
+ *  of this information or reproduction of this material is strictly
+ *  forbidden unless prior written permission is obtained from
+ *  enStratus Networks Inc.
  * ====================================================================
  */
-
-package org.dasein.cloud.openstack.nova.os.ext.hp.block;
+package org.dasein.cloud.openstack.nova.os.compute;
 
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
@@ -30,6 +28,7 @@ import org.dasein.cloud.compute.VolumeCreateOptions;
 import org.dasein.cloud.compute.VolumeProduct;
 import org.dasein.cloud.compute.VolumeState;
 import org.dasein.cloud.compute.VolumeSupport;
+import org.dasein.cloud.compute.VolumeType;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -48,25 +47,38 @@ import java.util.HashMap;
 import java.util.Locale;
 
 /**
- * Implements block storage according to HP.
- * @author George Reese (george.reese@imaginary.com)
- * @since 2012.04.1
- * @version 2012.04.1
+ * Support for the Cinder volumes API in Dasein Cloud.
+ * <p>Created by George Reese: 10/25/12 9:22 AM</p>
+ * @author George Reese
+ * @version 2012.09.1 copied over from volume extension for HP
+ * @since 2012.09.1
  */
-public class HPBlockStorage implements VolumeSupport {
+public class CinderVolume implements VolumeSupport {
+    static private final Logger logger = NovaOpenStack.getLogger(CinderVolume.class, "std");
+
     static public final String SERVICE  = "volume";
-    static public final String RESOURCE = "/os-volumes";
-    
+
     private NovaOpenStack provider;
-    
-    public HPBlockStorage(@Nonnull NovaOpenStack provider) { this.provider = provider; }
+
+    public CinderVolume(@Nonnull NovaOpenStack provider) { this.provider = provider; }
+
+    private @Nonnull String getAttachmentsResource() {
+        return "os-volume_attachments";
+    }
+
+    private @Nonnull String getResource() {
+        return (provider.isHP() ? "/os-volumes" : "/volumes");
+    }
+
+    private @Nonnull String getTypesResource() {
+        return "/types";
+    }
 
     @Override
     public void attach(@Nonnull String volumeId, @Nonnull String toServer, @Nonnull String device) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(HPBlockStorage.class, "std");
 
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPBlockStorage.class.getName() + ".attach("+ volumeId + "," + toServer + "," + device + ")");
+            logger.trace("enter - " + CinderVolume.class.getName() + ".attach("+ volumeId + "," + toServer + "," + device + ")");
         }
         try {
             ProviderContext ctx = provider.getContext();
@@ -82,14 +94,14 @@ public class HPBlockStorage implements VolumeSupport {
             attachment.put("volumeId", volumeId);
             attachment.put("device", device);
             wrapper.put("volumeAttachment", attachment);
-            
-            if( method.postString(SERVICE, "/servers", toServer, "os-volume_attachments", new JSONObject(wrapper)) == null ) {
+
+            if( method.postString(SERVICE, "/servers", toServer, getAttachmentsResource(), new JSONObject(wrapper)) == null ) {
                 throw new CloudException("No response from the cloud");
             }
         }
         finally {
             if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPBlockStorage.class.getName() + ".detach()");
+                logger.trace("exit - " + CinderVolume.class.getName() + ".detach()");
             }
         }
     }
@@ -106,10 +118,8 @@ public class HPBlockStorage implements VolumeSupport {
 
     @Override
     public @Nonnull String createVolume(@Nonnull VolumeCreateOptions options) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(HPBlockStorage.class, "std");
-
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPBlockStorage.class.getName() + ".createVolume(" + options + ")");
+            logger.trace("enter - " + CinderVolume.class.getName() + ".createVolume(" + options + ")");
         }
         try {
             ProviderContext ctx = provider.getContext();
@@ -125,16 +135,28 @@ public class HPBlockStorage implements VolumeSupport {
 
             json.put("display_name", options.getName());
             json.put("display_description", options.getDescription());
-            json.put("size", options.getVolumeSize().intValue());
+
+            Storage<Gigabyte> size = options.getVolumeSize();
+
+            if( size == null || (size.intValue() < getMinimumVolumeSize().intValue()) ) {
+                size = getMinimumVolumeSize();
+            }
+            else if( getMaximumVolumeSize() != null && size.intValue() > getMaximumVolumeSize().intValue() ) {
+                size = getMaximumVolumeSize();
+            }
+            json.put("size", size.intValue());
             if( options.getSnapshotId() != null ) {
                 json.put("snapshot_id", options.getSnapshotId());
             }
+            //if( options.getVolumeProductId() != null ) {
+              //  json.put("volume_type", options.getVolumeProductId());
+            //}
             wrapper.put("volume", json);
-            JSONObject result = method.postString(SERVICE, RESOURCE, null, new JSONObject(wrapper), true);
+            JSONObject result = method.postString(SERVICE, getResource(), null, new JSONObject(wrapper), true);
 
             if( result != null && result.has("volume") ) {
                 try {
-                    Volume volume = toVolume(ctx, result.getJSONObject("volume"));
+                    Volume volume = toVolume(ctx, result.getJSONObject("volume"), listVolumeProducts());
 
                     if( volume != null ) {
                         return volume.getProviderVolumeId();
@@ -154,21 +176,19 @@ public class HPBlockStorage implements VolumeSupport {
         }
         finally {
             if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPBlockStorage.class.getName() + ".create()");
+                logger.trace("exit - " + CinderVolume.class.getName() + ".create()");
             }
         }
     }
 
     @Override
     public void detach(@Nonnull String volumeId) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(HPBlockStorage.class, "std");
-
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPBlockStorage.class.getName() + ".detach("+ volumeId + ")");
+            logger.trace("enter - " + CinderVolume.class.getName() + ".detach("+ volumeId + ")");
         }
         try {
             Volume volume = getVolume(volumeId);
-            
+
             if( volume == null ) {
                 throw new CloudException("No such volume: " + volumeId);
             }
@@ -183,11 +203,11 @@ public class HPBlockStorage implements VolumeSupport {
             }
             NovaMethod method = new NovaMethod(provider);
 
-            method.deleteResource(SERVICE, "/servers", volume.getProviderVirtualMachineId(), "os-volume_attachments/" + volumeId);
+            method.deleteResource(SERVICE, "/servers", volume.getProviderVirtualMachineId(), getAttachmentsResource() + "/" + volumeId);
         }
         finally {
             if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPBlockStorage.class.getName() + ".detach()");
+                logger.trace("exit - " + CinderVolume.class.getName() + ".detach()");
             }
         }
     }
@@ -202,9 +222,11 @@ public class HPBlockStorage implements VolumeSupport {
         return new Storage<Gigabyte>(1024, Storage.GIGABYTE);
     }
 
-    @Nonnull
     @Override
-    public Storage<Gigabyte> getMinimumVolumeSize() throws InternalException, CloudException {
+    public @Nonnull Storage<Gigabyte> getMinimumVolumeSize() throws InternalException, CloudException {
+        if( provider.isRackspace() ) {
+            return new Storage<Gigabyte>(100, Storage.GIGABYTE);
+        }
         return new Storage<Gigabyte>(1, Storage.GIGABYTE);
     }
 
@@ -215,45 +237,43 @@ public class HPBlockStorage implements VolumeSupport {
 
     @Override
     public @Nullable Volume getVolume(@Nonnull String volumeId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(HPBlockStorage.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + HPBlockStorage.class.getName() + ".getVolume(" + volumeId + ")");
+        if( logger.isTraceEnabled() ) {
+            logger.trace("enter - " + CinderVolume.class.getName() + ".getVolume(" + volumeId + ")");
         }
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
-            JSONObject ob = method.getResource(SERVICE, RESOURCE, volumeId, true);
+            JSONObject ob = method.getResource(SERVICE, getResource(), volumeId, true);
 
             if( ob == null ) {
                 return null;
             }
             try {
                 if( ob.has("volume") ) {
-                    return toVolume(ctx, ob.getJSONObject("volume"));
+                    return toVolume(ctx, ob.getJSONObject("volume"), listVolumeProducts());
                 }
             }
             catch( JSONException e ) {
-                std.error("getVolume(): Unable to identify expected values in JSON: " + e.getMessage());
+                logger.error("getVolume(): Unable to identify expected values in JSON: " + e.getMessage());
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for volume");
             }
             return null;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPBlockStorage.class.getName() + ".getVolume()");
+            if( logger.isTraceEnabled() ) {
+                logger.trace("exit - " + CinderVolume.class.getName() + ".getVolume()");
             }
         }
     }
 
     @Override
     public @Nonnull Requirement getVolumeProductRequirement() throws InternalException, CloudException {
-        return Requirement.NONE;
+        return Requirement.OPTIONAL;
     }
 
     @Override
@@ -284,43 +304,94 @@ public class HPBlockStorage implements VolumeSupport {
 
     @Override
     public @Nonnull Iterable<VolumeProduct> listVolumeProducts() throws InternalException, CloudException {
-        return Collections.emptyList();
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            logger.error("No context exists for this request");
+            throw new InternalException("No context exists for this request");
+        }
+        NovaMethod method = new NovaMethod(provider);
+        ArrayList<VolumeProduct> products = new ArrayList<VolumeProduct>();
+
+        JSONObject json = method.getResource(SERVICE, getTypesResource(), null, false);
+
+        if( json != null && json.has("volume_types") ) {
+            try {
+                JSONArray list = json.getJSONArray("volume_types");
+
+                for( int i=0; i<list.length(); i++ ) {
+                    JSONObject t = list.getJSONObject(i);
+                    String name = (t.has("name") ? t.getString("name") : null);
+                    String id = (t.has("id") ? t.getString("id") : null);
+                    JSONObject specs = (t.has("extra_specs") ? t.getJSONObject("extra_specs") : null);
+
+                    if( name == null || id == null ) {
+                        continue;
+                    }
+                    // this is a huge ass guess
+                    VolumeType type = (name.toLowerCase().contains("ssd") ? VolumeType.SSD : VolumeType.HDD);
+
+                    if( specs != null ) {
+                        String[] names = JSONObject.getNames(specs);
+
+                        if( names != null && names.length > 0 ) {
+                            for( String field : names ) {
+                                if( specs.has(field) && specs.get(field) instanceof String ) {
+                                    String value = specs.getString(field);
+
+                                    if( value != null && value.toLowerCase().contains("ssd") ) {
+                                        type = VolumeType.SSD;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    products.add(VolumeProduct.getInstance(id, name, name, type));
+                }
+            }
+            catch( JSONException e ) {
+                logger.error("listVolumes(): Unable to identify expected values in JSON: " + e.getMessage());
+                e.printStackTrace();
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for volumes in " + json.toString());
+            }
+        }
+        return products;
     }
 
     @Override
     public @Nonnull Iterable<Volume> listVolumes() throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(HPBlockStorage.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + HPBlockStorage.class.getName() + ".listVolumes()");
+        if( logger.isTraceEnabled() ) {
+            logger.trace("ENTER: " + CinderVolume.class.getName() + ".listVolumes()");
         }
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
+            Iterable<VolumeProduct> products = listVolumeProducts();
             NovaMethod method = new NovaMethod(provider);
             ArrayList<Volume> volumes = new ArrayList<Volume>();
 
-            JSONObject json = method.getResource(SERVICE, RESOURCE, null, false);
+            JSONObject json = method.getResource(SERVICE, getResource(), null, false);
 
             if( json != null && json.has("volumes") ) {
                 try {
                     JSONArray list = json.getJSONArray("volumes");
-                    
+
                     for( int i=0; i<list.length(); i++ ) {
                         JSONObject v = list.getJSONObject(i);
-                        Volume volume = toVolume(ctx, v);
-                        
+                        Volume volume = toVolume(ctx, v, products);
+
                         if( volume != null ) {
                             volumes.add(volume);
                         }
                     }
                 }
                 catch( JSONException e ) {
-                    std.error("listVolumes(): Unable to identify expected values in JSON: " + e.getMessage());
+                    logger.error("listVolumes(): Unable to identify expected values in JSON: " + e.getMessage());
                     e.printStackTrace();
                     throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for volumes in " + json.toString());
                 }
@@ -328,8 +399,8 @@ public class HPBlockStorage implements VolumeSupport {
             return volumes;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPBlockStorage.class.getName() + ".listVolumes()");
+            if( logger.isTraceEnabled() ) {
+                logger.trace("exit - " + CinderVolume.class.getName() + ".listVolumes()");
             }
         }
     }
@@ -341,10 +412,8 @@ public class HPBlockStorage implements VolumeSupport {
 
     @Override
     public void remove(@Nonnull String volumeId) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(HPBlockStorage.class, "std");
-
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPBlockStorage.class.getName() + ".remove("+ volumeId + ")");
+            logger.trace("enter - " + CinderVolume.class.getName() + ".remove("+ volumeId + ")");
         }
         try {
             ProviderContext ctx = provider.getContext();
@@ -355,28 +424,28 @@ public class HPBlockStorage implements VolumeSupport {
             }
             NovaMethod method = new NovaMethod(provider);
 
-            method.deleteResource(SERVICE, RESOURCE, volumeId, null);
+            method.deleteResource(SERVICE, getResource(), volumeId, null);
         }
         finally {
             if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPBlockStorage.class.getName() + ".remove()");
+                logger.trace("exit - " + CinderVolume.class.getName() + ".remove()");
             }
         }
     }
 
     @Override
     public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
-        return new String[0]; 
+        return new String[0];
     }
-    
-    private @Nullable Volume toVolume(@Nonnull ProviderContext ctx, @Nullable JSONObject json) throws CloudException, InternalException {
+
+    private @Nullable Volume toVolume(@Nonnull ProviderContext ctx, @Nullable JSONObject json, @Nonnull Iterable<VolumeProduct> types) throws CloudException, InternalException {
         if( json == null ) {
             return null;
         }
         try {
             String region = ctx.getRegionId();
             String dataCenter = region + "-a";
-            
+
             String name = null, volumeId = null;
 
             if( json.has("id") ) {
@@ -393,15 +462,20 @@ public class HPBlockStorage implements VolumeSupport {
             }
 
             long created = 0L;
-            
+
             if( json.has("createdAt") ) {
                 created = provider.parseTimestamp(json.getString("createdAt"));
             }
-            
+
             int size = 0;
-            
+
             if( json.has("size") ) {
                 size = json.getInt("size");
+            }
+            String productId = null;
+
+            if( json.has("volume_type") ) {
+                productId = json.getString("volume_type");
             }
             String vmId = null, deviceId = null;
 
@@ -423,22 +497,28 @@ public class HPBlockStorage implements VolumeSupport {
                 }
             }
             String snapshotId = null;
-            
+
             // TODO: identify snapshot
 
             VolumeState currentState = VolumeState.PENDING;
-            
+
             if( json.has("status") ) {
                 String status = json.getString("status");
-                
+
                 if( status.equalsIgnoreCase("available") ) {
                     currentState = VolumeState.AVAILABLE;
                 }
                 else if( status.equalsIgnoreCase("creating") ) {
                     currentState = VolumeState.PENDING;
                 }
+                else if( status.equalsIgnoreCase("error") ) {
+                    currentState = VolumeState.PENDING;
+                }
+                else if( status.equals("in-use") ) {
+                    currentState = VolumeState.AVAILABLE;
+                }
                 else {
-                    System.out.println("DEBUG OS VOLUME STATE=" + status);
+                    logger.warn("DEBUG: Unknown OpenStack Cinder volume state: " + status);
                 }
             }
             Volume volume = new Volume();
@@ -453,7 +533,15 @@ public class HPBlockStorage implements VolumeSupport {
             volume.setProviderVirtualMachineId(vmId);
             volume.setProviderVolumeId(volumeId);
             volume.setSize(new Storage<Gigabyte>(size, Storage.GIGABYTE));
-    
+            volume.setProviderProductId(productId);
+            if( productId != null ) {
+                for( VolumeProduct prd : types ) {
+                    if( productId.equals(prd.getProviderProductId()) ) {
+                        volume.setType(prd.getType());
+                        break;
+                    }
+                }
+            }
             return volume;
         }
         catch( JSONException e ) {

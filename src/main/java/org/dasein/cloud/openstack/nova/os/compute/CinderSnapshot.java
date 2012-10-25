@@ -1,22 +1,20 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * ========= CONFIDENTIAL =========
+ *
+ * Copyright (C) 2012 enStratus Networks Inc - ALL RIGHTS RESERVED
  *
  * ====================================================================
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  NOTICE: All information contained herein is, and remains the
+ *  property of enStratus Networks Inc. The intellectual and technical
+ *  concepts contained herein are proprietary to enStratus Networks Inc
+ *  and may be covered by U.S. and Foreign Patents, patents in process,
+ *  and are protected by trade secret or copyright law. Dissemination
+ *  of this information or reproduction of this material is strictly
+ *  forbidden unless prior written permission is obtained from
+ *  enStratus Networks Inc.
  * ====================================================================
  */
-
-package org.dasein.cloud.openstack.nova.os.ext.hp.block;
+package org.dasein.cloud.openstack.nova.os.compute;
 
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
@@ -42,25 +40,30 @@ import java.util.HashMap;
 import java.util.Locale;
 
 /**
- * Supports the snapshotting of volumes in the HP block store support.
- * @author George Reese (george.reese@imaginary.com)
- * @since 2012.04.1
- * @version 2012.04.1
+ * Implements support for snapshots from the OpenStack Cinder API.
+ * <p>Created by George Reese: 10/25/12 9:27 AM</p>
+ * @author George Reese
+ * @version 2012.09.1 copied from the HP block storage support
+ * @since 2012.09.1
  */
-public class HPVolumeSnapshot implements SnapshotSupport {
-    static public final String SERVICE  = "hpext:blockstore";
-    static public final String RESOURCE = "/os-snapshots";
+public class CinderSnapshot implements SnapshotSupport {
+    static private final Logger logger = NovaOpenStack.getLogger(CinderSnapshot.class, "std");
+
+    static public final String SERVICE  = "volume";
 
     private NovaOpenStack provider;
-    
-    public HPVolumeSnapshot(NovaOpenStack provider) { this.provider = provider; }
 
+    public CinderSnapshot(NovaOpenStack provider) { this.provider = provider; }
+
+    private @Nonnull String getResource() {
+        return (provider.isHP() ? "/os-snapshots" : "/snapshots");
+    }
+    
     @Override
-    public @Nonnull String create(@Nonnull String ofVolume, @Nonnull String description) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(HPVolumeSnapshot.class, "std");
+    public @Nonnull  String create(@Nonnull String ofVolume, @Nonnull String description) throws InternalException, CloudException {
 
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPVolumeSnapshot.class.getName() + ".create(" + ofVolume + "," + description + ")");
+            logger.trace("enter - " + CinderSnapshot.class.getName() + ".create(" + ofVolume + "," + description + ")");
         }
         try {
             ProviderContext ctx = provider.getContext();
@@ -79,7 +82,7 @@ public class HPVolumeSnapshot implements SnapshotSupport {
             json.put("display_description", description);
             json.put("force", "True");
             wrapper.put("snapshot", json);
-            JSONObject result = method.postString(SERVICE, RESOURCE, null, new JSONObject(wrapper), true);
+            JSONObject result = method.postString(SERVICE, getResource(), null, new JSONObject(wrapper), true);
 
             if( result != null && result.has("snapshot") ) {
                 try {
@@ -103,7 +106,7 @@ public class HPVolumeSnapshot implements SnapshotSupport {
         }
         finally {
             if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPVolumeSnapshot.class.getName() + ".create()");
+                logger.trace("exit - " + CinderSnapshot.class.getName() + ".create()");
             }
         }
     }
@@ -115,10 +118,10 @@ public class HPVolumeSnapshot implements SnapshotSupport {
 
     @Override
     public Snapshot getSnapshot(String snapshotId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(HPVolumeSnapshot.class, "std");
+        Logger std = NovaOpenStack.getLogger(CinderSnapshot.class, "std");
 
         if( std.isTraceEnabled() ) {
-            std.trace("enter - " + HPVolumeSnapshot.class.getName() + ".getSnapshot(" + snapshotId + ")");
+            std.trace("enter - " + CinderSnapshot.class.getName() + ".getSnapshot(" + snapshotId + ")");
         }
         try {
             ProviderContext ctx = provider.getContext();
@@ -128,7 +131,7 @@ public class HPVolumeSnapshot implements SnapshotSupport {
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
-            JSONObject ob = method.getResource(SERVICE, RESOURCE, snapshotId, true);
+            JSONObject ob = method.getResource(SERVICE, getResource(), snapshotId, true);
 
             if( ob == null ) {
                 return null;
@@ -146,7 +149,7 @@ public class HPVolumeSnapshot implements SnapshotSupport {
         }
         finally {
             if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPVolumeSnapshot.class.getName() + ".getSnapshot()");
+                std.trace("exit - " + CinderSnapshot.class.getName() + ".getSnapshot()");
             }
         }
     }
@@ -158,7 +161,7 @@ public class HPVolumeSnapshot implements SnapshotSupport {
 
     @Override
     public boolean isPublic(@Nonnull String snapshotId) throws InternalException, CloudException {
-        return false; 
+        return false;
     }
 
     @Override
@@ -168,10 +171,10 @@ public class HPVolumeSnapshot implements SnapshotSupport {
 
     @Override
     public @Nonnull Iterable<Snapshot> listSnapshots() throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(HPVolumeSnapshot.class, "std");
+        Logger std = NovaOpenStack.getLogger(CinderSnapshot.class, "std");
 
         if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + HPVolumeSnapshot.class.getName() + ".listSnapshots()");
+            std.trace("ENTER: " + CinderSnapshot.class.getName() + ".listSnapshots()");
         }
         try {
             ProviderContext ctx = provider.getContext();
@@ -183,7 +186,7 @@ public class HPVolumeSnapshot implements SnapshotSupport {
             NovaMethod method = new NovaMethod(provider);
             ArrayList<Snapshot> snapshots = new ArrayList<Snapshot>();
 
-            JSONObject json = method.getResource(SERVICE, RESOURCE, null, false);
+            JSONObject json = method.getResource(SERVICE, getResource(), null, false);
 
             if( json != null && json.has("snapshots") ) {
                 try {
@@ -207,17 +210,17 @@ public class HPVolumeSnapshot implements SnapshotSupport {
         }
         finally {
             if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPVolumeSnapshot.class.getName() + ".listSnapshots()");
+                std.trace("exit - " + CinderSnapshot.class.getName() + ".listSnapshots()");
             }
         }
     }
 
     @Override
     public void remove(String snapshotId) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(HPVolumeSnapshot.class, "std");
+        Logger logger = NovaOpenStack.getLogger(CinderSnapshot.class, "std");
 
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPVolumeSnapshot.class.getName() + ".remove("+ snapshotId + ")");
+            logger.trace("enter - " + CinderSnapshot.class.getName() + ".remove("+ snapshotId + ")");
         }
         try {
             ProviderContext ctx = provider.getContext();
@@ -228,11 +231,11 @@ public class HPVolumeSnapshot implements SnapshotSupport {
             }
             NovaMethod method = new NovaMethod(provider);
 
-            method.deleteResource(SERVICE, RESOURCE, snapshotId, null);
+            method.deleteResource(SERVICE, getResource(), snapshotId, null);
         }
         finally {
             if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPVolumeSnapshot.class.getName() + ".remove()");
+                logger.trace("exit - " + CinderSnapshot.class.getName() + ".remove()");
             }
         }
     }
@@ -244,19 +247,19 @@ public class HPVolumeSnapshot implements SnapshotSupport {
 
     @Override
     public boolean supportsSnapshotSharing() throws InternalException, CloudException {
-        return false; 
+        return false;
     }
 
     @Override
     public boolean supportsSnapshotSharingWithPublic() throws InternalException, CloudException {
-        return false; 
+        return false;
     }
 
     @Override
     public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
         return new String[0];
     }
-    
+
     private @Nullable Snapshot toSnapshot(@Nonnull ProviderContext ctx, @Nullable JSONObject json) throws CloudException, InternalException {
         if( json == null ) {
             return null;
@@ -264,30 +267,30 @@ public class HPVolumeSnapshot implements SnapshotSupport {
 
         try {
             String snapshotId = (json.has("id") ? json.getString("id") : null);
-            
+
             if( snapshotId == null ) {
                 return null;
             }
-    
+
             String regionId = ctx.getRegionId();
             String name = (json.has("displayName") ? json.getString("displayName") : null);
-            
+
             if( name == null ) {
                 name = snapshotId;
             }
-            
+
             String description = (json.has("displayDescription") ? json.getString("displayDescription") : null);
-            
+
             if( description == null ) {
                 description = null;
             }
-            
+
             String volumeId = (json.has("volumeId") ? json.getString("volumeId") : null);
-            
-            
+
+
             SnapshotState currentState = SnapshotState.PENDING;
             String status = (json.has("status") ? json.getString("status") : null);
-    
+
             if( status != null ) {
                 if( status.equalsIgnoreCase("deleted") ) {
                     currentState = SnapshotState.DELETED;
@@ -300,11 +303,11 @@ public class HPVolumeSnapshot implements SnapshotSupport {
                 }
             }
             long created = (json.has("createdAt") ? provider.parseTimestamp(json.getString("createdAt")) : -1L);
-            
+
             int size = (json.has("size") ? json.getInt("size") : 0);
-            
+
             Snapshot snapshot = new Snapshot();
-            
+
             snapshot.setCurrentState(currentState);
             snapshot.setDescription(description);
             snapshot.setName(name);
@@ -320,5 +323,5 @@ public class HPVolumeSnapshot implements SnapshotSupport {
             throw new CloudException(e);
         }
     }
-            
+
 }
