@@ -60,7 +60,9 @@ import org.json.JSONObject;
 
 public class NovaServer implements VirtualMachineSupport {
     private NovaOpenStack provider;
-    
+
+    static public final String SERVICE = "compute";
+
     NovaServer(NovaOpenStack provider) { this.provider = provider; }
 
     @Override

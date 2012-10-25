@@ -42,7 +42,6 @@ import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -95,7 +94,7 @@ public class CinderVolume implements VolumeSupport {
             attachment.put("device", device);
             wrapper.put("volumeAttachment", attachment);
 
-            if( method.postString(SERVICE, "/servers", toServer, getAttachmentsResource(), new JSONObject(wrapper)) == null ) {
+            if( method.postString(NovaServer.SERVICE, "/servers", toServer, getAttachmentsResource(), new JSONObject(wrapper)) == null ) {
                 throw new CloudException("No response from the cloud");
             }
         }
@@ -148,9 +147,20 @@ public class CinderVolume implements VolumeSupport {
             if( options.getSnapshotId() != null ) {
                 json.put("snapshot_id", options.getSnapshotId());
             }
-            //if( options.getVolumeProductId() != null ) {
-              //  json.put("volume_type", options.getVolumeProductId());
-            //}
+            if( options.getVolumeProductId() != null ) {
+                // TODO: cinder is broken and expects the name; should be fixed in Grizzly
+                VolumeProduct product = null;
+
+                for( VolumeProduct p : listVolumeProducts() ) {
+                    if( p.getProviderProductId().equals(options.getVolumeProductId()) ) {
+                        product = p;
+                        break;
+                    }
+                }
+                if( product != null ) {
+                    json.put("volume_type", product.getName());
+                }
+            }
             wrapper.put("volume", json);
             JSONObject result = method.postString(SERVICE, getResource(), null, new JSONObject(wrapper), true);
 
@@ -203,7 +213,7 @@ public class CinderVolume implements VolumeSupport {
             }
             NovaMethod method = new NovaMethod(provider);
 
-            method.deleteResource(SERVICE, "/servers", volume.getProviderVirtualMachineId(), getAttachmentsResource() + "/" + volumeId);
+            method.deleteResource(NovaServer.SERVICE, "/servers", volume.getProviderVirtualMachineId(), getAttachmentsResource() + "/" + volumeId);
         }
         finally {
             if( logger.isTraceEnabled() ) {
@@ -488,6 +498,9 @@ public class CinderVolume implements VolumeSupport {
                     if( ob.has("serverId") ) {
                         vmId = ob.getString("serverId");
                     }
+                    else if( ob.has("server_id") ) {
+                        vmId = ob.getString("server_id");
+                    }
                     if( ob.has("device") ) {
                         deviceId = ob.getString("device");
                     }
@@ -517,6 +530,9 @@ public class CinderVolume implements VolumeSupport {
                 else if( status.equals("in-use") ) {
                     currentState = VolumeState.AVAILABLE;
                 }
+                else if( status.equals("attaching") ) {
+                    currentState = VolumeState.PENDING;
+                }
                 else {
                     logger.warn("DEBUG: Unknown OpenStack Cinder volume state: " + status);
                 }
@@ -533,14 +549,30 @@ public class CinderVolume implements VolumeSupport {
             volume.setProviderVirtualMachineId(vmId);
             volume.setProviderVolumeId(volumeId);
             volume.setSize(new Storage<Gigabyte>(size, Storage.GIGABYTE));
-            volume.setProviderProductId(productId);
             if( productId != null ) {
+                VolumeProduct match = null;
+
                 for( VolumeProduct prd : types ) {
                     if( productId.equals(prd.getProviderProductId()) ) {
-                        volume.setType(prd.getType());
+                        match = prd;
                         break;
                     }
                 }
+                if( match == null ) { // TODO: stupid Folsom bug
+                    for( VolumeProduct prd : types ) {
+                        if( productId.equals(prd.getName()) ) {
+                            match = prd;
+                            break;
+                        }
+                    }
+                }
+                if( match != null ) {
+                    volume.setProviderProductId(match.getProviderProductId());
+                    volume.setType(match.getType());
+                }
+            }
+            if( volume.getProviderProductId() == null ) {
+                volume.setProviderProductId(productId);
             }
             return volume;
         }

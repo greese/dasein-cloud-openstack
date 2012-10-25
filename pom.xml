@@ -178,52 +178,6 @@
         <version>2.6</version>
         <configuration>
             <systemProperties>
-                <!--
-                <property>
-                    <name>endpoint</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.endpoint}</value>
-                </property>
-                <property>
-                    <name>accountNumber</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.accountNumber}</value>
-                </property>
-                <property>
-                    <name>apiSharedKey</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.apiSharedKey}</value>
-                </property>
-                <property>
-                    <name>apiSecretKey</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.apiSecretKey}</value>
-                </property>
-                <property>
-                    <name>cloudName</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.cloudName}</value>
-                </property>
-                <property>
-                    <name>providerName</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.providerName}</value>
-                </property>
-                <property>
-                    <name>regionId</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.regionId}</value>
-                </property>
-                <property>
-                    <name>test.region</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.test.region}</value>
-                </property>
-                <property>
-                    <name>test.dataCenter</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.test.dataCenter}</value>
-                </property>
-                <property>
-                    <name>test.machineImage</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.test.machineImage}</value>
-                </property>
-                <property>
-                    <name>test.product</name>
-                    <value>${org.dasein.cloud.openstack.nova.ec2.test.product}</value>
-                </property>
-                -->
                 <property>
                     <name>endpoint</name>
                     <value>${org.dasein.cloud.openstack.nova.os.endpoint}</value>
@@ -270,8 +224,7 @@
                 </property>
             </systemProperties>
           <includes>
-            <!-- <include>**/NovaEC2TestSuite.java</include> -->
-            <include>**/NovaOpenStackTestSuite.java</include>
+              <!-- <include>**/NovaOpenStackTestSuite.java</include> -->
           </includes>
         </configuration>
       </plugin>     

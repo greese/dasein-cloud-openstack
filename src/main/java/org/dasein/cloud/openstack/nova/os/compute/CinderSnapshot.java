@@ -298,8 +298,11 @@ public class CinderSnapshot implements SnapshotSupport {
                 else if( status.equalsIgnoreCase("available") ) {
                     currentState = SnapshotState.AVAILABLE;
                 }
+                else if( status.equalsIgnoreCase("creating") ) {
+                    currentState = SnapshotState.PENDING;
+                }
                 else {
-                    System.out.println("DEBUG OS SNAPSHOT STATE: " + status);
+                    logger.warn("DEBUG: Unknown OpenStack snapshot state: " + status);
                 }
             }
             long created = (json.has("createdAt") ? provider.parseTimestamp(json.getString("createdAt")) : -1L);
