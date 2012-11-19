@@ -18,6 +18,7 @@
 
 package org.dasein.cloud.openstack.nova.os.compute;
 
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,6 +29,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.codec.binary.Base64;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
@@ -231,7 +233,12 @@ public class NovaServer implements VirtualMachineSupport {
 
             json.put("name", options.getHostName());
             if( options.getUserData() != null ) {
-                json.put("user_data", options.getUserData());
+                try {
+                    json.put("user_data", Base64.encodeBase64String(options.getUserData().getBytes("utf-8")));
+                }
+                catch( UnsupportedEncodingException e ) {
+                    throw new InternalException(e);
+                }
             }
             if( provider.getMinorVersion() == 0 && provider.getMajorVersion() == 1 ) {
                 json.put("imageId", String.valueOf(options.getMachineImageId()));
