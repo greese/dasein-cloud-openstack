@@ -230,6 +230,9 @@ public class NovaServer implements VirtualMachineSupport {
             NovaMethod method = new NovaMethod(provider);
 
             json.put("name", options.getHostName());
+            if( options.getUserData() != null ) {
+                json.put("user_data", options.getUserData());
+            }
             if( provider.getMinorVersion() == 0 && provider.getMajorVersion() == 1 ) {
                 json.put("imageId", String.valueOf(options.getMachineImageId()));
                 json.put("flavorId", options.getStandardProductId());
