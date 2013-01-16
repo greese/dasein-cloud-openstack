@@ -381,7 +381,20 @@ public class NovaServer implements VirtualMachineSupport {
                         return results;
                     }
                     else {
-                        return Collections.singletonList("default");
+                        ob = method.getServers("/servers", vmId + "/os-security-groups", true);
+                        if( ob.has("security_groups") ) {
+                            JSONArray groups = server.getJSONArray("security_groups");
+                            ArrayList<String> results = new ArrayList<String>();
+
+                            for( int i=0; i<groups.length(); i++ ) {
+                                JSONObject group = groups.getJSONObject(i);
+
+                                if( group.has("id") ) {
+                                    results.add(group.getString("id"));
+                                }
+                            }
+                            return results;
+                        }
                     }
                 }
                 throw new CloudException("No such server: " + vmId);
