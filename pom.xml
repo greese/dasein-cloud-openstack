@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-openstack</artifactId>
-  <version>2012.09.6-SNAPSHOT</version>
+  <version>2013.02-SNAPSHOT</version>
   <name>Dasein Cloud Nova</name>
   <description>Dasein Cloud implementation for the Nova APIs</description>
   
@@ -37,32 +37,20 @@
   </parent>
         
   <dependencies>
+      <!-- Compile -->
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2012.09</version>
+        <version>2013.02</version>
         <scope>compile</scope>
         <optional>false</optional>
-    </dependency> 
-    <dependency>
-        <groupId>org.dasein</groupId>
-        <artifactId>dasein-cloud-test</artifactId>
-        <version>2012.09.5</version>
-        <scope>test</scope>
-        <optional>false</optional>
-    </dependency>      
+    </dependency>
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-util</artifactId>
         <version>2012.08</version>
         <scope>compile</scope>
         <optional>false</optional>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.9</version>
-      <scope>test</scope>
     </dependency>
     <dependency>
         <groupId>commons-httpclient</groupId>
@@ -75,19 +63,27 @@
         <version>1.2.17</version>
         <scope>compile</scope>
         <optional>false</optional>
-    </dependency>  
-    <dependency>
-    	<groupId>javax.servlet</groupId>
-    	<artifactId>servlet-api</artifactId>
-    	<version>2.5</version>
-    	<type>jar</type>
-    	<scope>compile</scope>
     </dependency>
       <dependency>
           <groupId>org.json</groupId>
           <artifactId>json</artifactId>
           <version>20090211</version>
           <scope>compile</scope>
+      </dependency>
+
+      <!-- Test -->
+      <dependency>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+          <version>4.9</version>
+          <scope>test</scope>
+      </dependency>
+      <dependency>
+          <groupId>org.dasein</groupId>
+          <artifactId>dasein-cloud-test</artifactId>
+          <version>2013.02</version>
+          <scope>test</scope>
+          <optional>false</optional>
       </dependency>
   </dependencies>
   
@@ -224,7 +220,7 @@
                 </property>
             </systemProperties>
           <includes>
-              <!-- <include>**/NovaOpenStackTestSuite.java</include> -->
+              <include>**/NovaOpenStackTestSuite.java</include>
           </includes>
         </configuration>
       </plugin>     

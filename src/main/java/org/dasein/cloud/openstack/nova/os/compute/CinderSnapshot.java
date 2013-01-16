@@ -22,6 +22,9 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
+import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.Snapshot;
 import org.dasein.cloud.compute.SnapshotState;
 import org.dasein.cloud.compute.SnapshotSupport;
@@ -35,6 +38,7 @@ import org.json.JSONObject;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
@@ -44,6 +48,7 @@ import java.util.Locale;
  * <p>Created by George Reese: 10/25/12 9:27 AM</p>
  * @author George Reese
  * @version 2012.09.1 copied from the HP block storage support
+ * @version 2013.02 implement Dasein Cloud 2013.02 model changes
  * @since 2012.09.1
  */
 public class CinderSnapshot implements SnapshotSupport {
@@ -58,57 +63,21 @@ public class CinderSnapshot implements SnapshotSupport {
     private @Nonnull String getResource() {
         return (provider.isHP() ? "/os-snapshots" : "/snapshots");
     }
-    
+
     @Override
+    public void addSnapshotShare(@Nonnull String providerSnapshotId, @Nonnull String accountNumber) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("No snapshot sharing in OpenStack");
+    }
+
+    @Override
+    public void addPublicShare(@Nonnull String providerSnapshotId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("No snapshot sharing in OpenStack");
+    }
+
+    @Override
+    @Deprecated
     public @Nonnull  String create(@Nonnull String ofVolume, @Nonnull String description) throws InternalException, CloudException {
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + CinderSnapshot.class.getName() + ".create(" + ofVolume + "," + description + ")");
-        }
-        try {
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                logger.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-
-            HashMap<String,Object> wrapper = new HashMap<String,Object>();
-            HashMap<String,Object> json = new HashMap<String,Object>();
-            NovaMethod method = new NovaMethod(provider);
-
-            json.put("volume_id", ofVolume);
-            json.put("display_name", description);
-            json.put("display_description", description);
-            json.put("force", "True");
-            wrapper.put("snapshot", json);
-            JSONObject result = method.postString(SERVICE, getResource(), null, new JSONObject(wrapper), true);
-
-            if( result != null && result.has("snapshot") ) {
-                try {
-                    Snapshot snapshot = toSnapshot(ctx, result.getJSONObject("snapshot"));
-
-                    if( snapshot != null ) {
-                        return snapshot.getProviderSnapshotId();
-                    }
-                }
-                catch( JSONException e ) {
-                    logger.error("create(): Unable to understand create response: " + e.getMessage());
-                    if( logger.isTraceEnabled() ) {
-                        e.printStackTrace();
-                    }
-                    throw new CloudException(e);
-                }
-            }
-            logger.error("create(): No snapshot was created by the create attempt, and no error was returned");
-            throw new CloudException("No snapshot was created");
-
-        }
-        finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + CinderSnapshot.class.getName() + ".create()");
-            }
-        }
+        return snapshot(ofVolume, description, description).getProviderSnapshotId();
     }
 
     @Override
@@ -117,7 +86,7 @@ public class CinderSnapshot implements SnapshotSupport {
     }
 
     @Override
-    public Snapshot getSnapshot(String snapshotId) throws InternalException, CloudException {
+    public @Nullable Snapshot getSnapshot(@Nonnull String snapshotId) throws InternalException, CloudException {
         Logger std = NovaOpenStack.getLogger(CinderSnapshot.class, "std");
 
         if( std.isTraceEnabled() ) {
@@ -155,8 +124,57 @@ public class CinderSnapshot implements SnapshotSupport {
     }
 
     @Override
+    public @Nonnull Requirement identifyAttachmentRequirement() throws InternalException, CloudException {
+        return Requirement.OPTIONAL;
+    }
+
+    @Override
     public @Nonnull Iterable<String> listShares(@Nonnull String snapshotId) throws InternalException, CloudException {
         return Collections.emptyList();
+    }
+
+    @Override
+    public @Nonnull Iterable<ResourceStatus> listSnapshotStatus() throws InternalException, CloudException {
+        Logger std = NovaOpenStack.getLogger(CinderSnapshot.class, "std");
+
+        if( std.isTraceEnabled() ) {
+            std.trace("ENTER: " + CinderSnapshot.class.getName() + ".listSnapshotStatus()");
+        }
+        try {
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                std.error("No context exists for this request");
+                throw new InternalException("No context exists for this request");
+            }
+            NovaMethod method = new NovaMethod(provider);
+            ArrayList<ResourceStatus> snapshots = new ArrayList<ResourceStatus>();
+
+            JSONObject json = method.getResource(SERVICE, getResource(), null, false);
+
+            if( json != null && json.has("snapshots") ) {
+                try {
+                    JSONArray list = json.getJSONArray("snapshots");
+
+                    for( int i=0; i<list.length(); i++ ) {
+                        ResourceStatus snapshot = toStatus(list.getJSONObject(i));
+
+                        if( snapshot != null ) {
+                            snapshots.add(snapshot);
+                        }
+                    }
+                }
+                catch( JSONException e ) {
+                    throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for snapshots in " + json.toString());
+                }
+            }
+            return snapshots;
+        }
+        finally {
+            if( std.isTraceEnabled() ) {
+                std.trace("EXIT: " + CinderSnapshot.class.getName() + ".listSnapshotStatus()");
+            }
+        }
     }
 
     @Override
@@ -216,7 +234,7 @@ public class CinderSnapshot implements SnapshotSupport {
     }
 
     @Override
-    public void remove(String snapshotId) throws InternalException, CloudException {
+    public void remove(@Nonnull String snapshotId) throws InternalException, CloudException {
         Logger logger = NovaOpenStack.getLogger(CinderSnapshot.class, "std");
 
         if( logger.isTraceEnabled() ) {
@@ -241,8 +259,131 @@ public class CinderSnapshot implements SnapshotSupport {
     }
 
     @Override
+    public void removeAllSnapshotShares(@Nonnull String providerSnapshotId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("No snapshot sharing in OpenStack");
+    }
+
+    @Override
+    public void removeSnapshotShare(@Nonnull String providerSnapshotId, @Nonnull String accountNumber) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("No snapshot sharing in OpenStack");
+    }
+
+    @Override
+    public void removePublicShare(@Nonnull String providerSnapshotId) throws CloudException, InternalException {
+        throw new OperationNotSupportedException("No snapshot sharing in OpenStack");
+    }
+
+    @Override
+    public @Nonnull Iterable<Snapshot> searchSnapshots(@Nullable String ownerId, @Nullable String keyword) throws InternalException, CloudException {
+        Logger std = NovaOpenStack.getLogger(CinderSnapshot.class, "std");
+
+        if( std.isTraceEnabled() ) {
+            std.trace("ENTER: " + CinderSnapshot.class.getName() + ".searchSnapshots(" + ownerId + "," + keyword + ")");
+        }
+        try {
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                std.error("No context exists for this request");
+                throw new InternalException("No context exists for this request");
+            }
+            NovaMethod method = new NovaMethod(provider);
+            ArrayList<Snapshot> snapshots = new ArrayList<Snapshot>();
+
+            JSONObject json = method.getResource(SERVICE, getResource(), null, false);
+
+            if( json != null && json.has("snapshots") ) {
+                try {
+                    JSONArray list = json.getJSONArray("snapshots");
+
+                    for( int i=0; i<list.length(); i++ ) {
+                        Snapshot snapshot = toSnapshot(ctx, list.getJSONObject(i));
+
+                        if( snapshot != null ) {
+                            if( ownerId != null && !ownerId.equals(snapshot.getProviderSnapshotId()) ) {
+                                continue;
+                            }
+                            if( keyword != null && !snapshot.getName().contains(keyword) && !snapshot.getDescription().contains(keyword) ) {
+                                continue;
+                            }
+                            snapshots.add(snapshot);
+                        }
+                    }
+                }
+                catch( JSONException e ) {
+                    std.error("searchSnapshots(): Unable to identify expected values in JSON: " + e.getMessage());
+                    e.printStackTrace();
+                    throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for snapshots in " + json.toString());
+                }
+            }
+            return snapshots;
+        }
+        finally {
+            if( std.isTraceEnabled() ) {
+                std.trace("EXIT: " + CinderSnapshot.class.getName() + ".searchSnapshots()");
+            }
+        }
+    }
+
+    @Override
     public void shareSnapshot(@Nonnull String snapshotId, @Nullable String withAccountId, boolean affirmative) throws InternalException, CloudException {
         throw new OperationNotSupportedException("Snapshot sharing not currently supported");
+    }
+
+    @Override
+    public @Nonnull Snapshot snapshot(@Nonnull String volumeId, @Nonnull String name, @Nonnull String description, @Nullable Tag... tags) throws InternalException, CloudException {
+        if( logger.isTraceEnabled() ) {
+            logger.trace("enter - " + CinderSnapshot.class.getName() + ".snapshot(" + volumeId + "," + name + "," + description + "," + Arrays.toString(tags) + ")");
+        }
+        try {
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                logger.error("No context exists for this request");
+                throw new InternalException("No context exists for this request");
+            }
+
+            HashMap<String,Object> wrapper = new HashMap<String,Object>();
+            HashMap<String,Object> json = new HashMap<String,Object>();
+            NovaMethod method = new NovaMethod(provider);
+
+            json.put("volume_id", volumeId);
+            json.put("display_name", name);
+            json.put("display_description", description);
+            json.put("force", "True");
+            wrapper.put("snapshot", json);
+            JSONObject result = method.postString(SERVICE, getResource(), null, new JSONObject(wrapper), true);
+
+            if( result != null && result.has("snapshot") ) {
+                try {
+                    Snapshot snapshot = toSnapshot(ctx, result.getJSONObject("snapshot"));
+
+                    if( snapshot != null ) {
+                        return snapshot;
+                    }
+                }
+                catch( JSONException e ) {
+                    logger.error("create(): Unable to understand create response: " + e.getMessage());
+                    if( logger.isTraceEnabled() ) {
+                        e.printStackTrace();
+                    }
+                    throw new CloudException(e);
+                }
+            }
+            logger.error("snapshot(): No snapshot was created by the create attempt, and no error was returned");
+            throw new CloudException("No snapshot was created");
+
+        }
+        finally {
+            if( logger.isTraceEnabled() ) {
+                logger.trace("exit - " + CinderSnapshot.class.getName() + ".snapshot()");
+            }
+        }
+    }
+
+    @Override
+    public boolean supportsSnapshotCreation() throws CloudException, InternalException {
+        return true;
     }
 
     @Override
@@ -327,4 +468,39 @@ public class CinderSnapshot implements SnapshotSupport {
         }
     }
 
+    private @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws CloudException, InternalException {
+        if( json == null ) {
+            return null;
+        }
+
+        try {
+            String snapshotId = (json.has("id") ? json.getString("id") : null);
+
+            if( snapshotId == null ) {
+                return null;
+            }
+            SnapshotState state = SnapshotState.PENDING;
+
+            String status = (json.has("status") ? json.getString("status") : null);
+
+            if( status != null ) {
+                if( status.equalsIgnoreCase("deleted") ) {
+                    state = SnapshotState.DELETED;
+                }
+                else if( status.equalsIgnoreCase("available") ) {
+                    state = SnapshotState.AVAILABLE;
+                }
+                else if( status.equalsIgnoreCase("creating") ) {
+                    state = SnapshotState.PENDING;
+                }
+                else {
+                    logger.warn("DEBUG: Unknown OpenStack snapshot state: " + status);
+                }
+            }
+            return new ResourceStatus(snapshotId, state);
+        }
+        catch( JSONException e ) {
+            throw new CloudException(e);
+        }
+    }
 }

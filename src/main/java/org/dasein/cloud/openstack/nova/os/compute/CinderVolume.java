@@ -22,9 +22,11 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
 import org.dasein.cloud.compute.VolumeCreateOptions;
+import org.dasein.cloud.compute.VolumeFormat;
 import org.dasein.cloud.compute.VolumeProduct;
 import org.dasein.cloud.compute.VolumeState;
 import org.dasein.cloud.compute.VolumeSupport;
@@ -42,6 +44,7 @@ import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 
@@ -193,8 +196,13 @@ public class CinderVolume implements VolumeSupport {
 
     @Override
     public void detach(@Nonnull String volumeId) throws InternalException, CloudException {
+        detach(volumeId, false);
+    }
+
+    @Override
+    public void detach(@Nonnull String volumeId, boolean force) throws InternalException, CloudException {
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + CinderVolume.class.getName() + ".detach("+ volumeId + ")");
+            logger.trace("enter - " + CinderVolume.class.getName() + ".detach("+ volumeId + "," + force + ")");
         }
         try {
             Volume volume = getVolume(volumeId);
@@ -313,6 +321,11 @@ public class CinderVolume implements VolumeSupport {
     }
 
     @Override
+    public @Nonnull Iterable<VolumeFormat> listSupportedFormats() throws InternalException, CloudException {
+        return Collections.singletonList(VolumeFormat.BLOCK);
+    }
+
+    @Override
     public @Nonnull Iterable<VolumeProduct> listVolumeProducts() throws InternalException, CloudException {
         ProviderContext ctx = provider.getContext();
 
@@ -367,6 +380,40 @@ public class CinderVolume implements VolumeSupport {
             }
         }
         return products;
+    }
+
+    @Override
+    public @Nonnull Iterable<ResourceStatus> listVolumeStatus() throws InternalException, CloudException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            logger.error("No context exists for this request");
+            throw new InternalException("No context exists for this request");
+        }
+        NovaMethod method = new NovaMethod(provider);
+        ArrayList<ResourceStatus> volumes = new ArrayList<ResourceStatus>();
+
+        JSONObject json = method.getResource(SERVICE, getResource(), null, false);
+
+        if( json != null && json.has("volumes") ) {
+            try {
+                JSONArray list = json.getJSONArray("volumes");
+
+                for( int i=0; i<list.length(); i++ ) {
+                    ResourceStatus volume = toStatus(list.getJSONObject(i));
+
+                    if( volume != null ) {
+                        volumes.add(volume);
+                    }
+                }
+            }
+            catch( JSONException e ) {
+                logger.error("listVolumes(): Unable to identify expected values in JSON: " + e.getMessage());
+                e.printStackTrace();
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for volumes in " + json.toString());
+            }
+        }
+        return volumes;
     }
 
     @Override
@@ -446,6 +493,51 @@ public class CinderVolume implements VolumeSupport {
     @Override
     public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
         return new String[0];
+    }
+
+    private @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws CloudException, InternalException {
+        if( json == null ) {
+            return null;
+        }
+        try {
+            String volumeId = null;
+
+            if( json.has("id") ) {
+                volumeId = json.getString("id");
+            }
+            if( volumeId == null ) {
+                return null;
+            }
+
+            VolumeState state = VolumeState.PENDING;
+
+            if( json.has("status") ) {
+                String status = json.getString("status");
+
+                if( status.equalsIgnoreCase("available") ) {
+                    state = VolumeState.AVAILABLE;
+                }
+                else if( status.equalsIgnoreCase("creating") ) {
+                    state = VolumeState.PENDING;
+                }
+                else if( status.equalsIgnoreCase("error") ) {
+                    state = VolumeState.PENDING;
+                }
+                else if( status.equals("in-use") ) {
+                    state = VolumeState.AVAILABLE;
+                }
+                else if( status.equals("attaching") ) {
+                    state = VolumeState.PENDING;
+                }
+                else {
+                    logger.warn("DEBUG: Unknown OpenStack Cinder volume state: " + status);
+                }
+            }
+            return new ResourceStatus(volumeId, state);
+        }
+        catch( JSONException e ) {
+            throw new CloudException(e);
+        }
     }
 
     private @Nullable Volume toVolume(@Nonnull ProviderContext ctx, @Nullable JSONObject json, @Nonnull Iterable<VolumeProduct> types) throws CloudException, InternalException {
