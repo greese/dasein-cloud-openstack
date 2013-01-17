@@ -383,7 +383,7 @@ public class NovaServer implements VirtualMachineSupport {
                     else {
                         ob = method.getServers("/servers", vmId + "/os-security-groups", true);
                         if( ob.has("security_groups") ) {
-                            JSONArray groups = server.getJSONArray("security_groups");
+                            JSONArray groups = ob.getJSONArray("security_groups");
                             ArrayList<String> results = new ArrayList<String>();
 
                             for( int i=0; i<groups.length(); i++ ) {
