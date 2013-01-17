@@ -24,6 +24,8 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.network.AddressType;
 import org.dasein.cloud.network.IPVersion;
@@ -55,6 +57,7 @@ import java.util.Locale;
  * @since 2011.10
  * @version 2011.10
  * @version 2012.04.1 Added some intelligence around features Rackspace does not support
+ * @version 2013.02 updated to 2013.02 model
  */
 public class NovaFloatingIP implements IpAddressSupport {
     private NovaOpenStack provider;
@@ -79,7 +82,7 @@ public class NovaFloatingIP implements IpAddressSupport {
                 throw new CloudException("No such IP address: " + addressId);
             }
             //action.put("server", serverId);
-            action.put("address",addr.getAddress());
+            action.put("address",addr.getRawAddress().getIpAddress());
             json.put("addFloatingIp", action);
 
             NovaMethod method = new NovaMethod(provider);
@@ -152,6 +155,11 @@ public class NovaFloatingIP implements IpAddressSupport {
     }
 
     @Override
+    public @Nonnull Requirement identifyVlanForVlanIPRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
     public boolean isAssigned(@Nonnull AddressType type) {
         return type.equals(AddressType.PUBLIC);
     }
@@ -159,6 +167,11 @@ public class NovaFloatingIP implements IpAddressSupport {
     @Override
     public boolean isAssigned(@Nonnull IPVersion version) throws CloudException, InternalException {
         return getVersions().contains(version);
+    }
+
+    @Override
+    public boolean isAssignablePostLaunch(@Nonnull IPVersion version) throws CloudException, InternalException {
+        return version.equals(IPVersion.IPV6);
     }
 
     @Override
@@ -274,6 +287,43 @@ public class NovaFloatingIP implements IpAddressSupport {
     }
 
     @Override
+    public @Nonnull Iterable<ResourceStatus> listIpPoolStatus(@Nonnull IPVersion version) throws InternalException, CloudException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new InternalException("No context exists for this request");
+        }
+        NovaMethod method = new NovaMethod(provider);
+        JSONObject ob = method.getServers("/os-floating-ips", null, false);
+        ArrayList<ResourceStatus> addresses = new ArrayList<ResourceStatus>();
+
+        try {
+            if( ob != null && ob.has("floating_ips") ) {
+                JSONArray list = ob.getJSONArray("floating_ips");
+
+                for( int i=0; i<list.length(); i++ ) {
+                    JSONObject json = list.getJSONObject(i);
+
+                    try {
+                        ResourceStatus addr = toStatus(json);
+
+                        if( addr != null ) {
+                            addresses.add(addr);
+                        }
+                    }
+                    catch( JSONException e ) {
+                        throw new CloudException("Invalid JSON from cloud: " + e.getMessage());
+                    }
+                }
+            }
+        }
+        catch( JSONException e ) {
+            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for floating IP in " + ob.toString());
+        }
+        return addresses;
+    }
+
+    @Override
     public @Nonnull Iterable<IpForwardingRule> listRules(@Nonnull String addressId) throws InternalException, CloudException {
         throw new OperationNotSupportedException("Forwarding not supported");
     }
@@ -360,7 +410,7 @@ public class NovaFloatingIP implements IpAddressSupport {
                 throw new CloudException("IP address " + addressId + " is not attached to a server");
             }
             //action.put("server", serverId);
-            action.put("address",addr.getAddress());
+            action.put("address", addr.getRawAddress().getIpAddress());
             json.put("removeFloatingIp", action);
 
             NovaMethod method = new NovaMethod(provider);
@@ -430,7 +480,12 @@ public class NovaFloatingIP implements IpAddressSupport {
     }
 
     @Override
-    public @Nonnull String requestForVLAN(IPVersion version) throws InternalException, CloudException {
+    public @Nonnull String requestForVLAN(@Nonnull IPVersion version) throws InternalException, CloudException {
+        throw new OperationNotSupportedException(provider.getCloudName() + " does not support static IP addresses for VLANs");
+    }
+
+    @Override
+    public @Nonnull String requestForVLAN(@Nonnull IPVersion version, @Nonnull String vlanId) throws InternalException, CloudException {
         throw new OperationNotSupportedException(provider.getCloudName() + " does not support static IP addresses for VLANs");
     }
 
@@ -476,5 +531,24 @@ public class NovaFloatingIP implements IpAddressSupport {
         }
         address.setVersion(IPVersion.IPV4);
         return address;
+    }
+
+    private ResourceStatus toStatus(JSONObject json) throws JSONException {
+        if( json == null ) {
+            return null;
+        }
+        Boolean available = null;
+        String id;
+
+        id = (json.has("id") ? json.getString("id") : null);
+        if( json.has("instance_id") ) {
+            String instance = json.getString("instance_id");
+
+            available = !(instance != null && instance.length() > 0);
+        }
+        if( id == null ) {
+            return null;
+        }
+        return new ResourceStatus(id, available == null ? true : available);
     }
 }
