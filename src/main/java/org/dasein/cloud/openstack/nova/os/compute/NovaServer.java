@@ -71,6 +71,7 @@ import org.json.JSONObject;
  * @version 2012.09 addressed issue with alternate security group lookup in some OpenStack environments (issue #1)
  * @version 2013.02 implemented setting kernel/ramdisk image IDs (see issue #40 in dasein-cloud-core)
  * @version 2013.02 updated with support for Dasein Cloud 2013.02 model
+ * @version 2013.02 added support for fetching shell keys (issue #4)
  * @since unknown
  */
 public class NovaServer implements VirtualMachineSupport {
@@ -1143,6 +1144,9 @@ public class NovaServer implements VirtualMachineSupport {
             }
             if( server.has("adminPass") ) {
                 vm.setRootPassword("adminPass");
+            }
+            if( server.has("key_name") ) {
+                vm.setProviderShellKeyIds(server.getString("key_name"));
             }
             if( server.has("status") ) {
                 String s = server.getString("status").toLowerCase();
