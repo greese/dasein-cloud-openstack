@@ -271,7 +271,7 @@ public class NovaServer implements VirtualMachineSupport {
             logger.trace("enter - " + NovaServer.class.getName() + ".launch(" + options + ")");
         }
         try {
-            MachineImage targetImage = provider.getComputeServices().getImageSupport().getMachineImage(options.getMachineImageId());
+            MachineImage targetImage = provider.getComputeServices().getImageSupport().getImage(options.getMachineImageId());
 
             if( targetImage == null ) {
                 throw new CloudException("No such machine image: " + options.getMachineImageId());
@@ -432,7 +432,7 @@ public class NovaServer implements VirtualMachineSupport {
                     else {
                         ob = method.getServers("/servers", vmId + "/os-security-groups", true);
                         if( ob.has("security_groups") ) {
-                            JSONArray groups = server.getJSONArray("security_groups");
+                            JSONArray groups = ob.getJSONArray("security_groups");
                             ArrayList<String> results = new ArrayList<String>();
 
                             for( int i=0; i<groups.length(); i++ ) {

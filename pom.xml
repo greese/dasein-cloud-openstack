@@ -176,47 +176,47 @@
             <systemProperties>
                 <property>
                     <name>endpoint</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.endpoint}</value>
+                    <value>${endpoint}</value>
                 </property>
                 <property>
                     <name>accountNumber</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.accountNumber}</value>
+                    <value>${accountNumber}</value>
                 </property>
                 <property>
                     <name>apiSharedKey</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.apiSharedKey}</value>
+                    <value>${apiSharedKey}</value>
                 </property>
                 <property>
                     <name>apiSecretKey</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.apiSecretKey}</value>
+                    <value>${apiSecretKey}</value>
                 </property>
                 <property>
                     <name>cloudName</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.cloudName}</value>
+                    <value>${cloudName}</value>
                 </property>
                 <property>
                     <name>providerName</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.providerName}</value>
+                    <value>${providerName}</value>
                 </property>
                 <property>
                     <name>regionId</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.regionId}</value>
+                    <value>${regionId}</value>
                 </property>
                 <property>
                     <name>test.region</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.test.region}</value>
+                    <value>${test.region}</value>
                 </property>
                 <property>
                     <name>test.dataCenter</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.test.dataCenter}</value>
+                    <value>${test.dataCenter}</value>
                 </property>
                 <property>
                     <name>test.machineImage</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.test.machineImage}</value>
+                    <value>${test.machineImage}</value>
                 </property>
                 <property>
                     <name>test.product</name>
-                    <value>${org.dasein.cloud.openstack.nova.os.test.product}</value>
+                    <value>${test.product}</value>
                 </property>
             </systemProperties>
           <includes>
