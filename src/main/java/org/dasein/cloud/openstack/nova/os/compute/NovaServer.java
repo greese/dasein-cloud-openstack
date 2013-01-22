@@ -1181,7 +1181,7 @@ public class NovaServer implements VirtualMachineSupport {
                 if( s.equals("active") ) {
                     vm.setCurrentState(VmState.RUNNING);
                 }
-                else if( s.equals("build") ) {
+                else if( s.startsWith("build") ) {
                     vm.setCurrentState(VmState.PENDING);
                 }
                 else if( s.equals("deleted") ) {

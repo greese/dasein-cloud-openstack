@@ -31,6 +31,7 @@ import org.dasein.cloud.compute.SnapshotSupport;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -39,6 +40,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
@@ -250,6 +252,17 @@ public class CinderSnapshot implements SnapshotSupport {
             NovaMethod method = new NovaMethod(provider);
 
             method.deleteResource(SERVICE, getResource(), snapshotId, null);
+            long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 5L);
+
+            while( System.currentTimeMillis() < timeout ) {
+                Snapshot s = getSnapshot(snapshotId);
+
+                if( s == null || s.getCurrentState().equals(SnapshotState.DELETED) ) {
+                    return;
+                }
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+            }
         }
         finally {
             if( logger.isTraceEnabled() ) {

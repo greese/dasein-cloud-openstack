@@ -142,6 +142,28 @@ public class NovaImage implements MachineImageSupport {
             task.setStartTime(System.currentTimeMillis());
         }
         String vmId = options.getVirtualMachineId();
+
+        if( vmId != null ) {
+            long timeout = (System.currentTimeMillis() + CalendarWrapper.MINUTE*10L);
+
+            while( timeout > System.currentTimeMillis() ) {
+                try {
+                    VirtualMachine vm = provider.getComputeServices().getVirtualMachineSupport().getVirtualMachine(vmId);
+
+                    if( vm == null ) {
+                        throw new CloudException("No such virtual machine: " + vmId);
+                    }
+                    if( !VmState.PENDING.equals(vm.getCurrentState()) ) {
+                        break;
+                    }
+                }
+                catch( Throwable ignore ) {
+                    // ignore
+                }
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+            }
+        }
         JSONObject result;
 
         if( provider.isPostCactus() ) {
