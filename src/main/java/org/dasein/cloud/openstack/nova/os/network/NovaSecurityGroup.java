@@ -514,10 +514,10 @@ public class NovaSecurityGroup implements FirewallSupport {
         fw.setProviderVlanId(null);
         String regionId = ctx.getRegionId();
         fw.setRegionId(regionId == null ? "" : regionId);
-        if( json.has("id") ) {
+        if( json.has("id") && !json.isNull("id") ) {
             id = json.getString("id");
         }
-        if( json.has("name") ) {
+        if( json.has("name") && !json.isNull("name") ) {
             name = json.getString("name");
         }
         if( json.has("description") ) {

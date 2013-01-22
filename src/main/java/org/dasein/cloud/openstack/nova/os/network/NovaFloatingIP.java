@@ -459,9 +459,9 @@ public class NovaFloatingIP implements IpAddressSupport {
         address.setProviderLoadBalancerId(null);
         address.setAddressType(AddressType.PUBLIC);
         
-        String id = (json.has("id") ? json.getString("id") : null);
-        String ip = (json.has("ip") ? json.getString("ip") : null);
-        String server = (json.has("instance_id") ? json.getString("instance_id") : null);
+        String id = ((json.has("id") && !json.isNull("id")) ? json.getString("id") : null);
+        String ip = ((json.has("ip") && !json.isNull("ip")) ? json.getString("ip") : null);
+        String server = ((json.has("instance_id") && !json.isNull("instance_id")) ? json.getString("instance_id") : null);
         if( id != null ) {
             address.setIpAddressId(id);
         }
