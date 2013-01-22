@@ -754,7 +754,7 @@ public class NovaSecurityGroup implements FirewallSupport {
 
     @Override
     public boolean supportsRules(@Nonnull Direction direction, @Nonnull Permission permission, boolean inVlan) throws CloudException, InternalException {
-        return (inVlan && Direction.INGRESS.equals(direction) && Permission.ALLOW.equals(permission));
+        return (!inVlan && Direction.INGRESS.equals(direction) && Permission.ALLOW.equals(permission));
     }
 
     @Override

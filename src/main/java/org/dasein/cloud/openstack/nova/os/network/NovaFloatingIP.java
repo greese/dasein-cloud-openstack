@@ -149,6 +149,14 @@ public class NovaFloatingIP implements IpAddressSupport {
         }
     }
 
+    private void clear() {
+        try {
+            for( IpAddress addr : listIpPool(IPVersion.IPV4, false) ) { releaseFromPool(addr.getProviderIpAddressId()); }
+        }
+        catch( Throwable t ) { }
+        System.out.println("Done");
+    }
+
     @Override
     public @Nonnull String getProviderTermForIpAddress(@Nonnull Locale locale) {
         return "floating IP";
@@ -171,7 +179,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public boolean isAssignablePostLaunch(@Nonnull IPVersion version) throws CloudException, InternalException {
-        return version.equals(IPVersion.IPV6);
+        return getVersions().contains(version);
     }
 
     @Override
@@ -233,6 +241,9 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public @Nonnull Iterable<IpAddress> listIpPool(@Nonnull IPVersion version, boolean unassignedOnly) throws InternalException, CloudException {
+        if( !getVersions().contains(version) ) {
+            return Collections.emptyList();
+        }
         Logger std = NovaOpenStack.getLogger(NovaFloatingIP.class, "std");
 
         if( std.isTraceEnabled() ) {
@@ -288,6 +299,9 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listIpPoolStatus(@Nonnull IPVersion version) throws InternalException, CloudException {
+        if( !getVersions().contains(version) ) {
+            return Collections.emptyList();
+        }
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
@@ -325,7 +339,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public @Nonnull Iterable<IpForwardingRule> listRules(@Nonnull String addressId) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Forwarding not supported");
+        return Collections.emptyList();
     }
 
     static private volatile List<IPVersion> versions;
@@ -434,6 +448,9 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public @Nonnull String request(@Nonnull IPVersion version) throws InternalException, CloudException {
+        if( !getVersions().contains(version) ) {
+            throw new OperationNotSupportedException("Cannot request an IPv6 IP address at this time");
+        }
         Logger logger = NovaOpenStack.getLogger(NovaFloatingIP.class, "std");
 
         if( logger.isTraceEnabled() ) {
@@ -513,14 +530,14 @@ public class NovaFloatingIP implements IpAddressSupport {
         address.setServerId(null);
         address.setProviderLoadBalancerId(null);
         address.setAddressType(AddressType.PUBLIC);
-        
-        String id = (json.has("id") ? json.getString("id") : null);
-        String ip = (json.has("ip") ? json.getString("ip") : null);
-        String server = (json.has("instance_id") ? json.getString("instance_id") : null);
+
+        String id = ((json.has("id") && !json.isNull("id")) ? json.getString("id") : null);
+        String ip = ((json.has("ip") && !json.isNull("ip")) ? json.getString("ip") : null);
+        String server = ((json.has("instance_id") && !json.isNull("instance_id")) ? json.getString("instance_id") : null);
         if( id != null ) {
             address.setIpAddressId(id);
         }
-        if( id != null  ) {
+        if( server != null ) {
             address.setServerId(server);
         }
         if( ip != null ) {

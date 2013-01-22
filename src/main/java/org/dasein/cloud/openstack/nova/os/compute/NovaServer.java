@@ -53,6 +53,9 @@ import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.compute.VmStatistics;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.network.Firewall;
+import org.dasein.cloud.network.IPVersion;
+import org.dasein.cloud.network.IpAddress;
+import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
@@ -162,10 +165,21 @@ public class NovaServer implements VirtualMachineSupport {
             if( ob == null ) {
                 return null;
             }
+            Iterable<IpAddress> ipv4, ipv6;
+
+            IpAddressSupport support = provider.getNetworkServices().getIpAddressSupport();
+
+            if( support != null ) {
+                ipv4 = support.listIpPool(IPVersion.IPV4, false);
+                ipv6 = support.listIpPool(IPVersion.IPV6, false);
+            }
+            else {
+                ipv4 = ipv6 = Collections.emptyList();
+            }
             try {
                 if( ob.has("server") ) {
                     JSONObject server = ob.getJSONObject("server");
-                    VirtualMachine vm = toVirtualMachine(server);
+                    VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6);
                         
                     if( vm != null ) {
                         return vm;
@@ -331,8 +345,10 @@ public class NovaServer implements VirtualMachineSupport {
 
             if( result.has("server") ) {
                 try {
+                    Collection<IpAddress> ips = Collections.emptyList();
+
                     JSONObject server = result.getJSONObject("server");
-                    VirtualMachine vm = toVirtualMachine(server);
+                    VirtualMachine vm = toVirtualMachine(server, ips, ips);
 
                     if( vm != null ) {
                         return vm;
@@ -619,14 +635,25 @@ public class NovaServer implements VirtualMachineSupport {
             NovaMethod method = new NovaMethod(provider);
             JSONObject ob = method.getServers("/servers", null, true);
             ArrayList<VirtualMachine> servers = new ArrayList<VirtualMachine>();
-            
+
+            Iterable<IpAddress> ipv4, ipv6;
+
+            IpAddressSupport support = provider.getNetworkServices().getIpAddressSupport();
+
+            if( support != null ) {
+                ipv4 = support.listIpPool(IPVersion.IPV4, false);
+                ipv6 = support.listIpPool(IPVersion.IPV6, false);
+            }
+            else {
+                ipv4 = ipv6 = Collections.emptyList();
+            }
             try {
                 if( ob != null && ob.has("servers") ) {
                     JSONArray list = ob.getJSONArray("servers");
                     
                     for( int i=0; i<list.length(); i++ ) {
                         JSONObject server = list.getJSONObject(i);
-                        VirtualMachine vm = toVirtualMachine(server);
+                        VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6);
                         
                         if( vm != null ) {
                             servers.add(vm);
@@ -1043,7 +1070,7 @@ public class NovaServer implements VirtualMachineSupport {
         }
     }
 
-    private @Nullable VirtualMachine toVirtualMachine(@Nullable JSONObject server) throws JSONException, InternalException, CloudException {
+    private @Nullable VirtualMachine toVirtualMachine(@Nullable JSONObject server, Iterable<IpAddress> ipv4, Iterable<IpAddress> ipv6) throws JSONException, InternalException, CloudException {
         Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
         
         if( std.isTraceEnabled() ) {
@@ -1249,6 +1276,51 @@ public class NovaServer implements VirtualMachineSupport {
                     }
                     vm.setPrivateAddresses(raw);
                 }
+                RawAddress[] raw = vm.getPublicAddresses();
+
+                if( raw != null ) {
+                    for( RawAddress addr : vm.getPublicAddresses() ) {
+                        if( addr.getVersion().equals(IPVersion.IPV4) ) {
+                            for( IpAddress a : ipv4 ) {
+                                if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
+                                    vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
+                                    break;
+                                }
+                            }
+                        }
+                        else if( addr.getVersion().equals(IPVersion.IPV6) ) {
+                            for( IpAddress a : ipv6 ) {
+                                if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
+                                    vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if( vm.getProviderAssignedIpAddressId() == null ) {
+                    raw = vm.getPrivateAddresses();
+                    if( raw != null ) {
+                        for( RawAddress addr :raw ) {
+                            if( addr.getVersion().equals(IPVersion.IPV4) ) {
+                                for( IpAddress a : ipv4 ) {
+                                    if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
+                                        vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
+                                        break;
+                                    }
+                                }
+                            }
+                            else if( addr.getVersion().equals(IPVersion.IPV6) ) {
+                                for( IpAddress a : ipv6 ) {
+                                    if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
+                                        vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             vm.setProviderRegionId(provider.getContext().getRegionId());
             vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
@@ -1262,7 +1334,7 @@ public class NovaServer implements VirtualMachineSupport {
                 Platform p = Platform.guess(vm.getName() + " " + vm.getDescription());
                 
                 if( p.equals(Platform.UNKNOWN) ) {
-                    MachineImage img = provider.getComputeServices().getImageSupport().getMachineImage(vm.getProviderMachineImageId());
+                    MachineImage img = provider.getComputeServices().getImageSupport().getImage(vm.getProviderMachineImageId());
                     
                     if( img != null ) {
                         p = img.getPlatform();
