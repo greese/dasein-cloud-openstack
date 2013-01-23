@@ -24,6 +24,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.TimeWindow;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
@@ -55,6 +56,7 @@ import java.util.Map;
  * @author George Reese (george.reese@imaginary.com)
  * @since 2012.04.1
  * @version 2012.04.1
+ * @version 2013.02 updated for 2013.02 model
  */
 public class RackspaceRDBMS implements RelationalDatabaseSupport {
     static public final String RESOURCE  = "/instances";
@@ -460,6 +462,37 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     }
 
     @Override
+    public @Nonnull Iterable<ResourceStatus> listDatabaseStatus() throws CloudException, InternalException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new InternalException("No context exists for this request");
+        }
+        NovaMethod method = new NovaMethod(provider);
+        ArrayList<ResourceStatus> databases = new ArrayList<ResourceStatus>();
+
+        JSONObject json = method.getResource(SERVICE, RESOURCE, "detail", false);
+
+        if( json != null && json.has("instances") ) {
+            try {
+                JSONArray list = json.getJSONArray("instances");
+
+                for( int i=0; i<list.length(); i++ ) {
+                    ResourceStatus db = toStatus(list.getJSONObject(i));
+
+                    if( db != null ) {
+                        databases.add(db);
+                    }
+                }
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for instances in " + json.toString());
+            }
+        }
+        return databases;
+    }
+
+    @Override
     public Iterable<Database> listDatabases() throws CloudException, InternalException {
         Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
 
@@ -478,7 +511,6 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
             JSONObject json = method.getResource(SERVICE, RESOURCE, "detail", false);
 
-            System.out.println("JSON=" + json);
             if( json != null && json.has("instances") ) {
                 try {
                     JSONArray list = json.getJSONArray("instances");
@@ -737,6 +769,47 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             product.setStorageInGigabytes(size);
 
             return product;
+        }
+        catch( JSONException e ) {
+            throw new CloudException(e);
+        }
+    }
+
+    private @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws CloudException, InternalException {
+        if( json == null ) {
+            return null;
+        }
+
+        try {
+            String dbId = (json.has("id") ? json.getString("id") : null);
+
+            if( dbId == null ) {
+                return null;
+            }
+            DatabaseState currentState = DatabaseState.PENDING;
+            String status = (json.has("status") ? json.getString("status") : null);
+
+            if( status != null ) {
+                if( status.equalsIgnoreCase("BUILD") || status.equalsIgnoreCase("building") ) {
+                    currentState = DatabaseState.PENDING;
+                }
+                else if( status.equalsIgnoreCase("ACTIVE") || status.equalsIgnoreCase("AVAILABLE") ) {
+                    currentState = DatabaseState.AVAILABLE;
+                }
+                else if( status.equalsIgnoreCase("RESIZE") ) {
+                    currentState = DatabaseState.MODIFYING;
+                }
+                else if( status.equalsIgnoreCase("SHUTDOWN") ) {
+                    currentState = DatabaseState.RESTARTING;
+                }
+                else if( status.equalsIgnoreCase("BLOCKED") ) {
+                    currentState = DatabaseState.PENDING;
+                }
+                else {
+                    System.out.println("DEBUG OS Rackspace DB STATE: " + status);
+                }
+            }
+            return new ResourceStatus(dbId, currentState);
         }
         catch( JSONException e ) {
             throw new CloudException(e);

@@ -37,11 +37,15 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.Architecture;
+import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.VMLaunchOptions;
+import org.dasein.cloud.compute.VMScalingCapabilities;
+import org.dasein.cloud.compute.VMScalingOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineProduct;
 import org.dasein.cloud.compute.VirtualMachineSupport;
@@ -49,6 +53,10 @@ import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.compute.VmStatistics;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.network.Firewall;
+import org.dasein.cloud.network.IPVersion;
+import org.dasein.cloud.network.IpAddress;
+import org.dasein.cloud.network.IpAddressSupport;
+import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -60,6 +68,15 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+/**
+ * Implements services supporting interaction with cloud virtual machines.
+ * @author George Reese (george.reese@imaginary.com)
+ * @version 2012.09 addressed issue with alternate security group lookup in some OpenStack environments (issue #1)
+ * @version 2013.02 implemented setting kernel/ramdisk image IDs (see issue #40 in dasein-cloud-core)
+ * @version 2013.02 updated with support for Dasein Cloud 2013.02 model
+ * @version 2013.02 added support for fetching shell keys (issue #4)
+ * @since unknown
+ */
 public class NovaServer implements VirtualMachineSupport {
     private NovaOpenStack provider;
 
@@ -68,8 +85,18 @@ public class NovaServer implements VirtualMachineSupport {
     NovaServer(NovaOpenStack provider) { this.provider = provider; }
 
     @Override
+    public VirtualMachine alterVirtualMachine(@Nonnull String vmId, @Nonnull VMScalingOptions options) throws InternalException, CloudException {
+        throw new OperationNotSupportedException("Vertical scaloing is not currently supported");
+    }
+
+    @Override
     public @Nonnull VirtualMachine clone(@Nonnull String vmId, @Nullable String intoDcId, @Nonnull String name, @Nonnull String description, boolean powerOn, @Nullable String... firewallIds) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Rackspace foes not support the cloning of servers.");
+        throw new OperationNotSupportedException("Cloning is not currently supported");
+    }
+
+    @Override
+    public VMScalingCapabilities describeVerticalScalingCapabilities() throws CloudException, InternalException {
+        return null;
     }
 
     @Override
@@ -85,6 +112,11 @@ public class NovaServer implements VirtualMachineSupport {
     @Override
     public @Nonnull String getConsoleOutput(@Nonnull String vmId) throws InternalException, CloudException {
         return "";
+    }
+
+    @Override
+    public int getCostFactor(@Nonnull VmState state) throws InternalException, CloudException {
+        return 100;
     }
 
     @Override
@@ -133,10 +165,21 @@ public class NovaServer implements VirtualMachineSupport {
             if( ob == null ) {
                 return null;
             }
+            Iterable<IpAddress> ipv4, ipv6;
+
+            IpAddressSupport support = provider.getNetworkServices().getIpAddressSupport();
+
+            if( support != null ) {
+                ipv4 = support.listIpPool(IPVersion.IPV4, false);
+                ipv6 = support.listIpPool(IPVersion.IPV6, false);
+            }
+            else {
+                ipv4 = ipv6 = Collections.emptyList();
+            }
             try {
                 if( ob.has("server") ) {
                     JSONObject server = ob.getJSONObject("server");
-                    VirtualMachine vm = toVirtualMachine(server);
+                    VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6);
                         
                     if( vm != null ) {
                         return vm;
@@ -167,7 +210,18 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
+    public @Nonnull Requirement identifyImageRequirement(@Nonnull ImageClass cls) throws CloudException, InternalException {
+        return (cls.equals(ImageClass.MACHINE) ? Requirement.REQUIRED : Requirement.OPTIONAL);
+    }
+
+    @Override
+    @Deprecated
     public @Nonnull Requirement identifyPasswordRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyPasswordRequirement(Platform platform) throws CloudException, InternalException {
         return Requirement.NONE;
     }
 
@@ -182,6 +236,16 @@ public class NovaServer implements VirtualMachineSupport {
             return Requirement.NONE;
         }
         return Requirement.OPTIONAL;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyShellKeyRequirement(Platform platform) throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyStaticIPRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
     }
 
     @Override
@@ -215,14 +279,14 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
-    public @Nonnull VirtualMachine launch(VMLaunchOptions options) throws CloudException, InternalException {
+    public @Nonnull VirtualMachine launch(@Nonnull VMLaunchOptions options) throws CloudException, InternalException {
         Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
 
         if( logger.isTraceEnabled() ) {
             logger.trace("enter - " + NovaServer.class.getName() + ".launch(" + options + ")");
         }
         try {
-            MachineImage targetImage = provider.getComputeServices().getImageSupport().getMachineImage(options.getMachineImageId());
+            MachineImage targetImage = provider.getComputeServices().getImageSupport().getImage(options.getMachineImageId());
 
             if( targetImage == null ) {
                 throw new CloudException("No such machine image: " + options.getMachineImageId());
@@ -281,8 +345,10 @@ public class NovaServer implements VirtualMachineSupport {
 
             if( result.has("server") ) {
                 try {
+                    Collection<IpAddress> ips = Collections.emptyList();
+
                     JSONObject server = result.getJSONObject("server");
-                    VirtualMachine vm = toVirtualMachine(server);
+                    VirtualMachine vm = toVirtualMachine(server, ips, ips);
 
                     if( vm != null ) {
                         return vm;
@@ -519,6 +585,46 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
+    public @Nonnull Iterable<ResourceStatus> listVirtualMachineStatus() throws InternalException, CloudException {
+        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
+
+        if( std.isTraceEnabled() ) {
+            std.trace("enter - " + NovaServer.class.getName() + ".listVirtualMachines()");
+        }
+        try {
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject ob = method.getServers("/servers", null, true);
+            ArrayList<ResourceStatus> servers = new ArrayList<ResourceStatus>();
+
+            try {
+                if( ob != null && ob.has("servers") ) {
+                    JSONArray list = ob.getJSONArray("servers");
+
+                    for( int i=0; i<list.length(); i++ ) {
+                        JSONObject server = list.getJSONObject(i);
+                        ResourceStatus vm = toStatus(server);
+
+                        if( vm != null ) {
+                            servers.add(vm);
+                        }
+
+                    }
+                }
+            }
+            catch( JSONException e ) {
+                std.error("listVirtualMachines(): Unable to identify expected values in JSON: " + e.getMessage());                e.printStackTrace();
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for servers in " + ob.toString());
+            }
+            return servers;
+        }
+        finally {
+            if( std.isTraceEnabled() ) {
+                std.trace("exit - " + NovaServer.class.getName() + ".listVirtualMachines()");
+            }
+        }
+    }
+
+    @Override
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
         Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
         
@@ -529,14 +635,25 @@ public class NovaServer implements VirtualMachineSupport {
             NovaMethod method = new NovaMethod(provider);
             JSONObject ob = method.getServers("/servers", null, true);
             ArrayList<VirtualMachine> servers = new ArrayList<VirtualMachine>();
-            
+
+            Iterable<IpAddress> ipv4, ipv6;
+
+            IpAddressSupport support = provider.getNetworkServices().getIpAddressSupport();
+
+            if( support != null ) {
+                ipv4 = support.listIpPool(IPVersion.IPV4, false);
+                ipv6 = support.listIpPool(IPVersion.IPV6, false);
+            }
+            else {
+                ipv4 = ipv6 = Collections.emptyList();
+            }
             try {
                 if( ob != null && ob.has("servers") ) {
                     JSONArray list = ob.getJSONArray("servers");
                     
                     for( int i=0; i<list.length(); i++ ) {
                         JSONObject server = list.getJSONObject(i);
-                        VirtualMachine vm = toVirtualMachine(server);
+                        VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6);
                         
                         if( vm != null ) {
                             servers.add(vm);
@@ -653,10 +770,15 @@ public class NovaServer implements VirtualMachineSupport {
 
     @Override
     public void stop(@Nonnull String vmId) throws InternalException, CloudException {
+        stop(vmId, false);
+    }
+
+    @Override
+    public void stop(@Nonnull String vmId, boolean force) throws InternalException, CloudException {
         Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
 
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaServer.class.getName() + ".stop(" + vmId + ")");
+            logger.trace("ENTER: " + NovaServer.class.getName() + ".stop(" + vmId + "," + force + ")");
         }
         try {
             VirtualMachine vm = getVirtualMachine(vmId);
@@ -742,6 +864,11 @@ public class NovaServer implements VirtualMachineSupport {
                 logger.trace("exit - " + NovaServer.class.getName() + ".unpause()");
             }
         }
+    }
+
+    @Override
+    public void updateTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+        // NO-OP
     }
 
     @Override
@@ -871,8 +998,79 @@ public class NovaServer implements VirtualMachineSupport {
             }            
         }
     }
-    
-    private @Nullable VirtualMachine toVirtualMachine(@Nullable JSONObject server) throws JSONException, InternalException, CloudException {
+
+    private @Nullable ResourceStatus toStatus(@Nullable JSONObject server) throws JSONException, InternalException, CloudException {
+        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
+
+        if( std.isTraceEnabled() ) {
+            std.trace("ENTER: " + NovaServer.class.getName() + ".toStatus(" + server + ")");
+        }
+        try {
+            if( server == null ) {
+                return null;
+            }
+            String serverId = null;
+
+            if( server.has("id") ) {
+                serverId = server.getString("id");
+            }
+            if( serverId == null ) {
+                return null;
+            }
+
+            VmState state = VmState.PENDING;
+
+            if( server.has("status") ) {
+                String s = server.getString("status").toLowerCase();
+
+                if( s.equals("active") ) {
+                    state = VmState.RUNNING;
+                }
+                else if( s.equals("build") ) {
+                    state = VmState.PENDING;
+                }
+                else if( s.equals("deleted") ) {
+                    state = VmState.TERMINATED;
+                }
+                else if( s.equals("suspended") ) {
+                    state = VmState.SUSPENDED;
+                }
+                else if( s.equalsIgnoreCase("paused") ) {
+                    state = VmState.PAUSED;
+                }
+                else if( s.equalsIgnoreCase("stopped") || s.equalsIgnoreCase("shutoff")) {
+                    state = VmState.STOPPED;
+                }
+                else if( s.equalsIgnoreCase("stopping") ) {
+                    state = VmState.STOPPING;
+                }
+                else if( s.equalsIgnoreCase("pausing") ) {
+                    state = VmState.PAUSING;
+                }
+                else if( s.equalsIgnoreCase("suspending") ) {
+                    state = VmState.SUSPENDING;
+                }
+                else if( s.equals("error") ) {
+                    return null;
+                }
+                else if( s.equals("reboot") || s.equals("hard_reboot") ) {
+                    state = VmState.REBOOTING;
+                }
+                else {
+                    std.warn("toVirtualMachine(): Unknown server state: " + s);
+                    state = VmState.PENDING;
+                }
+            }
+            return new ResourceStatus(serverId, state);
+        }
+        finally {
+            if( std.isTraceEnabled() ) {
+                std.trace("exit - " + NovaServer.class.getName() + ".toStatus()");
+            }
+        }
+    }
+
+    private @Nullable VirtualMachine toVirtualMachine(@Nullable JSONObject server, Iterable<IpAddress> ipv4, Iterable<IpAddress> ipv6) throws JSONException, InternalException, CloudException {
         Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
         
         if( std.isTraceEnabled() ) {
@@ -904,6 +1102,12 @@ public class NovaServer implements VirtualMachineSupport {
             }
             if( server.has("description") ) {
                 vm.setDescription(server.getString("description"));
+            }
+            if( server.has("kernel_id") ) {
+                vm.setProviderKernelImageId(server.getString("kernel_id"));
+            }
+            if( server.has("ramdisk_id") ) {
+                vm.setProviderRamdiskImageId(server.getString("ramdisk_id"));
             }
             if( vm.getDescription() == null ) {
                 HashMap<String,String> map = new HashMap<String,String>();
@@ -968,13 +1172,16 @@ public class NovaServer implements VirtualMachineSupport {
             if( server.has("adminPass") ) {
                 vm.setRootPassword("adminPass");
             }
+            if( server.has("key_name") ) {
+                vm.setProviderShellKeyIds(server.getString("key_name"));
+            }
             if( server.has("status") ) {
                 String s = server.getString("status").toLowerCase();
                 
                 if( s.equals("active") ) {
                     vm.setCurrentState(VmState.RUNNING);
                 }
-                else if( s.equals("build") ) {
+                else if( s.startsWith("build") ) {
                     vm.setCurrentState(VmState.PENDING);
                 }
                 else if( s.equals("deleted") ) {
@@ -1031,10 +1238,13 @@ public class NovaServer implements VirtualMachineSupport {
                             }
                         }
                     }
-                    vm.setPublicIpAddresses(addresses.toArray(new String[addresses.size()])); 
-                }
-                else {
-                    vm.setPublicIpAddresses(new String[0]);                    
+                    RawAddress[] raw = new RawAddress[addresses.size()];
+                    int i=0;
+
+                    for( String addr : addresses ) {
+                        raw[i++] = new RawAddress(addr);
+                    }
+                    vm.setPublicAddresses(raw);
                 }
                 if( addrs.has("private") || addrs.has("nova_fixed")) {
                     JSONArray arr;
@@ -1058,10 +1268,58 @@ public class NovaServer implements VirtualMachineSupport {
                             }
                         }
                     }
-                    vm.setPrivateIpAddresses(addresses.toArray(new String[addresses.size()]));                    
+                    RawAddress[] raw = new RawAddress[addresses.size()];
+                    int i=0;
+
+                    for( String addr : addresses ) {
+                        raw[i++] = new RawAddress(addr);
+                    }
+                    vm.setPrivateAddresses(raw);
                 }
-                else {
-                    vm.setPrivateIpAddresses(new String[0]);                    
+                RawAddress[] raw = vm.getPublicAddresses();
+
+                if( raw != null ) {
+                    for( RawAddress addr : vm.getPublicAddresses() ) {
+                        if( addr.getVersion().equals(IPVersion.IPV4) ) {
+                            for( IpAddress a : ipv4 ) {
+                                if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
+                                    vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
+                                    break;
+                                }
+                            }
+                        }
+                        else if( addr.getVersion().equals(IPVersion.IPV6) ) {
+                            for( IpAddress a : ipv6 ) {
+                                if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
+                                    vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if( vm.getProviderAssignedIpAddressId() == null ) {
+                    raw = vm.getPrivateAddresses();
+                    if( raw != null ) {
+                        for( RawAddress addr :raw ) {
+                            if( addr.getVersion().equals(IPVersion.IPV4) ) {
+                                for( IpAddress a : ipv4 ) {
+                                    if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
+                                        vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
+                                        break;
+                                    }
+                                }
+                            }
+                            else if( addr.getVersion().equals(IPVersion.IPV6) ) {
+                                for( IpAddress a : ipv6 ) {
+                                    if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
+                                        vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             vm.setProviderRegionId(provider.getContext().getRegionId());
@@ -1076,7 +1334,7 @@ public class NovaServer implements VirtualMachineSupport {
                 Platform p = Platform.guess(vm.getName() + " " + vm.getDescription());
                 
                 if( p.equals(Platform.UNKNOWN) ) {
-                    MachineImage img = provider.getComputeServices().getImageSupport().getMachineImage(vm.getProviderMachineImageId());
+                    MachineImage img = provider.getComputeServices().getImageSupport().getImage(vm.getProviderMachineImageId());
                     
                     if( img != null ) {
                         p = img.getPlatform();

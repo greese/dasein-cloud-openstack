@@ -23,6 +23,7 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.network.DNSRecord;
 import org.dasein.cloud.network.DNSRecordType;
@@ -52,6 +53,7 @@ import java.util.Map;
  * @author George Reese (george.reese@imaginary.com)
  * @since 2012.04.1
  * @version 2012.04.1
+ * @version 2013.02 updated to 2013.02 model
  */
 public class RackspaceCloudDNS implements DNSSupport {
     static private final String RESOURCE = "/domains";
@@ -499,6 +501,55 @@ public class RackspaceCloudDNS implements DNSSupport {
                 std.trace("exit - " + RackspaceCloudDNS.class.getName() + ".listDnsRecords()");
             }
         }
+    }
+
+    @Override
+    public @Nonnull Iterable<ResourceStatus> listDnsZoneStatus() throws CloudException, InternalException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new InternalException("No context exists for this request");
+        }
+        NovaMethod method = new NovaMethod(provider);
+        JSONObject response = method.getResource(SERVICE, RESOURCE, null, false);
+
+        if( response == null ) {
+            return Collections.emptyList();
+        }
+        ArrayList<ResourceStatus> zones = new ArrayList<ResourceStatus>();
+
+        try {
+            int count = 0, total = 0;
+
+            if( response.has("totalEntries") ) {
+                total = response.getInt("totalEntries");
+            }
+            while( response != null ) {
+                int current = 0;
+
+                if( response.has("domains") ) {
+                    JSONArray list = response.getJSONArray("domains");
+
+                    current = list.length();
+                    count += current;
+                    for( int i=0; i<list.length(); i++ ) {
+                        JSONObject item = list.getJSONObject(i);
+
+                        if( item != null && item.has("id") ) {
+                            zones.add(new ResourceStatus(item.getString("id"), true));
+                        }
+                    }
+                }
+                response = null;
+                if( current > 0 && count < total ) {
+                    response = method.getResource(SERVICE, RESOURCE, "?offset=" + count, false);
+                }
+            }
+        }
+        catch( JSONException e ) {
+            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "JSON error parsing " + response);
+        }
+        return zones;
     }
 
     @Override

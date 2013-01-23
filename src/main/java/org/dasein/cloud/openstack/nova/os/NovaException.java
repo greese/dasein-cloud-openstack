@@ -32,7 +32,8 @@ public class NovaException extends CloudException {
         public String message;
         public String details;
     }
-    
+
+    //    //{"badRequest": {"message": "AddressLimitExceeded: Address quota exceeded. You cannot allocate any more addresses", "code": 400}}
     static public ExceptionItems parseException(int code, String json) {
         ExceptionItems items = new ExceptionItems();
         
@@ -43,7 +44,13 @@ public class NovaException extends CloudException {
         if( json != null ) {
             try {
                 JSONObject ob = new JSONObject(json);
-                
+
+                if( code == 400 && ob.has("badRequest") ) {
+                    ob = ob.getJSONObject("badRequest");
+                }
+                if( code == 413 && ob.has("overLimit") ) {
+                    ob = ob.getJSONObject("overLimit");
+                }
                 if( ob.has("message") ) {
                     items.message = ob.getString("message");
                     if( items.message == null ) {
@@ -52,9 +59,6 @@ public class NovaException extends CloudException {
                     else {
                         items.message = items.message.trim();
                     }
-                }
-                else {
-                    items.message = "unknown";
                 }
                 if( ob.has("details") ) {
                     items.details = ob.getString("details");
@@ -66,6 +70,9 @@ public class NovaException extends CloudException {
 
                 if( code == 413 ) {
                     items.type = CloudErrorType.THROTTLING;
+                }
+                else if( t.startsWith("addresslimitexceeded") || t.startsWith("ramlimitexceeded")) {
+                    items.type = CloudErrorType.QUOTA;
                 }
                 else if( t.equals("unauthorized") ) {
                     items.type = CloudErrorType.AUTHENTICATION;
@@ -88,7 +95,6 @@ public class NovaException extends CloudException {
             }
             catch( JSONException e ) {
                 NovaOpenStack.getLogger(NovaException.class, "std").warn("parseException(): Invalid JSON in cloud response: " + json);
-                
                 items.details = json;
             }
         }

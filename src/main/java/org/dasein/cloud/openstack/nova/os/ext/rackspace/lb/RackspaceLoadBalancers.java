@@ -24,6 +24,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.network.IPVersion;
@@ -367,6 +368,50 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
     @Override
     public String getProviderTermForLoadBalancer(Locale locale) {
         return "load balancer";
+    }
+
+    @Override
+    public Iterable<ResourceStatus> listLoadBalancerStatus() throws CloudException, InternalException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new InternalException("No context exists for this request");
+        }
+        NovaMethod method = new NovaMethod(provider);
+        JSONObject ob = method.getResource(SERVICE, RESOURCE, null, false);
+
+        if( ob == null ) {
+            return Collections.emptyList();
+        }
+        try {
+            ArrayList<ResourceStatus> loadBalancers = new ArrayList<ResourceStatus>();
+
+            if( ob.has("loadBalancers") ) {
+                JSONArray lbs = ob.getJSONArray("loadBalancers");
+
+                if( lbs.length() > 0 ) {
+                    for( int i=0; i<lbs.length(); i++ ) {
+                        JSONObject tmp = lbs.getJSONObject(i);
+
+                        if( tmp.has("id") ) {
+                            JSONObject actual = method.getResource(SERVICE, RESOURCE, tmp.getString("id"), false);
+
+                            if( actual != null && actual.has("loadBalancer") ) {
+                                ResourceStatus lb = toStatus(actual.getJSONObject("loadBalancer"));
+
+                                if( lb != null ) {
+                                    loadBalancers.add(lb);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return loadBalancers;
+        }
+        catch( JSONException e ) {
+            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for load balancers: " + e.getMessage());
+        }
     }
 
     static private transient Collection<LbAlgorithm> supportedAlgorithms;
@@ -808,5 +853,29 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
             loadBalancer.setDescription(loadBalancer.getName());
         }
         return loadBalancer;
+    }
+
+    private @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws JSONException, CloudException {
+        if( json == null ) {
+            return null;
+        }
+        String id = (json.has("id") ? json.getString("id") : null);
+
+        if( id == null || id.length() < 1 ) {
+            return null;
+        }
+        LoadBalancerState state = LoadBalancerState.PENDING;
+
+        if( json.has("status") ) {
+            String s = json.getString("status").toLowerCase();
+
+            if( s.equals("active") ) {
+                state = LoadBalancerState.ACTIVE;
+            }
+            else {
+                state = LoadBalancerState.PENDING;
+            }
+        }
+        return new ResourceStatus(id, state);
     }
 }

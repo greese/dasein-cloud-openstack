@@ -81,7 +81,7 @@ public class NovaMethod extends AbstractMethod {
             throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
         }
     }
-    
+
     public @Nullable JSONObject postServers(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
 

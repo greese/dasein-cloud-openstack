@@ -23,6 +23,7 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -48,6 +49,7 @@ import java.util.Map;
  * @author George Reese (george.reese@imaginary.com)
  * @since 2012.04.1
  * @version 2012.04.1
+ * @version 2013.02 updated for 2013.02 model
  */
 public class HPCDN implements CDNSupport {
     static public final String SERVICE  = "hpext:cdn";
@@ -177,6 +179,38 @@ public class HPCDN implements CDNSupport {
     }
 
     @Override
+    public @Nonnull Iterable<ResourceStatus> listDistributionStatus() throws InternalException, CloudException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new InternalException("No context exists for this request");
+        }
+        NovaMethod method = new NovaMethod(provider);
+        String response = method.getHPCDN(null);
+        ArrayList<ResourceStatus> distributions = new ArrayList<ResourceStatus>();
+
+        try {
+            if( response != null ) {
+                BufferedReader reader = new BufferedReader(new StringReader(response));
+                String container;
+
+                while( (container = reader.readLine()) != null ) {
+                    ResourceStatus d = toStatus(container);
+
+                    if( d != null ) {
+                        distributions.add(d);
+                    }
+                }
+            }
+        }
+        catch( IOException e ) {
+            e.printStackTrace();
+            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "I/O error parsing " + response);
+        }
+        return distributions;
+    }
+
+    @Override
     public void update(@Nonnull String distributionId, @Nonnull String name, boolean active, @CheckForNull String... aliases) throws InternalException, CloudException {
         Logger std = NovaOpenStack.getLogger(HPCDN.class, "std");
 
@@ -263,5 +297,32 @@ public class HPCDN implements CDNSupport {
         distribution.setProviderDistributionId(container);
         distribution.setProviderOwnerId(ctx.getAccountNumber());
         return distribution;
+    }
+
+    private @Nullable ResourceStatus toStatus(@Nullable String container) throws CloudException, InternalException {
+        if( container == null ) {
+            return null;
+        }
+        NovaMethod method = new NovaMethod(provider);
+        Map<String,String> headers = method.headResource(SERVICE, RESOURCE, container);
+
+        if( headers == null ) {
+            return null;
+        }
+
+        String enabled = null, uriString = null;
+        for( String key : headers.keySet() ) {
+            if( key.equalsIgnoreCase("X-CDN-Enabled") ) {
+                enabled = headers.get(key);
+            }
+            else if( key.equalsIgnoreCase("X-CDN-URI") ) {
+                uriString = headers.get(key);
+
+            }
+        }
+        if( uriString == null ) {
+            return null;
+        }
+        return new ResourceStatus(container, enabled != null && enabled.equalsIgnoreCase("true"));
     }
 }
