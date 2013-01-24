@@ -697,7 +697,6 @@ public class NovaSecurityGroup implements FirewallSupport {
         revoke(firewallId, direction, permission, source, protocol, RuleTarget.getGlobal(firewallId), beginPort, endPort);
     }
 
-    //{"security_group": {"rules": [{"from_port": 3306, "group": {"tenant_id": "be344db2784445da9415d19c2bb31ac1", "name": "asaenz-test2"}, "ip_protocol": "tcp", "to_port": 3307, "parent_group_id": 1380, "ip_range": {}, "id": 2299}], "tenant_id": "be344db2784445da9415d19c2bb31ac1", "id": 1380, "name": "asaenz-test", "description": "just testing"}}
     @Override
     public void revoke(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull Permission permission, @Nonnull String source, @Nonnull Protocol protocol, @Nonnull RuleTarget target, int beginPort, int endPort) throws CloudException, InternalException {
         if( direction.equals(Direction.EGRESS) ) {
