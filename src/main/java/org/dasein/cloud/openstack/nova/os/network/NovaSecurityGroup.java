@@ -697,6 +697,7 @@ public class NovaSecurityGroup implements FirewallSupport {
         revoke(firewallId, direction, permission, source, protocol, RuleTarget.getGlobal(firewallId), beginPort, endPort);
     }
 
+    //{"security_group": {"rules": [{"from_port": 3306, "group": {"tenant_id": "be344db2784445da9415d19c2bb31ac1", "name": "asaenz-test2"}, "ip_protocol": "tcp", "to_port": 3307, "parent_group_id": 1380, "ip_range": {}, "id": 2299}], "tenant_id": "be344db2784445da9415d19c2bb31ac1", "id": 1380, "name": "asaenz-test", "description": "just testing"}}
     @Override
     public void revoke(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull Permission permission, @Nonnull String source, @Nonnull Protocol protocol, @Nonnull RuleTarget target, int beginPort, int endPort) throws CloudException, InternalException {
         if( direction.equals(Direction.EGRESS) ) {
@@ -742,7 +743,38 @@ public class NovaSecurityGroup implements FirewallSupport {
                             break;
                         }
                     }
+                }
+            }
+            else if( t.getRuleTargetType().equals(RuleTargetType.GLOBAL) && source.equals(t.getProviderFirewallId()) ) {
+                RuleTarget rt = rule.getDestinationEndpoint();
 
+                if( target.getRuleTargetType().equals(rt.getRuleTargetType()) ) {
+                    boolean matches = false;
+
+                    switch( rt.getRuleTargetType() ) {
+                        case CIDR:
+                            //noinspection ConstantConditions
+                            matches = target.getCidr().equals(rt.getCidr());
+                            break;
+                        case GLOBAL:
+                            //noinspection ConstantConditions
+                            matches = target.getProviderFirewallId().equals(rt.getProviderFirewallId());
+                            break;
+                        case VLAN:
+                            //noinspection ConstantConditions
+                            matches = target.getProviderVlanId().equals(rt.getProviderVlanId());
+                            break;
+                        case VM:
+                            //noinspection ConstantConditions
+                            matches = target.getProviderVirtualMachineId().equals(rt.getProviderVirtualMachineId());
+                            break;
+                    }
+                    if( matches && rule.getProtocol().equals(protocol) && rule.getPermission().equals(permission) && rule.getDirection().equals(direction) ) {
+                        if( rule.getStartPort() == beginPort && rule.getEndPort() == endPort ) {
+                            targetRule = rule;
+                            break;
+                        }
+                    }
                 }
             }
         }
