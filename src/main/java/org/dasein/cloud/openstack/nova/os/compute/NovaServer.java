@@ -872,6 +872,21 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
+    public void updateTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+        // NO-OP
+    }
+
+    @Override
+    public void removeTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+        // NO-OP
+    }
+
+    @Override
+    public void removeTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+        // NO-OP
+    }
+
+    @Override
     public void reboot(@Nonnull String vmId) throws CloudException, InternalException {
         Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
         
