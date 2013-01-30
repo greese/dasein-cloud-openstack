@@ -32,14 +32,14 @@ import org.dasein.cloud.AsynchronousTask;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
-import org.dasein.cloud.Tag;
+import org.dasein.cloud.compute.AbstractImageSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.ImageCreateOptions;
+import org.dasein.cloud.compute.ImageFilterOptions;
 import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.MachineImageFormat;
 import org.dasein.cloud.compute.MachineImageState;
@@ -57,13 +57,15 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-
-public class NovaImage implements MachineImageSupport {
+public class NovaImage extends AbstractImageSupport {
     static private final Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
 
     private NovaOpenStack provider;
     
-    NovaImage(NovaOpenStack provider) { this.provider = provider; }
+    NovaImage(NovaOpenStack provider) {
+        super(provider);
+        this.provider = provider;
+    }
 
     public @Nullable String getImageRef(@Nonnull String machineImageId) throws CloudException, InternalException {
         if( logger.isTraceEnabled() ) {
@@ -109,31 +111,7 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    public void addImageShare(@Nonnull String providerImageId, @Nonnull String accountNumber) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image sharing is not currently supported");
-    }
-
-    @Override
-    public void addPublicShare(@Nonnull String providerImageId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image sharing is not currently supported");
-    }
-
-    @Override
-    public @Nonnull String bundleVirtualMachine(@Nonnull String virtualMachineId, @Nonnull MachineImageFormat format, @Nonnull String bucket, @Nonnull String name) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("This operation is not currently supported");
-    }
-
-    @Override
-    public void bundleVirtualMachineAsync(@Nonnull String virtualMachineId, @Nonnull MachineImageFormat format, @Nonnull String bucket, @Nonnull String name, @Nonnull AsynchronousTask<String> trackingTask) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("This operation is not currently supported");
-    }
-
-    @Override
-    public @Nonnull MachineImage captureImage(@Nonnull ImageCreateOptions options) throws CloudException, InternalException {
-        return captureImage(options, null);
-    }
-
-    private MachineImage captureImage(@Nonnull ImageCreateOptions options, @Nullable AsynchronousTask<MachineImage> task) throws CloudException, InternalException {
+    protected MachineImage capture(@Nonnull ImageCreateOptions options, @Nullable AsynchronousTask<MachineImage> task) throws CloudException, InternalException {
         NovaMethod method = new NovaMethod(provider);
         HashMap<String,Object> action = new HashMap<String,Object>();
 
@@ -231,55 +209,6 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    public void captureImageAsync(final @Nonnull ImageCreateOptions options, final @Nonnull AsynchronousTask<MachineImage> taskTracker) throws CloudException, InternalException {
-        VirtualMachine vm = null;
-
-        long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 30L);
-
-        while( timeout > System.currentTimeMillis() ) {
-            try {
-                //noinspection ConstantConditions
-                vm = provider.getComputeServices().getVirtualMachineSupport().getVirtualMachine(options.getVirtualMachineId());
-                if( vm == null ) {
-                    break;
-                }
-                if( !vm.isPersistent() ) {
-                    throw new OperationNotSupportedException("You cannot capture instance-backed virtual machines");
-                }
-                if( VmState.RUNNING.equals(vm.getCurrentState()) || VmState.STOPPED.equals(vm.getCurrentState()) ) {
-                    break;
-                }
-            }
-            catch( Throwable ignore ) {
-                // ignore
-            }
-            try { Thread.sleep(15000L); }
-            catch( InterruptedException ignore ) { }
-        }
-        if( vm == null ) {
-            throw new CloudException("No such virtual machine: " + options.getVirtualMachineId());
-        }
-        Thread t = new Thread() {
-            public void run() {
-                try {
-                    taskTracker.completeWithResult(captureImage(options, taskTracker));
-                }
-                catch( Throwable t ) {
-                    taskTracker.complete(t);
-                }
-                finally {
-                    provider.release();
-                }
-            }
-        };
-
-        provider.hold();
-        t.setName("Imaging " + options.getVirtualMachineId() + " as " + options.getName());
-        t.setDaemon(true);
-        t.start();
-    }
-
-    @Override
     public MachineImage getImage(@Nonnull String providerImageId) throws CloudException, InternalException {
         Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
 
@@ -317,17 +246,6 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    @Deprecated
-    public @Nullable MachineImage getMachineImage(@Nonnull String machineImageId) throws CloudException, InternalException {
-        return getImage(machineImageId);
-    }
-
-    @Override
-    public @Nonnull String getProviderTermForImage(@Nonnull Locale locale) {
-        return "image";
-    }
-
-    @Override
     public @Nonnull String getProviderTermForImage(@Nonnull Locale locale, @Nonnull ImageClass cls) {
         switch( cls ) {
             case MACHINE: return "machine image";
@@ -338,11 +256,6 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    public @Nonnull String getProviderTermForCustomImage(@Nonnull Locale locale, @Nonnull ImageClass cls) {
-        return getProviderTermForImage(locale, cls);
-    }
-
-    @Override
     public boolean hasPublicLibrary() {
         return false;
     }
@@ -350,53 +263,6 @@ public class NovaImage implements MachineImageSupport {
     @Override
     public @Nonnull Requirement identifyLocalBundlingRequirement() throws CloudException, InternalException {
         return Requirement.NONE;
-    }
-
-    @Override
-    public @Nonnull AsynchronousTask<String> imageVirtualMachine(@Nonnull String vmId, @Nonnull String name, @Nonnull String description) throws CloudException, InternalException {
-        @SuppressWarnings("ConstantConditions") VirtualMachine vm = provider.getComputeServices().getVirtualMachineSupport().getVirtualMachine(vmId);
-
-        if( vm == null ) {
-            throw new CloudException("No such virtual machine: " + vmId);
-        }
-        final AsynchronousTask<MachineImage> task = new AsynchronousTask<MachineImage>();
-        final AsynchronousTask<String> oldTask = new AsynchronousTask<String>();
-
-        captureImageAsync(ImageCreateOptions.getInstance(vm,  name, description), task);
-
-        final long timeout = System.currentTimeMillis() + (CalendarWrapper.HOUR * 2);
-
-        Thread t = new Thread() {
-            public void run() {
-                while( timeout > System.currentTimeMillis() ) {
-                    try { Thread.sleep(15000L); }
-                    catch( InterruptedException ignore ) { }
-                    oldTask.setPercentComplete(task.getPercentComplete());
-
-                    Throwable error = task.getTaskError();
-                    MachineImage img = task.getResult();
-
-                    if( error != null ) {
-                        oldTask.complete(error);
-                        return;
-                    }
-                    else if( img != null ) {
-                        oldTask.completeWithResult(img.getProviderMachineImageId());
-                        return;
-                    }
-                    else if( task.isComplete() ) {
-                        oldTask.complete(new CloudException("Task completed without info"));
-                        return;
-                    }
-                }
-                oldTask.complete(new CloudException("Image creation task timed out"));
-            }
-        };
-
-        t.setDaemon(true);
-        t.start();
-
-        return oldTask;
     }
 
     @Override
@@ -447,11 +313,22 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    public @Nonnull Iterable<MachineImage> listImages(@Nonnull ImageClass cls) throws CloudException, InternalException {
+    public @Nonnull Iterable<MachineImage> listImages(@Nullable ImageFilterOptions options) throws CloudException, InternalException {
         if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaImage.class.getName() + ".listImages(" + cls + ")");
+            logger.trace("enter - " + NovaImage.class.getName() + ".listImages(" + options + ")");
         }
         try {
+            ImageClass cls = (options == null ? null : options.getImageClass());
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                throw new CloudException("No context was set for this request");
+            }
+            String account = (options == null ? null : options.getAccountNumber());
+
+            if( account != null && !account.equals(ctx.getAccountNumber()) ) {
+                return Collections.emptyList();
+            }
             NovaMethod method = new NovaMethod(provider);
             JSONObject ob = method.getServers("/images", null, true);
             ArrayList<MachineImage> images = new ArrayList<MachineImage>();
@@ -464,7 +341,7 @@ public class NovaImage implements MachineImageSupport {
                         JSONObject image = list.getJSONObject(i);
                         MachineImage img = toImage(image);
 
-                        if( img != null ) {
+                        if( img != null && (cls == null || cls.equals(img.getImageClass())) ) {
                             images.add(img);
                         }
 
@@ -481,34 +358,6 @@ public class NovaImage implements MachineImageSupport {
                 logger.trace("exit - " + NovaImage.class.getName() + ".listImages()");
             }
         }
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImage> listImages(@Nonnull ImageClass cls, @Nonnull String ownedBy) throws CloudException, InternalException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new CloudException("No context was set for this request");
-        }
-        if( !ownedBy.equals(ctx.getAccountNumber()) ) {
-            return Collections.emptyList();
-        }
-        return listImages(cls);
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull Iterable<MachineImage> listMachineImages() throws CloudException, InternalException {
-        return listImages(ImageClass.MACHINE);
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull Iterable<MachineImage> listMachineImagesOwnedBy(@Nullable String accountId) throws CloudException, InternalException {
-        if( accountId == null ) {
-            return Collections.emptyList();
-        }
-        return listImages(ImageClass.MACHINE, accountId);
     }
 
     @Override
@@ -540,18 +389,8 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    public @Nonnull MachineImage registerImageBundle(@Nonnull ImageCreateOptions options) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Glance integration not yet supported");
-    }
-
-    @Override
     public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
         return new String[0];
-    }
-
-    @Override
-    public void remove(@Nonnull String machineImageId) throws CloudException, InternalException {
-        remove(machineImageId, false);
     }
 
     @Override
@@ -584,21 +423,6 @@ public class NovaImage implements MachineImageSupport {
                 logger.trace("exit - " + NovaImage.class.getName() + ".remove()");
             }
         }
-    }
-
-    @Override
-    public void removeAllImageShares(@Nonnull String providerImageId) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void removeImageShare(@Nonnull String providerImageId, @Nonnull String accountNumber) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image sharing is not supported");
-    }
-
-    @Override
-    public void removePublicShare(@Nonnull String providerImageId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image sharing is not supported");
     }
 
     @Override
@@ -683,11 +507,6 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    public void shareMachineImage(@Nonnull String machineImageId, @Nullable String withAccountId, boolean allow) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("OpenStack does not support image sharing");
-    }
-
-    @Override
     public boolean supportsCustomImages() {
         return true;
     }
@@ -715,26 +534,6 @@ public class NovaImage implements MachineImageSupport {
     @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
         return false;
-    }
-
-    @Override
-    public void updateTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void updateTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void removeTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void removeTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
     }
 
     public @Nullable MachineImage toImage(@Nullable JSONObject json) throws JSONException {

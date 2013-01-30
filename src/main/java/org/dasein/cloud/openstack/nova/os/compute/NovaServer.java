@@ -39,6 +39,7 @@ import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
+import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.MachineImage;
@@ -77,51 +78,14 @@ import org.json.JSONObject;
  * @version 2013.02 added support for fetching shell keys (issue #4)
  * @since unknown
  */
-public class NovaServer implements VirtualMachineSupport {
+public class NovaServer extends AbstractVMSupport {
     private NovaOpenStack provider;
 
     static public final String SERVICE = "compute";
 
-    NovaServer(NovaOpenStack provider) { this.provider = provider; }
-
-    @Override
-    public VirtualMachine alterVirtualMachine(@Nonnull String vmId, @Nonnull VMScalingOptions options) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Vertical scaloing is not currently supported");
-    }
-
-    @Override
-    public @Nonnull VirtualMachine clone(@Nonnull String vmId, @Nullable String intoDcId, @Nonnull String name, @Nonnull String description, boolean powerOn, @Nullable String... firewallIds) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Cloning is not currently supported");
-    }
-
-    @Override
-    public VMScalingCapabilities describeVerticalScalingCapabilities() throws CloudException, InternalException {
-        return null;
-    }
-
-    @Override
-    public void disableAnalytics(@Nonnull String vmId) throws InternalException, CloudException {
-        // NO-OP
-    }
-
-    @Override
-    public void enableAnalytics(@Nonnull String vmId) throws InternalException, CloudException {
-        // NO-OP
-    }
-
-    @Override
-    public @Nonnull String getConsoleOutput(@Nonnull String vmId) throws InternalException, CloudException {
-        return "";
-    }
-
-    @Override
-    public int getCostFactor(@Nonnull VmState state) throws InternalException, CloudException {
-        return 100;
-    }
-
-    @Override
-    public int getMaximumVirtualMachineCount() throws CloudException, InternalException {
-        return -2;
+    NovaServer(NovaOpenStack provider) {
+        super(provider);
+        this.provider = provider;
     }
 
     @Override
@@ -129,7 +93,7 @@ public class NovaServer implements VirtualMachineSupport {
         Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
         
         if( std.isTraceEnabled() ) {
-            std.trace("enter - " + NovaServer.class.getName() + ".getProduct(" + productId + ")");
+            std.trace("ENTER: " + NovaServer.class.getName() + ".getProduct(" + productId + ")");
         }
         try {
             for( VirtualMachineProduct product : listProducts(Architecture.I64) ) {
@@ -141,7 +105,7 @@ public class NovaServer implements VirtualMachineSupport {
         }
         finally {
             if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaServer.class.getName() + ".getProduct()");
+                std.trace("EXIT: " + NovaServer.class.getName() + ".getProduct()");
             }
         }
     }
@@ -200,24 +164,8 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
-    public @Nullable VmStatistics getVMStatistics(@Nonnull String vmId, long from, long to) throws InternalException, CloudException {
-        return null;
-    }
-
-    @Override
-    public @Nonnull Iterable<VmStatistics> getVMStatisticsForPeriod(@Nonnull String vmId, long from, long to) throws InternalException, CloudException {
-        return Collections.emptyList();
-    }
-
-    @Override
     public @Nonnull Requirement identifyImageRequirement(@Nonnull ImageClass cls) throws CloudException, InternalException {
         return (cls.equals(ImageClass.MACHINE) ? Requirement.REQUIRED : Requirement.OPTIONAL);
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull Requirement identifyPasswordRequirement() throws CloudException, InternalException {
-        return Requirement.NONE;
     }
 
     @Override
@@ -231,15 +179,10 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
-    public @Nonnull Requirement identifyShellKeyRequirement() throws CloudException, InternalException {
+    public @Nonnull Requirement identifyShellKeyRequirement(Platform platform) throws CloudException, InternalException {
         if( provider.getIdentityServices().getShellKeySupport() == null ) {
             return Requirement.NONE;
         }
-        return Requirement.OPTIONAL;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyShellKeyRequirement(Platform platform) throws CloudException, InternalException {
         return Requirement.OPTIONAL;
     }
 
@@ -371,41 +314,6 @@ public class NovaServer implements VirtualMachineSupport {
                 logger.trace("exit - " + NovaServer.class.getName() + ".launch()");
             }
         }
-    }
-
-    @Override
-    public @Nonnull VirtualMachine launch(@Nonnull String fromMachineImageId, @Nonnull VirtualMachineProduct product, @Nullable String dataCenterId, @Nonnull String name, @Nonnull String description, @Nullable String withKeypairId, @Nullable String inVlanId, boolean withAnalytics, boolean asSandbox, @Nullable String... firewallIds) throws InternalException, CloudException {
-        return launch(fromMachineImageId, product, dataCenterId, name, description, withKeypairId, inVlanId, withAnalytics, asSandbox, firewallIds, new Tag[0]);
-    }
-
-    @Override
-    public @Nonnull VirtualMachine launch(@Nonnull String fromMachineImageId, @Nonnull VirtualMachineProduct product, @Nullable String dataCenterId, @Nonnull String name, @Nonnull String description, @Nullable String withKeypairId, @Nullable String inVlanId, boolean withAnalytics, boolean asSandbox, @Nullable String[] firewallIds, @Nullable Tag... tags) throws InternalException, CloudException {
-        VMLaunchOptions options = VMLaunchOptions.getInstance(product.getProviderProductId(), fromMachineImageId, name, description);
-
-        if( inVlanId == null && dataCenterId != null ) {
-            options.inDataCenter(dataCenterId);
-        }
-        else if( inVlanId != null && dataCenterId != null ) { // TODO: when vlans are supported in OpenStack proper...
-            options.inVlan(null, dataCenterId, inVlanId);
-        }
-        if( withKeypairId != null ) {
-            options.withBoostrapKey(withKeypairId);
-        }
-        if( withAnalytics ) {
-            options.withExtendedAnalytics();
-        }
-        if( firewallIds != null ) {
-            options.behindFirewalls(firewallIds);
-        }
-        if( tags != null && tags.length > 0 ) {
-            HashMap<String,Object> md = new HashMap<String, Object>();
-
-            for( Tag t : tags ) {
-                md.put(t.getKey(), t.getValue());
-            }
-            options.withMetaData(md);
-        }
-        return launch(options);
     }
 
     @Override
@@ -769,11 +677,6 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
-    public void stop(@Nonnull String vmId) throws InternalException, CloudException {
-        stop(vmId, false);
-    }
-
-    @Override
     public void stop(@Nonnull String vmId, boolean force) throws InternalException, CloudException {
         Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
 
@@ -867,26 +770,6 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
-    public void updateTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void updateTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void removeTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void removeTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
     public void reboot(@Nonnull String vmId) throws CloudException, InternalException {
         Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
         
@@ -914,11 +797,6 @@ public class NovaServer implements VirtualMachineSupport {
     @Override
     public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
         return new String[0];
-    }
-
-    @Override
-    public boolean supportsAnalytics() throws CloudException, InternalException {
-        return false;
     }
 
     @Override
