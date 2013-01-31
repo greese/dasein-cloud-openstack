@@ -23,13 +23,13 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.compute.AbstractVolumeSupport;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
 import org.dasein.cloud.compute.VolumeCreateOptions;
 import org.dasein.cloud.compute.VolumeFormat;
 import org.dasein.cloud.compute.VolumeProduct;
 import org.dasein.cloud.compute.VolumeState;
-import org.dasein.cloud.compute.VolumeSupport;
 import org.dasein.cloud.compute.VolumeType;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
@@ -40,7 +40,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -55,14 +54,17 @@ import java.util.Locale;
  * @version 2012.09.1 copied over from volume extension for HP
  * @since 2012.09.1
  */
-public class CinderVolume implements VolumeSupport {
+public class CinderVolume extends AbstractVolumeSupport {
     static private final Logger logger = NovaOpenStack.getLogger(CinderVolume.class, "std");
 
     static public final String SERVICE  = "volume";
 
     private NovaOpenStack provider;
 
-    public CinderVolume(@Nonnull NovaOpenStack provider) { this.provider = provider; }
+    public CinderVolume(@Nonnull NovaOpenStack provider) {
+        super(provider);
+        this.provider = provider;
+    }
 
     private @Nonnull String getAttachmentsResource() {
         return "os-volume_attachments";
@@ -105,16 +107,6 @@ public class CinderVolume implements VolumeSupport {
             if( logger.isTraceEnabled() ) {
                 logger.trace("exit - " + CinderVolume.class.getName() + ".detach()");
             }
-        }
-    }
-
-    @Override
-    public @Nonnull String create(@Nullable String fromSnapshot, @Nonnegative int sizeInGb, @Nonnull String inZone) throws InternalException, CloudException {
-        if( fromSnapshot != null ) {
-            return createVolume(VolumeCreateOptions.getInstanceForSnapshot(fromSnapshot, new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE), "volume-" + System.currentTimeMillis(), "dsn-auto-volume").inDataCenter(inZone));
-        }
-        else {
-            return createVolume(VolumeCreateOptions.getInstance(new Storage<Gigabyte>(sizeInGb, Storage.GIGABYTE), "volume-" + System.currentTimeMillis(), "dsn-auto-volume").inDataCenter(inZone));
         }
     }
 
@@ -192,11 +184,6 @@ public class CinderVolume implements VolumeSupport {
                 logger.trace("exit - " + CinderVolume.class.getName() + ".create()");
             }
         }
-    }
-
-    @Override
-    public void detach(@Nonnull String volumeId) throws InternalException, CloudException {
-        detach(volumeId, false);
     }
 
     @Override
