@@ -27,10 +27,10 @@ import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.identity.ServiceAction;
+import org.dasein.cloud.network.AbstractFirewallSupport;
 import org.dasein.cloud.network.Direction;
 import org.dasein.cloud.network.Firewall;
 import org.dasein.cloud.network.FirewallRule;
-import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.Permission;
 import org.dasein.cloud.network.Protocol;
 import org.dasein.cloud.network.RuleTarget;
@@ -60,95 +60,12 @@ import java.util.Locale;
  * @version 2011.10
  * @version 2012.04.1 Added some intelligence around features Rackspace does not support
  */
-public class NovaSecurityGroup implements FirewallSupport {
+public class NovaSecurityGroup extends AbstractFirewallSupport {
     private NovaOpenStack provider;
 
     NovaSecurityGroup(NovaOpenStack cloud) {
+        super(cloud);
         provider = cloud;
-    }
-
-    @Override
-    public @Nonnull String authorize(@Nonnull String firewallId, @Nullable String cidr, @Nonnull Protocol protocol, int beginPort, int endPort) throws CloudException, InternalException {
-        if( cidr == null ) {
-            cidr = "0.0.0.0/0";
-        }
-        return authorize(firewallId, Direction.INGRESS, cidr, protocol, beginPort, endPort);
-    }
-
-    @Override
-    public @Nonnull String authorize(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull String cidr, @Nonnull Protocol protocol, int beginPort, int endPort) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".authorize(" + firewallId + "," + direction + "," + cidr + "," + protocol + "," + beginPort + "," + endPort + ")");
-        }
-        try {
-            if( direction.equals(Direction.EGRESS) ) {
-                throw new OperationNotSupportedException(provider.getCloudName() + " does not support egress rules.");
-            }
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                logger.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-            HashMap<String,Object> wrapper = new HashMap<String,Object>();
-            HashMap<String,Object> json = new HashMap<String,Object>();
-            NovaMethod method = new NovaMethod(provider);
-
-            json.put("ip_protocol", protocol.name().toLowerCase());
-            json.put("from_port", beginPort);
-            json.put("to_port", endPort);
-            json.put("parent_group_id", firewallId);
-            json.put("cidr", cidr);
-            wrapper.put("security_group_rule", json);
-            JSONObject result = method.postServers("/os-security-group-rules", null, new JSONObject(wrapper), false);
-
-            if( result != null && result.has("security_group_rule") ) {
-                try {
-                    JSONObject rule = result.getJSONObject("security_group_rule");
-
-                    return rule.getString("id");
-                }
-                catch( JSONException e ) {
-                    logger.error("Invalid JSON returned from rule creation: " + e.getMessage());
-                    throw new CloudException(e);
-                }
-            }
-            logger.error("authorize(): No firewall rule was created by the create attempt, and no error was returned");
-            throw new CloudException("No firewall rule was created");
-        }
-        finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("EXIT: " + NovaSecurityGroup.class.getName() + ".authorize()");
-            }
-        }
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull String authorize(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull Permission permission, @Nonnull String source, @Nonnull Protocol protocol, int beginPort, int endPort) throws CloudException, InternalException {
-        RuleTarget sourceTarget = RuleTarget.getCIDR(source);
-
-        if( direction.equals(Direction.INGRESS) ) {
-            return authorize(firewallId, direction, permission, sourceTarget, protocol, RuleTarget.getGlobal(firewallId), beginPort, endPort, 0);
-        }
-        else {
-            return authorize(firewallId, direction, permission, RuleTarget.getGlobal(firewallId), protocol, sourceTarget, beginPort, endPort, 0);
-        }
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull String authorize(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull Permission permission, @Nonnull String source, @Nonnull Protocol protocol, @Nonnull RuleTarget target, int beginPort, int endPort) throws CloudException, InternalException {
-        RuleTarget sourceTarget = RuleTarget.getCIDR(source);
-
-        if( direction.equals(Direction.INGRESS) ) {
-            return authorize(firewallId, direction, permission, sourceTarget, protocol, target, beginPort, endPort, 0);
-        }
-        else {
-            return authorize(firewallId, direction, permission, target, protocol, sourceTarget, beginPort, endPort, 0);
-        }
     }
 
     @Override
