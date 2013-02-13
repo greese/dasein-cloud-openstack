@@ -47,7 +47,6 @@ import org.dasein.cloud.compute.MachineImageType;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VmState;
-import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -317,7 +316,6 @@ public class NovaImage extends AbstractImageSupport {
             logger.trace("enter - " + NovaImage.class.getName() + ".listImages(" + options + ")");
         }
         try {
-            ImageClass cls = (options == null ? null : options.getImageClass());
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
@@ -340,7 +338,7 @@ public class NovaImage extends AbstractImageSupport {
                         JSONObject image = list.getJSONObject(i);
                         MachineImage img = toImage(image);
 
-                        if( img != null && (cls == null || cls.equals(img.getImageClass())) ) {
+                        if( img != null && (options == null || options.matches(img)) ) {
                             images.add(img);
                         }
 
@@ -388,11 +386,6 @@ public class NovaImage extends AbstractImageSupport {
     }
 
     @Override
-    public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
-        return new String[0];
-    }
-
-    @Override
     public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
         Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
 
@@ -424,86 +417,6 @@ public class NovaImage extends AbstractImageSupport {
         }
     }
 
-    @Override
-    @Deprecated
-    public @Nonnull Iterable<MachineImage> searchMachineImages(@Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture) throws CloudException, InternalException {
-        return searchImages(null, keyword, platform, architecture, ImageClass.MACHINE);
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImage> searchImages(@Nullable String accountNumber, @Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass... imageClasses) throws CloudException, InternalException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new CloudException("No context was set for this request");
-        }
-        if( accountNumber != null && !accountNumber.equals(ctx.getAccountNumber()) ) {
-            return Collections.emptyList();
-        }
-
-        NovaMethod method = new NovaMethod(provider);
-        JSONObject ob = method.getServers("/images", null, true);
-        ArrayList<MachineImage> images = new ArrayList<MachineImage>();
-
-        try {
-            if( ob != null && ob.has("images") ) {
-                JSONArray list = ob.getJSONArray("images");
-
-                for( int i=0; i<list.length(); i++ ) {
-                    JSONObject image = list.getJSONObject(i);
-                    MachineImage img = toImage(image);
-
-                    if( img != null ) {
-                        if( architecture != null ) {
-                            if( !architecture.equals(img.getArchitecture()) ) {
-                                continue;
-                            }
-                        }
-                        if( platform != null && !platform.equals(Platform.UNKNOWN) ) {
-                            Platform p = img.getPlatform();
-
-                            if( p.equals(Platform.UNKNOWN) ) {
-                                continue;
-                            }
-                            else if( platform.isWindows() ) {
-                                if( !p.isWindows() ) {
-                                    continue;
-                                }
-                            }
-                            else if( platform.equals(Platform.UNIX) ) {
-                                if( !p.isUnix() ) {
-                                    continue;
-                                }
-                            }
-                            else if( !platform.equals(p) ) {
-                                continue;
-                            }
-                        }
-                        if( keyword != null ) {
-                            if( !img.getName().contains(keyword) ) {
-                                if( !img.getDescription().contains(keyword) ) {
-                                    if( !img.getProviderMachineImageId().contains(keyword) ) {
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                        images.add(img);
-                    }
-
-                }
-            }
-        }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for images: " + e.getMessage());
-        }
-        return images;
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImage> searchPublicImages(@Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass... imageClasses) throws CloudException, InternalException {
-        return Collections.emptyList();
-    }
 
     @Override
     public boolean supportsCustomImages() {

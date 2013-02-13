@@ -27,6 +27,7 @@ import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.AbstractSnapshotSupport;
 import org.dasein.cloud.compute.Snapshot;
 import org.dasein.cloud.compute.SnapshotCreateOptions;
+import org.dasein.cloud.compute.SnapshotFilterOptions;
 import org.dasein.cloud.compute.SnapshotState;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
@@ -308,11 +309,11 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
     }
 
     @Override
-    public @Nonnull Iterable<Snapshot> searchSnapshots(@Nullable String ownerId, @Nullable String keyword) throws InternalException, CloudException {
+    public @Nonnull Iterable<Snapshot> searchSnapshots(@Nonnull SnapshotFilterOptions options) throws InternalException, CloudException {
         Logger std = NovaOpenStack.getLogger(CinderSnapshot.class, "std");
 
         if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + CinderSnapshot.class.getName() + ".searchSnapshots(" + ownerId + "," + keyword + ")");
+            std.trace("ENTER: " + CinderSnapshot.class.getName() + ".searchSnapshots(" + options + ")");
         }
         try {
             ProviderContext ctx = provider.getContext();
@@ -333,13 +334,7 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
                     for( int i=0; i<list.length(); i++ ) {
                         Snapshot snapshot = toSnapshot(ctx, list.getJSONObject(i));
 
-                        if( snapshot != null ) {
-                            if( ownerId != null && !ownerId.equals(snapshot.getProviderSnapshotId()) ) {
-                                continue;
-                            }
-                            if( keyword != null && !snapshot.getName().contains(keyword) && !snapshot.getDescription().contains(keyword) ) {
-                                continue;
-                            }
+                        if( snapshot != null && options.matches(snapshot, null) ) {
                             snapshots.add(snapshot);
                         }
                     }
