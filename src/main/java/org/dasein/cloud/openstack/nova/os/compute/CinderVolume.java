@@ -47,6 +47,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Support for the Cinder volumes API in Dasein Cloud.
@@ -119,6 +120,11 @@ public class CinderVolume extends AbstractVolumeSupport {
             json.put("size", size.intValue());
             if( options.getSnapshotId() != null ) {
                 json.put("snapshot_id", options.getSnapshotId());
+            }
+            Map<String,Object> md = options.getMetaData();
+
+            if( md != null && !md.isEmpty() ) {
+                json.put("meta_data", md);
             }
             if( options.getVolumeProductId() != null ) {
                 // TODO: cinder is broken and expects the name; should be fixed in Grizzly
@@ -479,7 +485,7 @@ public class CinderVolume extends AbstractVolumeSupport {
             String region = getContext().getRegionId();
             String dataCenter = region + "-a";
 
-            String name = null, volumeId = null;
+            String volumeId = null;
 
             if( json.has("id") ) {
                 volumeId = json.getString("id");
@@ -487,17 +493,28 @@ public class CinderVolume extends AbstractVolumeSupport {
             if( volumeId == null ) {
                 return null;
             }
-            if( json.has("displayName") ) {
-                name = json.getString("displayName");
-            }
+            String name = (json.has("displayName") ? json.getString("displayName") : null);
+
             if( name == null ) {
-                name = volumeId;
+                name = (json.has("display_name") ? json.getString("display_name") : null);
+                if( name == null ) {
+                    name = volumeId;
+                }
             }
 
-            long created = 0L;
+            String description = (json.has("displayDescription") ? json.getString("displayDescription") : null);
 
-            if( json.has("createdAt") ) {
-                created = ((NovaOpenStack)getProvider()).parseTimestamp(json.getString("createdAt"));
+            if( description == null ) {
+                description = (json.has("display_description") ? json.getString("display_description") : null);
+                if( description == null ) {
+                    description = name;
+                }
+            }
+
+            long created = (json.has("createdAt") ? ((NovaOpenStack)getProvider()).parseTimestamp(json.getString("createdAt")) : -1L);
+
+            if( created < 1L ) {
+                created = (json.has("created_at") ? ((NovaOpenStack)getProvider()).parseTimestamp(json.getString("created_at")) : -1L);
             }
 
             int size = 0;
@@ -532,9 +549,11 @@ public class CinderVolume extends AbstractVolumeSupport {
                     }
                 }
             }
-            String snapshotId = null;
+            String snapshotId = (json.has("snapshotId") ? json.getString("snapshotId") : null);
 
-            // TODO: identify snapshot
+            if( snapshotId == null ) {
+                snapshotId = (json.has("snapshot_id") ? json.getString("snapshot_id") : null);
+            }
 
             VolumeState currentState = VolumeState.PENDING;
 
@@ -566,6 +585,7 @@ public class CinderVolume extends AbstractVolumeSupport {
             volume.setCurrentState(currentState);
             volume.setDeviceId(deviceId);
             volume.setName(name);
+            volume.setDescription(description);
             volume.setProviderDataCenterId(dataCenter);
             volume.setProviderRegionId(region);
             volume.setProviderSnapshotId(snapshotId);

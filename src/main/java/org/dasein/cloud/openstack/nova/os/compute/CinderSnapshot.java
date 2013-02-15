@@ -313,18 +313,27 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
             String name = (json.has("displayName") ? json.getString("displayName") : null);
 
             if( name == null ) {
-                name = snapshotId;
+                name = (json.has("display_name") ? json.getString("display_name") : null);
+                if( name == null ) {
+                    name = snapshotId;
+                }
             }
 
             String description = (json.has("displayDescription") ? json.getString("displayDescription") : null);
 
             if( description == null ) {
-                description = null;
+                description = (json.has("display_description") ? json.getString("display_description") : null);
+                if( description == null ) {
+                    description = name;
+                }
             }
 
             String volumeId = (json.has("volumeId") ? json.getString("volumeId") : null);
 
 
+            if( volumeId == null ) {
+                volumeId = (json.has("volume_id") ? json.getString("volume_id") : null);
+            }
             SnapshotState currentState = SnapshotState.PENDING;
             String status = (json.has("status") ? json.getString("status") : null);
 
@@ -344,6 +353,9 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
             }
             long created = (json.has("createdAt") ? ((NovaOpenStack)getProvider()).parseTimestamp(json.getString("createdAt")) : -1L);
 
+            if( created < 1L ) {
+                created = (json.has("created_at") ? ((NovaOpenStack)getProvider()).parseTimestamp(json.getString("created_at")) : -1L);
+            }
             int size = (json.has("size") ? json.getInt("size") : 0);
 
             Snapshot snapshot = new Snapshot();
