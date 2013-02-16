@@ -30,6 +30,7 @@ import org.dasein.cloud.identity.ShellKeySupport;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.APITrace;
 import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -52,17 +53,15 @@ import java.util.Locale;
  * @version 2012.04.1 Added some intelligence around features Rackspace does not support
  */
 public class NovaKeypair implements ShellKeySupport {
+    static private final Logger logger = NovaOpenStack.getLogger(NovaKeypair.class, "std");
+
     private NovaOpenStack provider;
 
     NovaKeypair(@Nonnull NovaOpenStack cloud) { provider = cloud; }
 
     @Override
     public @Nonnull SSHKeypair createKeypair(@Nonnull String name) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(NovaKeypair.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("ENTER: " + NovaKeypair.class.getName() + ".createKeypair(" + name + ")");
-        }
+        APITrace.begin(provider, "Keypair.createKeypair");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -102,24 +101,18 @@ public class NovaKeypair implements ShellKeySupport {
 
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("EXIT: " + NovaKeypair.class.getName() + ".createKeypair()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void deleteKeypair(@Nonnull String keypairId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaKeypair.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaKeypair.class.getName() + ".deleteKeypair(" + keypairId + ")");
-        }
+        APITrace.begin(provider, "Keypair.deleteKeypair");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -140,28 +133,20 @@ public class NovaKeypair implements ShellKeySupport {
             } while( System.currentTimeMillis() < timeout );
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("EXIT: " + NovaKeypair.class.getName() + ".deleteKeypair()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public @Nullable String getFingerprint(@Nonnull String keypairId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaKeypair.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaKeypair.class.getName() + ".getFingerprint(" + keypairId + ")");
-        }
+        APITrace.begin(provider, "Keypair.getFingerprint");
         try {
             SSHKeypair kp = getKeypair(keypairId);
             
             return (kp == null ? null : kp.getFingerprint());
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaKeypair.class.getName() + ".getFingerprint()");
-            }
+            APITrace.end();
         }
     }
 
@@ -172,16 +157,12 @@ public class NovaKeypair implements ShellKeySupport {
 
     @Override
     public @Nullable SSHKeypair getKeypair(@Nonnull String keypairId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaKeypair.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaKeypair.class.getName() + ".getKeypair(" + keypairId + ")");
-        }
+        APITrace.begin(provider, "Keypair.getKeypair");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -206,7 +187,7 @@ public class NovaKeypair implements ShellKeySupport {
                             }
                         }
                         catch( JSONException e ) {
-                            std.error("Invalid JSON from cloud: " + e.getMessage());
+                            logger.error("Invalid JSON from cloud: " + e.getMessage());
                             throw new CloudException("Invalid JSON from cloud: " + e.getMessage());
                         }
                     }
@@ -214,15 +195,13 @@ public class NovaKeypair implements ShellKeySupport {
                 return null;
             }
             catch( JSONException e ) {
-                std.error("list(): Unable to identify expected values in JSON: " + e.getMessage());
+                logger.error("list(): Unable to identify expected values in JSON: " + e.getMessage());
                 e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for keypair in " + ob.toString());
             }
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaKeypair.class.getName() + ".getKeypair()");
-            }
+            APITrace.end();
         }
     }
 
@@ -233,11 +212,7 @@ public class NovaKeypair implements ShellKeySupport {
 
     @Override
     public @Nonnull SSHKeypair importKeypair(@Nonnull String name, @Nonnull String publicKey) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(NovaKeypair.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("ENTER: " + NovaKeypair.class.getName() + ".importKeypair(" + name + "," + publicKey + ")");
-        }
+        APITrace.begin(provider, "Keypair.importKeypair");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -276,44 +251,50 @@ public class NovaKeypair implements ShellKeySupport {
 
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("EXIT: " + NovaKeypair.class.getName() + ".importKeypair()");
-            }
+            APITrace.end();
         }
     }
 
     private boolean verifySupport() throws InternalException, CloudException {
-        NovaMethod method = new NovaMethod(provider);
-
+        APITrace.begin(provider, "Keypair.verifySupport");
         try {
-            method.getServers("/os-keypairs", null, false);
-            return true;
-        }
-        catch( CloudException e ) {
-            if( e.getHttpCode() == 404 ) {
-                return false;
+            NovaMethod method = new NovaMethod(provider);
+
+            try {
+                method.getServers("/os-keypairs", null, false);
+                return true;
             }
-            throw e;
+            catch( CloudException e ) {
+                if( e.getHttpCode() == 404 ) {
+                    return false;
+                }
+                throw e;
+            }
+        }
+        finally {
+            APITrace.end();
         }
     }
 
     @Override
     public boolean isSubscribed() throws InternalException, CloudException {
-        return (provider.getMajorVersion() > 1 && provider.getComputeServices().getVirtualMachineSupport().isSubscribed() && verifySupport());
+        APITrace.begin(provider, "Keypair.isSubscribed");
+        try {
+            return (provider.getMajorVersion() > 1 && provider.getComputeServices().getVirtualMachineSupport().isSubscribed() && verifySupport());
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public @Nonnull Collection<SSHKeypair> list() throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaKeypair.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaKeypair.class.getName() + ".list()");
-        }
+        APITrace.begin(provider, "Keypair.list");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -335,23 +316,21 @@ public class NovaKeypair implements ShellKeySupport {
                             }
                         }
                         catch( JSONException e ) {
-                            std.error("Invalid JSON from cloud: " + e.getMessage());
+                            logger.error("Invalid JSON from cloud: " + e.getMessage());
                             throw new CloudException("Invalid JSON from cloud: " + e.getMessage());
                         }
                     }
                 }
             }
             catch( JSONException e ) {
-                std.error("list(): Unable to identify expected values in JSON: " + e.getMessage());
+                logger.error("list(): Unable to identify expected values in JSON: " + e.getMessage());
                 e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for keypair in " + ob.toString());
             }
             return keypairs;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaKeypair.class.getName() + ".list()");
-            }
+            APITrace.end();
         }
     }
 
