@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -195,7 +196,15 @@ public class NovaServer extends AbstractVMSupport {
 
     @Override
     public @Nonnull Requirement identifyVlanRequirement() throws CloudException, InternalException {
-        return Requirement.NONE;
+        NetworkServices services = getProvider().getNetworkServices();
+
+        if( services == null ) {
+            return Requirement.NONE;
+        }
+        if( services.getVlanSupport() == null ) {
+            return Requirement.NONE;
+        }
+        return Requirement.OPTIONAL;
     }
 
     @Override
@@ -263,6 +272,14 @@ public class NovaServer extends AbstractVMSupport {
                     json.put("imageRef", ((NovaOpenStack)getProvider()).getComputeServices().getImageSupport().getImageRef(options.getMachineImageId()));
                 }
                 json.put("flavorRef", getFlavorRef(options.getStandardProductId()));
+            }
+            if( options.getVlanId() != null ) {
+                ArrayList<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
+                HashMap<String,Object> vlan = new HashMap<String, Object>();
+
+                vlan.put("uuid", options.getVlanId());
+                vlans.add(vlan);
+                json.put("networks", vlans);
             }
             if( options.getBootstrapKey() != null ) {
                 json.put("key_name", options.getBootstrapKey());

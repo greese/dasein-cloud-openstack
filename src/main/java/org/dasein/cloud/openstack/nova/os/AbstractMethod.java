@@ -255,7 +255,7 @@ public abstract class AbstractMethod {
             std.debug("HTTP STATUS: " + code);
 
             if( code != HttpServletResponse.SC_OK ) {
-                if( code == 401 ) {
+                if( code == 401 || code == 405 ) {
                     std.warn("authenticateKeystone(): Authentication failed");
                     return null;
                 }
