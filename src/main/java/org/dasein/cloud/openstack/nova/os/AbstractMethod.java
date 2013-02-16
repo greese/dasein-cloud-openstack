@@ -1772,7 +1772,6 @@ public abstract class AbstractMethod {
                                 return "{\"location\" : \"" + h.getValue().trim() + "\"}";
                             }
                         }
-                        throw new CloudException("No location was specified in the response");
                     }
                 }
                 return null;
