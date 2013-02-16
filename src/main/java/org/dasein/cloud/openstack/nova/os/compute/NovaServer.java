@@ -35,7 +35,6 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
-import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.AbstractVMSupport;
@@ -47,19 +46,27 @@ import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineProduct;
 import org.dasein.cloud.compute.VmState;
-import org.dasein.cloud.identity.ServiceAction;
+import org.dasein.cloud.identity.IdentityServices;
+import org.dasein.cloud.identity.ShellKeySupport;
 import org.dasein.cloud.network.Firewall;
+import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.IpAddress;
 import org.dasein.cloud.network.IpAddressSupport;
+import org.dasein.cloud.network.NetworkServices;
 import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.Cache;
+import org.dasein.cloud.util.CacheLevel;
 import org.dasein.util.CalendarWrapper;
 import org.dasein.util.uom.storage.Gigabyte;
 import org.dasein.util.uom.storage.Megabyte;
 import org.dasein.util.uom.storage.Storage;
+import org.dasein.util.uom.time.Day;
+import org.dasein.util.uom.time.TimePeriod;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -74,22 +81,17 @@ import org.json.JSONObject;
  * @since unknown
  */
 public class NovaServer extends AbstractVMSupport {
-    private NovaOpenStack provider;
+    static private final Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
 
     static public final String SERVICE = "compute";
 
     NovaServer(NovaOpenStack provider) {
         super(provider);
-        this.provider = provider;
     }
 
     @Override
     public @Nullable VirtualMachineProduct getProduct(@Nonnull String productId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-        
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaServer.class.getName() + ".getProduct(" + productId + ")");
-        }
+        APITrace.begin(getProvider(), "VM.getProduct");
         try {
             for( VirtualMachineProduct product : listProducts(Architecture.I64) ) {
                 if( product.getProviderProductId().equals(productId) ) {
@@ -99,9 +101,7 @@ public class NovaServer extends AbstractVMSupport {
             return null;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("EXIT: " + NovaServer.class.getName() + ".getProduct()");
-            }
+            APITrace.end();
         }
     }
 
@@ -112,13 +112,9 @@ public class NovaServer extends AbstractVMSupport {
 
     @Override
     public @Nullable VirtualMachine getVirtualMachine(@Nonnull String vmId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-        
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + NovaServer.class.getName() + ".getVirtualMachine(" + vmId + ")");
-        }
+        APITrace.begin(getProvider(), "VM.getVirtualMachine");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/servers", vmId, true);
 
             if( ob == null ) {
@@ -126,11 +122,18 @@ public class NovaServer extends AbstractVMSupport {
             }
             Iterable<IpAddress> ipv4, ipv6;
 
-            IpAddressSupport support = provider.getNetworkServices().getIpAddressSupport();
+            NetworkServices services = getProvider().getNetworkServices();
 
-            if( support != null ) {
-                ipv4 = support.listIpPool(IPVersion.IPV4, false);
-                ipv6 = support.listIpPool(IPVersion.IPV6, false);
+            if( services != null ) {
+                IpAddressSupport support = services.getIpAddressSupport();
+
+                if( support != null ) {
+                    ipv4 = support.listIpPool(IPVersion.IPV4, false);
+                    ipv6 = support.listIpPool(IPVersion.IPV6, false);
+                }
+                else {
+                    ipv4 = ipv6 = Collections.emptyList();
+                }
             }
             else {
                 ipv4 = ipv6 = Collections.emptyList();
@@ -146,15 +149,13 @@ public class NovaServer extends AbstractVMSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("getVirtualMachine(): Unable to identify expected values in JSON: " + e.getMessage());
+                logger.error("getVirtualMachine(): Unable to identify expected values in JSON: " + e.getMessage());
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for servers");
             }
             return null;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaServer.class.getName() + ".getVirtualMachine()");
-            }
+            APITrace.end();
         }
     }
 
@@ -175,7 +176,13 @@ public class NovaServer extends AbstractVMSupport {
 
     @Override
     public @Nonnull Requirement identifyShellKeyRequirement(Platform platform) throws CloudException, InternalException {
-        if( provider.getIdentityServices().getShellKeySupport() == null ) {
+        IdentityServices services = getProvider().getIdentityServices();
+
+        if( services == null ) {
+            return Requirement.NONE;
+        }
+        ShellKeySupport support = services.getShellKeySupport();
+        if( support == null ) {
             return Requirement.NONE;
         }
         return Requirement.OPTIONAL;
@@ -208,7 +215,13 @@ public class NovaServer extends AbstractVMSupport {
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        return (provider.testContext() != null);
+        APITrace.begin(getProvider(), "VM.isSubscribed");
+        try {
+            return (getProvider().testContext() != null);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -218,20 +231,16 @@ public class NovaServer extends AbstractVMSupport {
 
     @Override
     public @Nonnull VirtualMachine launch(@Nonnull VMLaunchOptions options) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaServer.class.getName() + ".launch(" + options + ")");
-        }
+        APITrace.begin(getProvider(), "VM.launch");
         try {
-            MachineImage targetImage = provider.getComputeServices().getImageSupport().getImage(options.getMachineImageId());
+            MachineImage targetImage = getProvider().getComputeServices().getImageSupport().getImage(options.getMachineImageId());
 
             if( targetImage == null ) {
                 throw new CloudException("No such machine image: " + options.getMachineImageId());
             }
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
             HashMap<String,Object> json = new HashMap<String,Object>();
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             json.put("name", options.getHostName());
             if( options.getUserData() != null ) {
@@ -242,16 +251,16 @@ public class NovaServer extends AbstractVMSupport {
                     throw new InternalException(e);
                 }
             }
-            if( provider.getMinorVersion() == 0 && provider.getMajorVersion() == 1 ) {
+            if( ((NovaOpenStack)getProvider()).getMinorVersion() == 0 && ((NovaOpenStack)getProvider()).getMajorVersion() == 1 ) {
                 json.put("imageId", String.valueOf(options.getMachineImageId()));
                 json.put("flavorId", options.getStandardProductId());
             }
             else {
-                if( provider.getProviderName().equals("HP") ) {
+                if( getProvider().getProviderName().equals("HP") ) {
                     json.put("imageRef", options.getMachineImageId());
                 }
                 else {
-                    json.put("imageRef", provider.getComputeServices().getImageSupport().getImageRef(options.getMachineImageId()));
+                    json.put("imageRef", ((NovaOpenStack)getProvider()).getComputeServices().getImageSupport().getImageRef(options.getMachineImageId()));
                 }
                 json.put("flavorRef", getFlavorRef(options.getStandardProductId()));
             }
@@ -262,8 +271,16 @@ public class NovaServer extends AbstractVMSupport {
                 ArrayList<HashMap<String,Object>> firewalls = new ArrayList<HashMap<String,Object>>();
 
                 for( String id : options.getFirewallIds() ) {
-                    Firewall firewall = provider.getNetworkServices().getFirewallSupport().getFirewall(id);
+                    NetworkServices services = getProvider().getNetworkServices();
+                    Firewall firewall = null;
 
+                    if( services != null ) {
+                        FirewallSupport support = services.getFirewallSupport();
+
+                        if( support != null ) {
+                            firewall = support.getFirewall(id);
+                        }
+                    }
                     if( firewall != null ) {
                         HashMap<String,Object> fw = new HashMap<String, Object>();
 
@@ -274,9 +291,9 @@ public class NovaServer extends AbstractVMSupport {
                 json.put("security_groups", firewalls);
             }
             if( !targetImage.getPlatform().equals(Platform.UNKNOWN) ) {
-                options.getMetaData().put("dsnPlatform", targetImage.getPlatform().name());
+                options.withMetaData("org.dasein.platform", targetImage.getPlatform().name());
             }
-            options.getMetaData().put("dsnDescription", options.getDescription());
+            options.withMetaData("org.dasein.description", options.getDescription());
             json.put("metadata", options.getMetaData());
             wrapper.put("server", json);
             JSONObject result = method.postServers("/servers", null, new JSONObject(wrapper), true);
@@ -305,21 +322,15 @@ public class NovaServer extends AbstractVMSupport {
 
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaServer.class.getName() + ".launch()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public @Nonnull Iterable<String> listFirewalls(@Nonnull String vmId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaServer.class.getName() + ".listFirewalls(" + vmId + ")");
-        }
+        APITrace.begin(getProvider(), "VM.listFirewalls");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/servers", vmId, true);
 
             if( ob == null ) {
@@ -330,7 +341,19 @@ public class NovaServer extends AbstractVMSupport {
                     JSONObject server = ob.getJSONObject("server");
 
                     if( server.has("security_groups") ) {
-                        Collection<Firewall> firewalls = provider.getNetworkServices().getFirewallSupport().list();
+                        NetworkServices services = getProvider().getNetworkServices();
+                        Collection<Firewall> firewalls = null;
+
+                        if( services != null ) {
+                            FirewallSupport support = services.getFirewallSupport();
+
+                            if( support != null ) {
+                                firewalls = support.list();
+                            }
+                        }
+                        if( firewalls == null ) {
+                            firewalls = Collections.emptyList();
+                        }
                         JSONArray groups = server.getJSONArray("security_groups");
                         ArrayList<String> results = new ArrayList<String>();
 
@@ -369,133 +392,141 @@ public class NovaServer extends AbstractVMSupport {
                 throw new CloudException("No such server: " + vmId);
             }
             catch( JSONException e ) {
-                std.error("listFirewalls(): Unable to identify expected values in JSON: " + e.getMessage());
+                logger.error("listFirewalls(): Unable to identify expected values in JSON: " + e.getMessage());
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for servers");
             }
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("EXIT: " + NovaServer.class.getName() + ".getVirtualMachine()");
+            APITrace.end();
+        }
+    }
+
+    static public class FlavorRef {
+        public String id;
+        public String[][] links;
+        VirtualMachineProduct product;
+
+        public String toString() { return (id + " -> " + product); }
+    }
+
+    private @Nonnull Iterable<FlavorRef> listFlavors() throws InternalException, CloudException {
+        APITrace.begin(getProvider(), "VM.listFlavors");
+        try {
+            Cache<FlavorRef> cache = Cache.getInstance(getProvider(), "flavorRefs", FlavorRef.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+            Iterable<FlavorRef> refs = cache.get(getContext());
+
+            if( refs != null ) {
+                return refs;
             }
+
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            JSONObject ob = method.getServers("/flavors", null, true);
+            ArrayList<FlavorRef> flavors = new ArrayList<FlavorRef>();
+
+            try {
+                if( ob != null && ob.has("flavors") ) {
+                    JSONArray list = ob.getJSONArray("flavors");
+
+                    for( int i=0; i<list.length(); i++ ) {
+                        JSONObject p = list.getJSONObject(i);
+                        FlavorRef ref = new FlavorRef();
+
+                        if( p.has("id") ) {
+                            ref.id = p.getString("id");
+                        }
+                        else {
+                            continue;
+                        }
+                        if( p.has("links") ) {
+                            JSONArray links = p.getJSONArray("links");
+
+                            ref.links = new String[links.length()][];
+                            for( int j=0; j<links.length(); j++ ) {
+                                JSONObject link = links.getJSONObject(j);
+
+                                ref.links[j] = new String[2];
+                                if( link.has("rel") ) {
+                                    ref.links[j][0] = link.getString("rel");
+                                }
+                                if( link.has("href") ) {
+                                    ref.links[j][1] = link.getString("href");
+                                }
+                            }
+                        }
+                        else {
+                            ref.links = new String[0][];
+                        }
+                        ref.product = toProduct(p);
+                        if( ref.product != null ) {
+                            flavors.add(ref);
+                        }
+                    }
+                }
+            }
+            catch( JSONException e ) {
+                logger.error("listProducts(): Unable to identify expected values in JSON: " + e.getMessage());
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors: " + e.getMessage());
+            }
+            cache.put(getContext(), flavors);
+            return flavors;
+        }
+        finally {
+            APITrace.end();
         }
     }
 
     public @Nullable String getFlavorRef(@Nonnull String flavorId) throws InternalException, CloudException {
-       Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-        
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + NovaServer.class.getName() + ".getFlavorRef(" + flavorId + ")");
-        }
-        try {
-            NovaMethod method = new NovaMethod(provider);
-            JSONObject ob = method.getServers("/flavors", null, true);
-                
-            try {
-                if( ob.has("flavors") ) {
-                    JSONArray list = ob.getJSONArray("flavors");
-                        
-                    for( int i=0; i<list.length(); i++ ) {
-                        JSONObject p = list.getJSONObject(i);
-                        
-                        if( p.getString("id").equals(flavorId) ) {
-                            JSONArray links = p.getJSONArray("links");
-                            String def = null;
-                            
-                            for( int j=0; j<links.length(); j++ ) {
-                                JSONObject link = links.getJSONObject(j);
-                                
-                                if( link.getString("rel").equals("self") ) {
-                                    return link.getString("href");
-                                }
-                                else {
-                                    if( def != null ) {
-                                        def = link.optString("href");
-                                    }
-                                }
-                            }
-                            return def;
-                        }
+        for( FlavorRef ref : listFlavors() ) {
+            if( ref.id.equals(flavorId) ) {
+                String def = null;
+
+                for( String[] link : ref.links ) {
+                    if( link[0] != null && link[0].equals("self") && link[1] != null ) {
+                        return link[1];
+                    }
+                    else if( def == null && link[1] != null ) {
+                        def = link[1];
                     }
                 }
-            }
-            catch( JSONException e ) {
-                std.error("listProducts(): Unable to identify expected values in JSON: " + e.getMessage());
-                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors: " + e.getMessage());
-            }
-            return null;
-        }
-        finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaServer.class.getName() + ".listProducts()");
+                return def;
             }
         }
+        return null;
     }
     
     @Override
     public @Nonnull Iterable<VirtualMachineProduct> listProducts(@Nonnull Architecture architecture) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + NovaServer.class.getName() + ".listProducts()");
+        if( !architecture.equals(Architecture.I32) && !architecture.equals(Architecture.I64) ) {
+            return Collections.emptyList();
         }
+        APITrace.begin(getProvider(), "VM.listProducts");
         try {
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                throw new CloudException("No context has been established for this request");
-            }
-            if( architecture.equals(Architecture.I32) ) {
-                return Collections.emptyList();
-            }
-            if( std.isDebugEnabled() ) {
-                std.debug("listProducts(): Cache for " + ctx.getRegionId() + " is empty, fetching values from cloud");
-            }
-            NovaMethod method = new NovaMethod(provider);
-            JSONObject ob = method.getServers("/flavors", null, true);
-                
             ArrayList<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();
-            
-            try {
-                if( ob != null && ob.has("flavors") ) {
-                    JSONArray list = ob.getJSONArray("flavors");
-                    
-                    for( int i=0; i<list.length(); i++ ) {
-                        JSONObject p = list.getJSONObject(i);
-                        VirtualMachineProduct product = toProduct(p);
-                        
-                        if( product != null ) {
-                            products.add(product);
-                        }
-                    }
-                }
-            }
-            catch( JSONException e ) {
-                std.error("listProducts(): Unable to identify expected values in JSON: " + e.getMessage());
-                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors: " + e.getMessage());
+
+            for( FlavorRef flavor : listFlavors() ) {
+                products.add(flavor.product);
             }
             return products;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaServer.class.getName() + ".listProducts()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
-        return Collections.singletonList(Architecture.I64);
+        ArrayList<Architecture> architectures = new ArrayList<Architecture>();
+
+        architectures.add(Architecture.I32);
+        architectures.add(Architecture.I64);
+        return architectures;
     }
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listVirtualMachineStatus() throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + NovaServer.class.getName() + ".listVirtualMachines()");
-        }
+        APITrace.begin(getProvider(), "VM.listVirtualMachineStatus");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/servers", null, true);
             ArrayList<ResourceStatus> servers = new ArrayList<ResourceStatus>();
 
@@ -515,40 +546,34 @@ public class NovaServer extends AbstractVMSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("listVirtualMachines(): Unable to identify expected values in JSON: " + e.getMessage());                e.printStackTrace();
+                logger.error("listVirtualMachines(): Unable to identify expected values in JSON: " + e.getMessage());                e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for servers in " + ob.toString());
             }
             return servers;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaServer.class.getName() + ".listVirtualMachines()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-        
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + NovaServer.class.getName() + ".listVirtualMachines()");
-        }
+        APITrace.begin(getProvider(), "VM.listVirtualMachines");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/servers", null, true);
             ArrayList<VirtualMachine> servers = new ArrayList<VirtualMachine>();
 
-            Iterable<IpAddress> ipv4, ipv6;
+            Iterable<IpAddress> ipv4 = Collections.emptyList(), ipv6 = Collections.emptyList();
+            NetworkServices services = getProvider().getNetworkServices();
 
-            IpAddressSupport support = provider.getNetworkServices().getIpAddressSupport();
+            if( services != null ) {
+                IpAddressSupport support = services.getIpAddressSupport();
 
-            if( support != null ) {
-                ipv4 = support.listIpPool(IPVersion.IPV4, false);
-                ipv6 = support.listIpPool(IPVersion.IPV6, false);
-            }
-            else {
-                ipv4 = ipv6 = Collections.emptyList();
+                if( support != null ) {
+                    ipv4 = support.listIpPool(IPVersion.IPV4, false);
+                    ipv6 = support.listIpPool(IPVersion.IPV6, false);
+                }
             }
             try {
                 if( ob != null && ob.has("servers") ) {
@@ -566,25 +591,19 @@ public class NovaServer extends AbstractVMSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("listVirtualMachines(): Unable to identify expected values in JSON: " + e.getMessage());                e.printStackTrace();
+                logger.error("listVirtualMachines(): Unable to identify expected values in JSON: " + e.getMessage());                e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for servers in " + ob.toString());
             }
             return servers;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaServer.class.getName() + ".listVirtualMachines()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void pause(@Nonnull String vmId) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaServer.class.getName() + ".pause(" + vmId + ")");
-        }
+        APITrace.begin(getProvider(), "VM.pause");
         try {
             VirtualMachine vm = getVirtualMachine(vmId);
 
@@ -592,30 +611,24 @@ public class NovaServer extends AbstractVMSupport {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
             if( !supportsPauseUnpause(vm) ) {
-                throw new OperationNotSupportedException("Pause/unpause is not supported in " + provider.getCloudName());
+                throw new OperationNotSupportedException("Pause/unpause is not supported in " + getProvider().getCloudName());
             }
             HashMap<String,Object> json = new HashMap<String,Object>();
 
             json.put("pause", null);
 
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaServer.class.getName() + ".pause()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void resume(@Nonnull String vmId) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaServer.class.getName() + ".pause(" + vmId + ")");
-        }
+        APITrace.begin(getProvider(), "VM.resume");
         try {
             VirtualMachine vm = getVirtualMachine(vmId);
 
@@ -623,30 +636,24 @@ public class NovaServer extends AbstractVMSupport {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
             if( !supportsSuspendResume(vm) ) {
-                throw new OperationNotSupportedException("Suspend/resume is not supported in " + provider.getCloudName());
+                throw new OperationNotSupportedException("Suspend/resume is not supported in " + getProvider().getCloudName());
             }
             HashMap<String,Object> json = new HashMap<String,Object>();
 
             json.put("resume", null);
 
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaServer.class.getName() + ".pause()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void start(@Nonnull String vmId) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaServer.class.getName() + ".start(" + vmId + ")");
-        }
+        APITrace.begin(getProvider(), "VM.start");
         try {
             VirtualMachine vm = getVirtualMachine(vmId);
 
@@ -654,30 +661,24 @@ public class NovaServer extends AbstractVMSupport {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
             if( !supportsStartStop(vm) ) {
-                throw new OperationNotSupportedException("Start/stop is not supported in " + provider.getCloudName());
+                throw new OperationNotSupportedException("Start/stop is not supported in " + getProvider().getCloudName());
             }
             HashMap<String,Object> json = new HashMap<String,Object>();
 
             json.put("os-start", null);
 
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaServer.class.getName() + ".start()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void stop(@Nonnull String vmId, boolean force) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("ENTER: " + NovaServer.class.getName() + ".stop(" + vmId + "," + force + ")");
-        }
+        APITrace.begin(getProvider(), "VM.stop");
         try {
             VirtualMachine vm = getVirtualMachine(vmId);
 
@@ -685,30 +686,24 @@ public class NovaServer extends AbstractVMSupport {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
             if( !supportsStartStop(vm) ) {
-                throw new OperationNotSupportedException("Start/stop is not supported in " + provider.getCloudName());
+                throw new OperationNotSupportedException("Start/stop is not supported in " + getProvider().getCloudName());
             }
             HashMap<String,Object> json = new HashMap<String,Object>();
 
             json.put("os-stop", null);
 
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaServer.class.getName() + ".stop()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void suspend(@Nonnull String vmId) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaServer.class.getName() + ".suspend(" + vmId + ")");
-        }
+        APITrace.begin(getProvider(), "VM.suspend");
         try {
             VirtualMachine vm = getVirtualMachine(vmId);
 
@@ -716,30 +711,24 @@ public class NovaServer extends AbstractVMSupport {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
             if( !supportsSuspendResume(vm) ) {
-                throw new OperationNotSupportedException("Suspend/resume is not supported in " + provider.getCloudName());
+                throw new OperationNotSupportedException("Suspend/resume is not supported in " + getProvider().getCloudName());
             }
             HashMap<String,Object> json = new HashMap<String,Object>();
 
             json.put("suspend", null);
 
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaServer.class.getName() + ".suspend()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void unpause(@Nonnull String vmId) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaServer.class.getName() + ".unpause(" + vmId + ")");
-        }
+        APITrace.begin(getProvider(), "VM.unpause");
         try {
             VirtualMachine vm = getVirtualMachine(vmId);
 
@@ -747,30 +736,24 @@ public class NovaServer extends AbstractVMSupport {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
             if( !supportsPauseUnpause(vm) ) {
-                throw new OperationNotSupportedException("Pause/unpause is not supported in " + provider.getCloudName());
+                throw new OperationNotSupportedException("Pause/unpause is not supported in " + getProvider().getCloudName());
             }
             HashMap<String,Object> json = new HashMap<String,Object>();
 
             json.put("unpause", null);
 
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaServer.class.getName() + ".unpause()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void reboot(@Nonnull String vmId) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
-        
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaServer.class.getName() + ".reboot(" + vmId + ")");
-        }
+        APITrace.begin(getProvider(), "VM.reboot");
         try {
             HashMap<String,Object> json = new HashMap<String,Object>();
             HashMap<String,Object> action = new HashMap<String,Object>();
@@ -778,46 +761,35 @@ public class NovaServer extends AbstractVMSupport {
             action.put("type", "HARD");
             json.put("reboot", action);
 
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(((NovaOpenStack)getProvider()));
             
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaServer.class.getName() + ".reboot()");
-            }            
+            APITrace.end();
         }
-    }
-
-    @Override
-    public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
-        return new String[0];
     }
 
     @Override
     public boolean supportsPauseUnpause(@Nonnull VirtualMachine vm) {
-        return (!provider.isHP() && (!provider.isRackspace() || !provider.getCloudName().contains("Rackspace")));
+        return (!((NovaOpenStack)getProvider()).isHP() && (!((NovaOpenStack)getProvider()).isRackspace() || !getProvider().getCloudName().contains("Rackspace")));
     }
 
     @Override
     public boolean supportsStartStop(@Nonnull VirtualMachine vm) {
-        return (!provider.isHP() && (!provider.isRackspace() || !provider.getCloudName().contains("Rackspace")));
+        return (!((NovaOpenStack)getProvider()).isHP() && (!((NovaOpenStack)getProvider()).isRackspace() || !getProvider().getCloudName().contains("Rackspace")));
     }
 
     @Override
     public boolean supportsSuspendResume(@Nonnull VirtualMachine vm) {
-        return (!provider.isHP() && (!provider.isRackspace() || !provider.getCloudName().contains("Rackspace")));
+        return (!((NovaOpenStack)getProvider()).isHP() && (!((NovaOpenStack)getProvider()).isRackspace() || !getProvider().getCloudName().contains("Rackspace")));
     }
 
     @Override
     public void terminate(@Nonnull String vmId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-        
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + NovaServer.class.getName() + ".terminate(" + vmId + ")");
-        }
+        APITrace.begin(getProvider(), "VM.terminate");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             long timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
 
             do {
@@ -835,339 +807,325 @@ public class NovaServer extends AbstractVMSupport {
             } while( System.currentTimeMillis() < timeout );
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaServer.class.getName() + ".terminate()");
-            }
+            APITrace.end();
         }
     }
     
     private @Nullable VirtualMachineProduct toProduct(@Nullable JSONObject json) throws JSONException, InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-        
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + NovaServer.class.getName() + ".toProduct(" + json + ")");
+        if( json == null ) {
+            return null;
         }
-        try {
-            if( json == null ) {
-                return null;
-            }
-            VirtualMachineProduct product = new VirtualMachineProduct();
-            
-            if( json.has("id") ) {
-                product.setProviderProductId(json.getString("id"));
-            }
-            if( json.has("name") ) {
-                product.setName(json.getString("name"));
-            }
-            if( json.has("description") ) {
-                product.setDescription(json.getString("description"));
-            }
-            if( json.has("ram") ) {
-                product.setRamSize(new Storage<Megabyte>(json.getInt("ram"), Storage.MEGABYTE));
-            }
-            if( json.has("disk") ) {
-                product.setRootVolumeSize(new Storage<Gigabyte>(json.getInt("disk"), Storage.GIGABYTE));
-            }
-            product.setCpuCount(1);
-            if( product.getProviderProductId() == null ) {
-                return null;
-            }
-            if( product.getName() == null ) {
-                product.setName(product.getProviderProductId());
-            }
-            if( product.getDescription() == null ) {
-                product.setDescription(product.getName());
-            }
-            return product;
+        VirtualMachineProduct product = new VirtualMachineProduct();
+
+        if( json.has("id") ) {
+            product.setProviderProductId(json.getString("id"));
         }
-        finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("enter - " + NovaServer.class.getName() + ".toProduct()");
-            }            
+        if( json.has("name") ) {
+            product.setName(json.getString("name"));
         }
+        if( json.has("description") ) {
+            product.setDescription(json.getString("description"));
+        }
+        if( json.has("ram") ) {
+            product.setRamSize(new Storage<Megabyte>(json.getInt("ram"), Storage.MEGABYTE));
+        }
+        if( json.has("disk") ) {
+            product.setRootVolumeSize(new Storage<Gigabyte>(json.getInt("disk"), Storage.GIGABYTE));
+        }
+        product.setCpuCount(1);
+        if( product.getProviderProductId() == null ) {
+            return null;
+        }
+        if( product.getName() == null ) {
+            product.setName(product.getProviderProductId());
+        }
+        if( product.getDescription() == null ) {
+            product.setDescription(product.getName());
+        }
+        return product;
     }
 
     private @Nullable ResourceStatus toStatus(@Nullable JSONObject server) throws JSONException, InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaServer.class.getName() + ".toStatus(" + server + ")");
+        if( server == null ) {
+            return null;
         }
-        try {
-            if( server == null ) {
+        String serverId = null;
+
+        if( server.has("id") ) {
+            serverId = server.getString("id");
+        }
+        if( serverId == null ) {
+            return null;
+        }
+
+        VmState state = VmState.PENDING;
+
+        if( server.has("status") ) {
+            String s = server.getString("status").toLowerCase();
+
+            if( s.equals("active") ) {
+                state = VmState.RUNNING;
+            }
+            else if( s.equals("build") ) {
+                state = VmState.PENDING;
+            }
+            else if( s.equals("deleted") ) {
+                state = VmState.TERMINATED;
+            }
+            else if( s.equals("suspended") ) {
+                state = VmState.SUSPENDED;
+            }
+            else if( s.equalsIgnoreCase("paused") ) {
+                state = VmState.PAUSED;
+            }
+            else if( s.equalsIgnoreCase("stopped") || s.equalsIgnoreCase("shutoff")) {
+                state = VmState.STOPPED;
+            }
+            else if( s.equalsIgnoreCase("stopping") ) {
+                state = VmState.STOPPING;
+            }
+            else if( s.equalsIgnoreCase("pausing") ) {
+                state = VmState.PAUSING;
+            }
+            else if( s.equalsIgnoreCase("suspending") ) {
+                state = VmState.SUSPENDING;
+            }
+            else if( s.equals("error") ) {
                 return null;
             }
-            String serverId = null;
-
-            if( server.has("id") ) {
-                serverId = server.getString("id");
+            else if( s.equals("reboot") || s.equals("hard_reboot") ) {
+                state = VmState.REBOOTING;
             }
-            if( serverId == null ) {
-                return null;
-            }
-
-            VmState state = VmState.PENDING;
-
-            if( server.has("status") ) {
-                String s = server.getString("status").toLowerCase();
-
-                if( s.equals("active") ) {
-                    state = VmState.RUNNING;
-                }
-                else if( s.equals("build") ) {
-                    state = VmState.PENDING;
-                }
-                else if( s.equals("deleted") ) {
-                    state = VmState.TERMINATED;
-                }
-                else if( s.equals("suspended") ) {
-                    state = VmState.SUSPENDED;
-                }
-                else if( s.equalsIgnoreCase("paused") ) {
-                    state = VmState.PAUSED;
-                }
-                else if( s.equalsIgnoreCase("stopped") || s.equalsIgnoreCase("shutoff")) {
-                    state = VmState.STOPPED;
-                }
-                else if( s.equalsIgnoreCase("stopping") ) {
-                    state = VmState.STOPPING;
-                }
-                else if( s.equalsIgnoreCase("pausing") ) {
-                    state = VmState.PAUSING;
-                }
-                else if( s.equalsIgnoreCase("suspending") ) {
-                    state = VmState.SUSPENDING;
-                }
-                else if( s.equals("error") ) {
-                    return null;
-                }
-                else if( s.equals("reboot") || s.equals("hard_reboot") ) {
-                    state = VmState.REBOOTING;
-                }
-                else {
-                    std.warn("toVirtualMachine(): Unknown server state: " + s);
-                    state = VmState.PENDING;
-                }
-            }
-            return new ResourceStatus(serverId, state);
-        }
-        finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaServer.class.getName() + ".toStatus()");
+            else {
+                logger.warn("toVirtualMachine(): Unknown server state: " + s);
+                state = VmState.PENDING;
             }
         }
+        return new ResourceStatus(serverId, state);
     }
 
     private @Nullable VirtualMachine toVirtualMachine(@Nullable JSONObject server, Iterable<IpAddress> ipv4, Iterable<IpAddress> ipv6) throws JSONException, InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-        
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + NovaServer.class.getName() + ".toVirtualMachine(" + server + ")");
+        if( server == null ) {
+            return null;
         }
-        try {
-            if( server == null ) {
-                return null;
-            }
-            VirtualMachine vm = new VirtualMachine();
-            
-            vm.setCurrentState(VmState.RUNNING);
-            vm.setArchitecture(Architecture.I64);
-            vm.setClonable(false);
-            vm.setCreationTimestamp(-1L);
-            vm.setImagable(false);
-            vm.setLastBootTimestamp(-1L);
-            vm.setLastPauseTimestamp(-1L);
-            vm.setPausable(false);
-            vm.setPersistent(true);
-            vm.setPlatform(Platform.UNKNOWN);
-            vm.setRebootable(true);
-            vm.setProviderOwnerId(provider.getContext().getAccountNumber());
-            if( server.has("id") ) {
-                vm.setProviderVirtualMachineId(server.getString("id"));
-            }
-            if( server.has("name") ) {
-                vm.setName(server.getString("name"));
-            }
-            if( server.has("description") ) {
-                vm.setDescription(server.getString("description"));
-            }
-            if( server.has("kernel_id") ) {
-                vm.setProviderKernelImageId(server.getString("kernel_id"));
-            }
-            if( server.has("ramdisk_id") ) {
-                vm.setProviderRamdiskImageId(server.getString("ramdisk_id"));
+        VirtualMachine vm = new VirtualMachine();
+
+        vm.setCurrentState(VmState.RUNNING);
+        vm.setArchitecture(Architecture.I64);
+        vm.setClonable(false);
+        vm.setCreationTimestamp(-1L);
+        vm.setImagable(false);
+        vm.setLastBootTimestamp(-1L);
+        vm.setLastPauseTimestamp(-1L);
+        vm.setPausable(false);
+        vm.setPersistent(true);
+        vm.setPlatform(Platform.UNKNOWN);
+        vm.setRebootable(true);
+        vm.setProviderOwnerId(getContext().getAccountNumber());
+        if( server.has("id") ) {
+            vm.setProviderVirtualMachineId(server.getString("id"));
+        }
+        if( server.has("name") ) {
+            vm.setName(server.getString("name"));
+        }
+        if( server.has("description") ) {
+            vm.setDescription(server.getString("description"));
+        }
+        if( server.has("kernel_id") ) {
+            vm.setProviderKernelImageId(server.getString("kernel_id"));
+        }
+        if( server.has("ramdisk_id") ) {
+            vm.setProviderRamdiskImageId(server.getString("ramdisk_id"));
+        }
+        if( vm.getDescription() == null ) {
+            HashMap<String,String> map = new HashMap<String,String>();
+
+            if( server.has("metadata") ) {
+                JSONObject md = server.getJSONObject("metadata");
+
+                if( md.has("org.dasein.description") && vm.getDescription() == null ) {
+                    vm.setDescription(md.getString("org.dasein.description"));
+                }
+                else if( md.has("Server Label") ) {
+                    vm.setDescription(md.getString("Server Label"));
+                }
+                if( md.has("org.dasein.platform") ) {
+                    try {
+                        vm.setPlatform(Platform.valueOf(md.getString("org.dasein.platform")));
+                    }
+                    catch( Throwable ignore ) {
+                        // ignore
+                    }
+                }
+                String[] keys = JSONObject.getNames(md);
+
+                if( keys != null ) {
+                    for( String key : keys ) {
+                        String value = md.getString(key);
+
+                        if( value != null ) {
+                            map.put(key, value);
+                        }
+                    }
+                }
             }
             if( vm.getDescription() == null ) {
-                HashMap<String,String> map = new HashMap<String,String>();
-                
-                if( server.has("metadata") ) {
-                    JSONObject md = server.getJSONObject("metadata");
-                    
-                    if( md.has("dsnDescription") ) {
-                        vm.setDescription(md.getString("dsnDescription"));
+                if( vm.getName() == null ) {
+                    vm.setName(vm.getProviderVirtualMachineId());
+                }
+                vm.setDescription(vm.getName());
+            }
+            if( server.has("hostId") ) {
+                map.put("host", server.getString("hostId"));
+            }
+            vm.setTags(map);
+        }
+        if( server.has("image") ) {
+            JSONObject img = server.getJSONObject("image");
+
+            if( img.has("id") ) {
+                vm.setProviderMachineImageId(img.getString("id"));
+            }
+        }
+        if( server.has("flavor") ) {
+            JSONObject f = server.getJSONObject("flavor");
+
+            if( f.has("id") ) {
+                vm.setProductId(f.getString("id"));
+            }
+        }
+        else if( server.has("flavorId") ) {
+            vm.setProductId(server.getString("flavorId"));
+        }
+        if( server.has("adminPass") ) {
+            vm.setRootPassword("adminPass");
+        }
+        if( server.has("key_name") ) {
+            vm.setProviderShellKeyIds(server.getString("key_name"));
+        }
+        if( server.has("status") ) {
+            String s = server.getString("status").toLowerCase();
+
+            if( s.equals("active") ) {
+                vm.setCurrentState(VmState.RUNNING);
+            }
+            else if( s.startsWith("build") ) {
+                vm.setCurrentState(VmState.PENDING);
+            }
+            else if( s.equals("deleted") ) {
+                vm.setCurrentState(VmState.TERMINATED);
+            }
+            else if( s.equals("suspended") ) {
+                vm.setCurrentState(VmState.SUSPENDED);
+            }
+            else if( s.equalsIgnoreCase("paused") ) {
+                vm.setCurrentState(VmState.PAUSED);
+            }
+            else if( s.equalsIgnoreCase("stopped") || s.equalsIgnoreCase("shutoff")) {
+                vm.setCurrentState(VmState.STOPPED);
+            }
+            else if( s.equalsIgnoreCase("stopping") ) {
+                vm.setCurrentState(VmState.STOPPING);
+            }
+            else if( s.equalsIgnoreCase("pausing") ) {
+                vm.setCurrentState(VmState.PAUSING);
+            }
+            else if( s.equalsIgnoreCase("suspending") ) {
+                vm.setCurrentState(VmState.SUSPENDING);
+            }
+            else if( s.equals("error") ) {
+                return null;
+            }
+            else if( s.equals("reboot") || s.equals("hard_reboot") ) {
+                vm.setCurrentState(VmState.REBOOTING);
+            }
+            else {
+                logger.warn("toVirtualMachine(): Unknown server state: " + s);
+                vm.setCurrentState(VmState.PENDING);
+            }
+        }
+        if( server.has("created") ) {
+            vm.setCreationTimestamp(((NovaOpenStack)getProvider()).parseTimestamp(server.getString("created")));
+        }
+        if( server.has("addresses") ) {
+            JSONObject addrs = server.getJSONObject("addresses");
+
+            if( addrs.has("public") ) {
+                JSONArray arr = addrs.getJSONArray("public");
+                ArrayList<RawAddress> addresses = new ArrayList<RawAddress>();
+
+                for( int i=0; i<arr.length(); i++ ) {
+                    if( ((NovaOpenStack)getProvider()).getMinorVersion() == 0 && ((NovaOpenStack)getProvider()).getMajorVersion() == 1 ) {
+                        addresses.add(new RawAddress(arr.getString(i).trim(), IPVersion.IPV4));
                     }
-                    else if( md.has("Server Label") ) {
-                        vm.setDescription(md.getString("Server Label"));
-                    }
-                    if( md.has("dsnPlatform") ) {
-                        try {
-                            vm.setPlatform(Platform.valueOf(md.getString("dsnPlatform")));
+                    else {
+                        JSONObject a = arr.getJSONObject(i);
+
+                        if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
+                            addresses.add(new RawAddress(a.getString("addr"), IPVersion.IPV4));
                         }
-                        catch( Throwable ignore ) {
-                            // ignore
-                        }
-                    }
-                    String[] keys = JSONObject.getNames(md);
-                    
-                    if( keys != null ) {
-                        for( String key : keys ) {
-                            String value = md.getString(key);
-                            
-                            if( value != null ) {
-                                map.put(key, value);
-                            }
+                        else if( a.has("version") && a.getInt("version") == 6 && a.has("addr") ) {
+                            addresses.add(new RawAddress(a.getString("addr"), IPVersion.IPV6));
                         }
                     }
                 }
-                if( vm.getDescription() == null ) {
-                    if( vm.getName() == null ) {
-                        vm.setName(vm.getProviderVirtualMachineId());
-                    }
-                    vm.setDescription(vm.getName());
-                }
-                if( server.has("hostId") ) {
-                    map.put("host", server.getString("hostId"));
-                }
-                vm.setTags(map);
+                vm.setPublicAddresses(addresses.toArray(new RawAddress[addresses.size()]));
             }
-            if( server.has("image") ) {
-                JSONObject img = server.getJSONObject("image");
-                
-                if( img.has("id") ) {
-                    vm.setProviderMachineImageId(img.getString("id"));
-                }
-            }
-            if( server.has("flavor") ) {
-                JSONObject f = server.getJSONObject("flavor");
-                
-                if( f.has("id") ) {
-                    vm.setProductId(f.getString("id"));
-                }
-            }
-            else if( server.has("flavorId") ) {
-                vm.setProductId(server.getString("flavorId"));
-            }
-            if( server.has("adminPass") ) {
-                vm.setRootPassword("adminPass");
-            }
-            if( server.has("key_name") ) {
-                vm.setProviderShellKeyIds(server.getString("key_name"));
-            }
-            if( server.has("status") ) {
-                String s = server.getString("status").toLowerCase();
-                
-                if( s.equals("active") ) {
-                    vm.setCurrentState(VmState.RUNNING);
-                }
-                else if( s.startsWith("build") ) {
-                    vm.setCurrentState(VmState.PENDING);
-                }
-                else if( s.equals("deleted") ) {
-                    vm.setCurrentState(VmState.TERMINATED);
-                }
-                else if( s.equals("suspended") ) {
-                    vm.setCurrentState(VmState.SUSPENDED);
-                }
-                else if( s.equalsIgnoreCase("paused") ) {
-                    vm.setCurrentState(VmState.PAUSED);
-                }
-                else if( s.equalsIgnoreCase("stopped") || s.equalsIgnoreCase("shutoff")) {
-                    vm.setCurrentState(VmState.STOPPED);
-                }
-                else if( s.equalsIgnoreCase("stopping") ) {
-                    vm.setCurrentState(VmState.STOPPING);
-                }
-                else if( s.equalsIgnoreCase("pausing") ) {
-                    vm.setCurrentState(VmState.PAUSING);
-                }
-                else if( s.equalsIgnoreCase("suspending") ) {
-                    vm.setCurrentState(VmState.SUSPENDING);
-                }
-                else if( s.equals("error") ) {
-                    return null;
-                }
-                else if( s.equals("reboot") || s.equals("hard_reboot") ) {
-                    vm.setCurrentState(VmState.REBOOTING);
+            if( addrs.has("private") || addrs.has("nova_fixed")) {
+                JSONArray arr;
+
+                if( addrs.has("private") ) {
+                    arr = addrs.getJSONArray("private");
                 }
                 else {
-                    std.warn("toVirtualMachine(): Unknown server state: " + s);
-                    vm.setCurrentState(VmState.PENDING);
+                    arr = addrs.getJSONArray("nova_fixed");
                 }
-            }
-            if( server.has("created") ) {
-                vm.setCreationTimestamp(provider.parseTimestamp(server.getString("created")));
-            }
-            if( server.has("addresses") ) {
-                JSONObject addrs = server.getJSONObject("addresses");
-                
-                if( addrs.has("public") ) {
-                    JSONArray arr = addrs.getJSONArray("public");
-                    ArrayList<String> addresses = new ArrayList<String>();
-                    
-                    for( int i=0; i<arr.length(); i++ ) {
-                        if( provider.getMinorVersion() == 0 && provider.getMajorVersion() == 1 ) {
-                            addresses.add(arr.getString(i).trim());
+
+                ArrayList<RawAddress> addresses = new ArrayList<RawAddress>();
+
+                for( int i=0; i<arr.length(); i++ ) {
+                    if( ((NovaOpenStack)getProvider()).getMinorVersion() == 0 && ((NovaOpenStack)getProvider()).getMajorVersion() == 1 ) {
+                        addresses.add(new RawAddress(arr.getString(i).trim(), IPVersion.IPV4));
+                    }
+                    else {
+                        JSONObject a = arr.getJSONObject(i);
+
+                        if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
+                            addresses.add(new RawAddress(a.getString("addr"), IPVersion.IPV4));
                         }
-                        else {
-                            JSONObject a = arr.getJSONObject(i);
-                        
-                            if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
-                                addresses.add(a.getString("addr"));
+                        else if( a.has("version") && a.getInt("version") == 6 && a.has("addr") ) {
+                            addresses.add(new RawAddress(a.getString("addr"), IPVersion.IPV6));
+                        }
+                    }
+                }
+                vm.setPrivateAddresses(addresses.toArray(new RawAddress[addresses.size()]));
+            }
+            RawAddress[] raw = vm.getPublicAddresses();
+
+            if( raw != null ) {
+                for( RawAddress addr : vm.getPublicAddresses() ) {
+                    if( addr.getVersion().equals(IPVersion.IPV4) ) {
+                        for( IpAddress a : ipv4 ) {
+                            if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
+                                vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
+                                break;
                             }
                         }
                     }
-                    RawAddress[] raw = new RawAddress[addresses.size()];
-                    int i=0;
-
-                    for( String addr : addresses ) {
-                        raw[i++] = new RawAddress(addr);
-                    }
-                    vm.setPublicAddresses(raw);
-                }
-                if( addrs.has("private") || addrs.has("nova_fixed")) {
-                    JSONArray arr;
-                    
-                    if ( addrs.has("private"))
-                    	arr = addrs.getJSONArray("private");
-                    else 
-                    	arr = addrs.getJSONArray("nova_fixed");
-                    
-                    ArrayList<String> addresses = new ArrayList<String>();
-                    
-                    for( int i=0; i<arr.length(); i++ ) {
-                        if( provider.getMinorVersion() == 0 && provider.getMajorVersion() == 1 ) {
-                            addresses.add(arr.getString(i).trim());
-                        }
-                        else {
-                            JSONObject a = arr.getJSONObject(i);
-                        
-                            if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
-                                addresses.add(a.getString("addr"));
+                    else if( addr.getVersion().equals(IPVersion.IPV6) ) {
+                        for( IpAddress a : ipv6 ) {
+                            if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
+                                vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
+                                break;
                             }
                         }
                     }
-                    RawAddress[] raw = new RawAddress[addresses.size()];
-                    int i=0;
-
-                    for( String addr : addresses ) {
-                        raw[i++] = new RawAddress(addr);
-                    }
-                    vm.setPrivateAddresses(raw);
                 }
-                RawAddress[] raw = vm.getPublicAddresses();
-
+            }
+            if( vm.getProviderAssignedIpAddressId() == null ) {
+                raw = vm.getPrivateAddresses();
                 if( raw != null ) {
-                    for( RawAddress addr : vm.getPublicAddresses() ) {
+                    for( RawAddress addr :raw ) {
                         if( addr.getVersion().equals(IPVersion.IPV4) ) {
                             for( IpAddress a : ipv4 ) {
                                 if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
@@ -1186,57 +1144,35 @@ public class NovaServer extends AbstractVMSupport {
                         }
                     }
                 }
-                if( vm.getProviderAssignedIpAddressId() == null ) {
-                    raw = vm.getPrivateAddresses();
-                    if( raw != null ) {
-                        for( RawAddress addr :raw ) {
-                            if( addr.getVersion().equals(IPVersion.IPV4) ) {
-                                for( IpAddress a : ipv4 ) {
-                                    if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
-                                        vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
-                                        break;
-                                    }
-                                }
-                            }
-                            else if( addr.getVersion().equals(IPVersion.IPV6) ) {
-                                for( IpAddress a : ipv6 ) {
-                                    if( a.getRawAddress().getIpAddress().equals(addr.getIpAddress()) ) {
-                                        vm.setProviderAssignedIpAddressId(a.getProviderIpAddressId());
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            vm.setProviderRegionId(provider.getContext().getRegionId());
-            vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
-            vm.setTerminationTimestamp(-1L);
-            if( vm.getProviderVirtualMachineId() == null ) {
-                return null;
-            }
-            vm.setImagable(vm.getCurrentState().equals(VmState.RUNNING));
-            vm.setRebootable(vm.getCurrentState().equals(VmState.RUNNING));
-            if( vm.getPlatform().equals(Platform.UNKNOWN) ) {
-                Platform p = Platform.guess(vm.getName() + " " + vm.getDescription());
-                
-                if( p.equals(Platform.UNKNOWN) ) {
-                    MachineImage img = provider.getComputeServices().getImageSupport().getImage(vm.getProviderMachineImageId());
-                    
-                    if( img != null ) {
-                        p = img.getPlatform();
-                    }
-                }
-                vm.setPlatform(p);
-            }
-            return vm;
-        }
-        finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaServer.class.getName() + ".toVirtualMachine()");
             }
         }
+        vm.setProviderRegionId(getContext().getRegionId());
+        vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
+        vm.setTerminationTimestamp(-1L);
+        if( vm.getProviderVirtualMachineId() == null ) {
+            return null;
+        }
+        if( vm.getName() == null ) {
+            vm.setName(vm.getProviderVirtualMachineId());
+        }
+        if( vm.getDescription() == null ) {
+            vm.setDescription(vm.getName());
+        }
+        vm.setImagable(vm.getCurrentState().equals(VmState.RUNNING));
+        vm.setRebootable(vm.getCurrentState().equals(VmState.RUNNING));
+        if( vm.getPlatform().equals(Platform.UNKNOWN) ) {
+            Platform p = Platform.guess(vm.getName() + " " + vm.getDescription());
+
+            if( p.equals(Platform.UNKNOWN) ) {
+                MachineImage img = getProvider().getComputeServices().getImageSupport().getImage(vm.getProviderMachineImageId());
+
+                if( img != null ) {
+                    p = img.getPlatform();
+                }
+            }
+            vm.setPlatform(p);
+        }
+        return vm;
     }
 
 }

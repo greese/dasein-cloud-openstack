@@ -114,6 +114,7 @@ public class NovaImage extends AbstractImageSupport {
                 task.setStartTime(System.currentTimeMillis());
             }
             String vmId = options.getVirtualMachineId();
+            Platform platform = null;
 
             if( vmId != null ) {
                 long timeout = (System.currentTimeMillis() + CalendarWrapper.MINUTE*10L);
@@ -133,6 +134,7 @@ public class NovaImage extends AbstractImageSupport {
                         if( vm == null ) {
                             throw new CloudException("No such virtual machine: " + vmId);
                         }
+                        platform = vm.getPlatform();
                         if( !VmState.PENDING.equals(vm.getCurrentState()) ) {
                             break;
                         }
@@ -150,7 +152,10 @@ public class NovaImage extends AbstractImageSupport {
                 HashMap<String,Object> json = new HashMap<String,Object>();
                 HashMap<String,String> metaData = new HashMap<String,String>();
 
-                metaData.put("dsnDescription", options.getDescription());
+                metaData.put("org.dasein.description", options.getDescription());
+                if( platform != null ) {
+                    metaData.put("org.dasein.platform", platform.name());
+                }
                 action.put("metadata", metaData);
                 json.put("createImage", action);
 
@@ -257,7 +262,7 @@ public class NovaImage extends AbstractImageSupport {
 
     @Override
     public boolean hasPublicLibrary() {
-        return false;
+        return true;
     }
 
     @Override
@@ -285,6 +290,9 @@ public class NovaImage extends AbstractImageSupport {
     public @Nonnull Iterable<ResourceStatus> listImageStatus(@Nonnull ImageClass cls) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "Image.listImageStatus");
         try {
+            if( !cls.equals(ImageClass.MACHINE) ) {
+                return Collections.emptyList();
+            }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/images", null, true);
             ArrayList<ResourceStatus> images = new ArrayList<ResourceStatus>();
@@ -320,8 +328,13 @@ public class NovaImage extends AbstractImageSupport {
         try {
             String account = (options == null ? null : options.getAccountNumber());
 
-            if( account != null && !account.equals(getContext().getAccountNumber()) ) {
-                return Collections.emptyList();
+            if( account == null ) {
+                if( options == null ) {
+                    options = ImageFilterOptions.getInstance().withAccountNumber(getContext().getAccountNumber());
+                }
+                else {
+                    options.withAccountNumber(getContext().getAccountNumber());
+                }
             }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/images", null, true);
@@ -335,10 +348,9 @@ public class NovaImage extends AbstractImageSupport {
                         JSONObject image = list.getJSONObject(i);
                         MachineImage img = toImage(image);
 
-                        if( img != null && (options == null || options.matches(img)) ) {
+                        if( img != null && options.matches(img) ) {
                             images.add(img);
                         }
-
                     }
                 }
             }
@@ -391,6 +403,37 @@ public class NovaImage extends AbstractImageSupport {
         }
     }
 
+    public @Nonnull Iterable<MachineImage> searchPublicImages(@Nonnull ImageFilterOptions options) throws InternalException, CloudException {
+        APITrace.begin(getProvider(), "Image.searchPublicImages");
+        try {
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            JSONObject ob = method.getServers("/images", null, true);
+            ArrayList<MachineImage> images = new ArrayList<MachineImage>();
+            String me = getContext().getAccountNumber();
+
+            try {
+                if( ob != null && ob.has("images") ) {
+                    JSONArray list = ob.getJSONArray("images");
+
+                    for( int i=0; i<list.length(); i++ ) {
+                        JSONObject image = list.getJSONObject(i);
+                        MachineImage img = toImage(image);
+
+                        if( img != null && !img.getProviderOwnerId().equals(me) && options.matches(img) ) {
+                            images.add(img);
+                        }
+                    }
+                }
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for images: " + e.getMessage());
+            }
+            return images;
+        }
+        finally {
+            APITrace.end();
+        }
+    }
 
     @Override
     public boolean supportsCustomImages() {
@@ -409,7 +452,7 @@ public class NovaImage extends AbstractImageSupport {
 
     @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        return false;
+        return true;
     }
 
     public @Nullable MachineImage toImage(@Nullable JSONObject json) throws CloudException, InternalException {
@@ -427,20 +470,32 @@ public class NovaImage extends AbstractImageSupport {
                 String name = (json.has("name") ? json.getString("name") : null);
                 String description = (json.has("description") ? json.getString("description") : null);
                 JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
+                String owner = getContext().getAccountNumber();
                 Architecture architecture = Architecture.I64;
                 Platform platform = Platform.UNKNOWN;
 
                 if( md != null ) {
-                    if( description == null && md.has("dsnDescription") ) {
-                        description = md.getString("dsnDescription");
+                    if( description == null && md.has("org.dasein.description") ) {
+                        description = md.getString("org.dasein.description");
                     }
+                    if( md.has("org.dasein.platform") ) {
+                        try {
+                            platform = Platform.valueOf(md.getString("org.dasein.platform"));
+                        }
+                        catch( Throwable ignore ) {
+                            // ignore
+                        }
+                    }
+                    String[] akeys = { "arch", "architecture", "org.openstack__1__architecture", "com.hp__1__architecture" };
                     String a = null;
 
-                    if( md.has("arch") ) {
-                        a = md.getString("arch");
-                    }
-                    if( a == null ) {
-                        a = md.getString("org.openstack__1__architecture");
+                    for( String key : akeys ) {
+                        if( md.has(key) ) {
+                            a = md.getString(key);
+                            if( a != null ) {
+                                break;
+                            }
+                        }
                     }
                     if( a != null ) {
                         a = a.toLowerCase();
@@ -455,7 +510,19 @@ public class NovaImage extends AbstractImageSupport {
                         }
                     }
                     if( md.has("os_type") ) {
-                        platform = Platform.guess(md.getString("os_type"));
+                        Platform p = Platform.guess(md.getString("os_type"));
+
+                        if( !p.equals(Platform.UNKNOWN) ) {
+                            if( platform.equals(Platform.UNKNOWN) ) {
+                                platform = p;
+                            }
+                            else if( platform.equals(Platform.UNIX) && !p.equals(Platform.UNIX) ) {
+                                platform = p;
+                            }
+                        }
+                    }
+                    if( md.has("owner") ) {
+                        owner = md.getString("owner");
                     }
                 }
 
@@ -491,7 +558,7 @@ public class NovaImage extends AbstractImageSupport {
                     name = imageId;
                 }
                 if( description == null ) {
-                    description = null;
+                    description = name;
                 }
                 if( platform.equals(Platform.UNKNOWN) ) {
                     platform = Platform.guess(name + " " + description);
@@ -503,7 +570,7 @@ public class NovaImage extends AbstractImageSupport {
                         platform = p;
                     }
                 }
-                MachineImage image = MachineImage.getMachineImageInstance(getContext().getAccountNumber(), getContext().getRegionId(), imageId, currentState, name, description, architecture, platform).createdAt(created);
+                MachineImage image = MachineImage.getMachineImageInstance(owner, getContext().getRegionId(), imageId, currentState, name, description, architecture, platform).createdAt(created);
 
                 if( md != null ) {
                     String[] names = JSONObject.getNames(md);
@@ -531,38 +598,52 @@ public class NovaImage extends AbstractImageSupport {
         }
     }
 
-    public @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws JSONException {
+    public @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws CloudException, InternalException {
 
         if( json == null ) {
             return null;
         }
+        String owner = getContext().getAccountNumber();
         MachineImageState state = MachineImageState.PENDING;
         String id = null;
 
-        if( json.has("id") ) {
-            id = json.getString("id");
-        }
-        if( id == null ) {
-            return null;
-        }
-        if( json.has("status") ) {
-            String s = json.getString("status").toLowerCase();
-
-            if( s.equals("saving") ) {
-                state = MachineImageState.PENDING;
+        try {
+            if( json.has("id") ) {
+                id = json.getString("id");
             }
-            else if( s.equals("active") || s.equals("queued") || s.equals("preparing") ) {
-                state = MachineImageState.ACTIVE;
-            }
-            else if( s.equals("deleting") ) {
-                state = MachineImageState.PENDING;
-            }
-            else if( s.equals("failed") ) {
+            if( id == null ) {
                 return null;
             }
-            else {
-                state = MachineImageState.PENDING;
+            JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
+
+            if( md != null ) {
+                owner = md.getString("owner");
             }
+            if( json.has("status") ) {
+                String s = json.getString("status").toLowerCase();
+
+                if( s.equals("saving") ) {
+                    state = MachineImageState.PENDING;
+                }
+                else if( s.equals("active") || s.equals("queued") || s.equals("preparing") ) {
+                    state = MachineImageState.ACTIVE;
+                }
+                else if( s.equals("deleting") ) {
+                    state = MachineImageState.PENDING;
+                }
+                else if( s.equals("failed") ) {
+                    return null;
+                }
+                else {
+                    state = MachineImageState.PENDING;
+                }
+            }
+        }
+        catch( JSONException e ) {
+            throw new InternalException(e);
+        }
+        if( !owner.equals(getContext().getAccountNumber()) ) {
+            return null;
         }
         return new ResourceStatus(id, state);
     }

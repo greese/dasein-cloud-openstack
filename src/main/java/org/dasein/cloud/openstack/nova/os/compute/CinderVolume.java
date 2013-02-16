@@ -124,7 +124,7 @@ public class CinderVolume extends AbstractVolumeSupport {
             Map<String,Object> md = options.getMetaData();
 
             if( md != null && !md.isEmpty() ) {
-                json.put("meta_data", md);
+                json.put("metadata", md);
             }
             if( options.getVolumeProductId() != null ) {
                 // TODO: cinder is broken and expects the name; should be fixed in Grizzly
