@@ -77,6 +77,5 @@ public class NovaNetworkServices extends AbstractNetworkServices {
     @Override
     public @Nullable Quantum getVlanSupport() {
         return new Quantum(provider);
-        //return null;
     }
 }

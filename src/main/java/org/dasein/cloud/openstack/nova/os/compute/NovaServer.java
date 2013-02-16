@@ -59,6 +59,8 @@ import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.openstack.nova.os.network.NovaNetworkServices;
+import org.dasein.cloud.openstack.nova.os.network.Quantum;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
@@ -273,13 +275,37 @@ public class NovaServer extends AbstractVMSupport {
                 }
                 json.put("flavorRef", getFlavorRef(options.getStandardProductId()));
             }
-            if( options.getVlanId() != null ) {
+            if( options.getVlanId() != null && ((NovaOpenStack)getProvider()).isRackspace() ) {
                 ArrayList<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
                 HashMap<String,Object> vlan = new HashMap<String, Object>();
 
                 vlan.put("uuid", options.getVlanId());
                 vlans.add(vlan);
                 json.put("networks", vlans);
+            }
+            else {
+                if( options.getVlanId() != null && !((NovaOpenStack)getProvider()).isRackspace() ) {
+                    try {
+                        NovaNetworkServices services = ((NovaOpenStack)getProvider()).getNetworkServices();
+
+                        if( services != null ) {
+                            Quantum support = services.getVlanSupport();
+
+                            if( support != null ) {
+                                ArrayList<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
+                                HashMap<String,Object> vlan = new HashMap<String, Object>();
+
+                                vlan.put("port", support.createPort(options.getVlanId(), options.getHostName()));
+                                vlans.add(vlan);
+                                json.put("networks", vlans);
+                            }
+                        }
+                    }
+                    catch( Throwable ignore ) {
+                        // ignore this error
+                    }
+                }
+
             }
             if( options.getBootstrapKey() != null ) {
                 json.put("key_name", options.getBootstrapKey());
