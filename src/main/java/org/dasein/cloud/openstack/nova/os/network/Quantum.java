@@ -461,6 +461,9 @@ public class Quantum extends AbstractVLANSupport {
                         VLAN v = toVLAN(list.getJSONObject(i));
 
                         if( v != null ) {
+                            if( v.getProviderVlanId().equals("00000000-0000-0000-0000-000000000000") || v.getProviderVlanId().equals("11111111-1111-1111-1111-111111111111") ) {
+                                continue;
+                            }
                             networks.add(v);
                         }
                     }

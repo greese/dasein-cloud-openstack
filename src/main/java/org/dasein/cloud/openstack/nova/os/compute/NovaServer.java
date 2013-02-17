@@ -56,6 +56,8 @@ import org.dasein.cloud.network.IpAddress;
 import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.NetworkServices;
 import org.dasein.cloud.network.RawAddress;
+import org.dasein.cloud.network.VLAN;
+import org.dasein.cloud.network.VLANSupport;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -124,6 +126,7 @@ public class NovaServer extends AbstractVMSupport {
                 return null;
             }
             Iterable<IpAddress> ipv4, ipv6;
+            Iterable<VLAN> networks;
 
             NetworkServices services = getProvider().getNetworkServices();
 
@@ -137,14 +140,24 @@ public class NovaServer extends AbstractVMSupport {
                 else {
                     ipv4 = ipv6 = Collections.emptyList();
                 }
+
+                VLANSupport vs = services.getVlanSupport();
+
+                if( vs != null ) {
+                    networks = vs.listVlans();
+                }
+                else {
+                    networks = Collections.emptyList();
+                }
             }
             else {
                 ipv4 = ipv6 = Collections.emptyList();
+                networks = Collections.emptyList();
             }
             try {
                 if( ob.has("server") ) {
                     JSONObject server = ob.getJSONObject("server");
-                    VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6);
+                    VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6, networks);
                         
                     if( vm != null ) {
                         return vm;
@@ -203,7 +216,9 @@ public class NovaServer extends AbstractVMSupport {
         if( services == null ) {
             return Requirement.NONE;
         }
-        if( services.getVlanSupport() == null ) {
+        VLANSupport support = services.getVlanSupport();
+
+        if( support == null || !support.isSubscribed() ) {
             return Requirement.NONE;
         }
         return Requirement.OPTIONAL;
@@ -344,9 +359,10 @@ public class NovaServer extends AbstractVMSupport {
             if( result.has("server") ) {
                 try {
                     Collection<IpAddress> ips = Collections.emptyList();
+                    Collection<VLAN> nets = Collections.emptyList();
 
                     JSONObject server = result.getJSONObject("server");
-                    VirtualMachine vm = toVirtualMachine(server, ips, ips);
+                    VirtualMachine vm = toVirtualMachine(server, ips, ips, nets);
 
                     if( vm != null ) {
                         return vm;
@@ -608,6 +624,7 @@ public class NovaServer extends AbstractVMSupport {
             ArrayList<VirtualMachine> servers = new ArrayList<VirtualMachine>();
 
             Iterable<IpAddress> ipv4 = Collections.emptyList(), ipv6 = Collections.emptyList();
+            Iterable<VLAN> nets = Collections.emptyList();
             NetworkServices services = getProvider().getNetworkServices();
 
             if( services != null ) {
@@ -617,6 +634,12 @@ public class NovaServer extends AbstractVMSupport {
                     ipv4 = support.listIpPool(IPVersion.IPV4, false);
                     ipv6 = support.listIpPool(IPVersion.IPV6, false);
                 }
+
+                VLANSupport vs = services.getVlanSupport();
+
+                if( vs != null ) {
+                    nets = vs.listVlans();
+                }
             }
             try {
                 if( ob != null && ob.has("servers") ) {
@@ -624,7 +647,7 @@ public class NovaServer extends AbstractVMSupport {
                     
                     for( int i=0; i<list.length(); i++ ) {
                         JSONObject server = list.getJSONObject(i);
-                        VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6);
+                        VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6, nets);
                         
                         if( vm != null ) {
                             servers.add(vm);
@@ -947,7 +970,7 @@ public class NovaServer extends AbstractVMSupport {
         return new ResourceStatus(serverId, state);
     }
 
-    private @Nullable VirtualMachine toVirtualMachine(@Nullable JSONObject server, Iterable<IpAddress> ipv4, Iterable<IpAddress> ipv6) throws JSONException, InternalException, CloudException {
+    private @Nullable VirtualMachine toVirtualMachine(@Nullable JSONObject server, @Nonnull Iterable<IpAddress> ipv4, @Nonnull Iterable<IpAddress> ipv6, @Nonnull Iterable<VLAN> networks) throws JSONException, InternalException, CloudException {
         if( server == null ) {
             return null;
         }
@@ -1092,56 +1115,51 @@ public class NovaServer extends AbstractVMSupport {
         }
         if( server.has("addresses") ) {
             JSONObject addrs = server.getJSONObject("addresses");
+            String[] names = JSONObject.getNames(addrs);
 
-            if( addrs.has("public") ) {
-                JSONArray arr = addrs.getJSONArray("public");
-                ArrayList<RawAddress> addresses = new ArrayList<RawAddress>();
+            if( names != null && names.length > 0 ) {
+                ArrayList<RawAddress> pub = new ArrayList<RawAddress>();
+                ArrayList<RawAddress> priv = new ArrayList<RawAddress>();
 
-                for( int i=0; i<arr.length(); i++ ) {
-                    if( ((NovaOpenStack)getProvider()).getMinorVersion() == 0 && ((NovaOpenStack)getProvider()).getMajorVersion() == 1 ) {
-                        addresses.add(new RawAddress(arr.getString(i).trim(), IPVersion.IPV4));
-                    }
-                    else {
-                        JSONObject a = arr.getJSONObject(i);
+                for( String name : names ) {
+                    JSONArray arr = addrs.getJSONArray(name);
 
-                        if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
-                            addresses.add(new RawAddress(a.getString("addr"), IPVersion.IPV4));
+                    for( int i=0; i<arr.length(); i++ ) {
+                        RawAddress addr = null;
+
+                        if( ((NovaOpenStack)getProvider()).getMinorVersion() == 0 && ((NovaOpenStack)getProvider()).getMajorVersion() == 1 ) {
+                            addr = new RawAddress(arr.getString(i).trim(), IPVersion.IPV4);
                         }
-                        else if( a.has("version") && a.getInt("version") == 6 && a.has("addr") ) {
-                            addresses.add(new RawAddress(a.getString("addr"), IPVersion.IPV6));
+                        else {
+                            JSONObject a = arr.getJSONObject(i);
+
+                            if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
+                                addr = new RawAddress(a.getString("addr"), IPVersion.IPV4);
+                            }
+                            else if( a.has("version") && a.getInt("version") == 6 && a.has("addr") ) {
+                                addr = new RawAddress(a.getString("addr"), IPVersion.IPV6);
+                            }
+                        }
+                        if( addr != null ) {
+                            if( addr.isPublicIpAddress() ) {
+                                pub.add(addr);
+                            }
+                            else {
+                                priv.add(addr);
+                            }
                         }
                     }
-                }
-                vm.setPublicAddresses(addresses.toArray(new RawAddress[addresses.size()]));
-            }
-            if( addrs.has("private") || addrs.has("nova_fixed")) {
-                JSONArray arr;
-
-                if( addrs.has("private") ) {
-                    arr = addrs.getJSONArray("private");
-                }
-                else {
-                    arr = addrs.getJSONArray("nova_fixed");
-                }
-
-                ArrayList<RawAddress> addresses = new ArrayList<RawAddress>();
-
-                for( int i=0; i<arr.length(); i++ ) {
-                    if( ((NovaOpenStack)getProvider()).getMinorVersion() == 0 && ((NovaOpenStack)getProvider()).getMajorVersion() == 1 ) {
-                        addresses.add(new RawAddress(arr.getString(i).trim(), IPVersion.IPV4));
-                    }
-                    else {
-                        JSONObject a = arr.getJSONObject(i);
-
-                        if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
-                            addresses.add(new RawAddress(a.getString("addr"), IPVersion.IPV4));
-                        }
-                        else if( a.has("version") && a.getInt("version") == 6 && a.has("addr") ) {
-                            addresses.add(new RawAddress(a.getString("addr"), IPVersion.IPV6));
+                    if( vm.getProviderVlanId() == null && !name.equals("public") && !name.equals("private") && !name.equals("nova_fixed") ) {
+                        for( VLAN network : networks ) {
+                            if( network.getName().equals(name) ) {
+                                vm.setProviderVlanId(network.getProviderVlanId());
+                                break;
+                            }
                         }
                     }
                 }
-                vm.setPrivateAddresses(addresses.toArray(new RawAddress[addresses.size()]));
+                vm.setPublicAddresses(pub.toArray(new RawAddress[pub.size()]));
+                vm.setPrivateAddresses(priv.toArray(new RawAddress[priv.size()]));
             }
             RawAddress[] raw = vm.getPublicAddresses();
 
