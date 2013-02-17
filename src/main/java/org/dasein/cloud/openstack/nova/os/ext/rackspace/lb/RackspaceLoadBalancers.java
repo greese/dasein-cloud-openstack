@@ -39,6 +39,7 @@ import org.dasein.cloud.network.LoadBalancerSupport;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.APITrace;
 import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -48,7 +49,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -58,6 +58,8 @@ import java.util.TreeSet;
 
 
 public class RackspaceLoadBalancers implements LoadBalancerSupport {
+    static private final Logger logger = NovaOpenStack.getLogger(RackspaceLoadBalancers.class, "std");
+
     static public final String RESOURCE = "/loadbalancers";
     static public final String SERVICE  = "rax:load-balancer";
 
@@ -72,11 +74,7 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
 
     @Override
     public void addServers(@Nonnull String toLoadBalancerId, @Nonnull String... serverIdsToAdd) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(RackspaceLoadBalancers.class, "std");
-        
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + RackspaceLoadBalancers.class.getName() + ".addServers(" + toLoadBalancerId + "," + Arrays.toString(serverIdsToAdd) + ")");
-        }
+        APITrace.begin(provider, "LB.addServers");
         try {
             ArrayList<HashMap<String,Object>> nodes = new ArrayList<HashMap<String,Object>>();
             LoadBalancer lb = getLoadBalancer(toLoadBalancerId);
@@ -156,19 +154,13 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
             }
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + RackspaceLoadBalancers.class.getName() + ".addServers()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public @Nonnull String create(@Nonnull String name, @Nonnull String description, @Nonnull String addressId, @Nonnull String[] dataCenterIds, @Nonnull LbListener[] listeners, @Nonnull String[] serverIds) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(RackspaceLoadBalancers.class, "std");
-        
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + RackspaceLoadBalancers.class.getName() + ".create(" + name + "," + description + "," + addressId + "," + Arrays.toString(dataCenterIds) + "," + Arrays.toString(listeners) + "," + Arrays.toString(serverIds) + ")");
-        }
+        APITrace.begin(provider, "LB.create");
         try {
             if( listeners == null || listeners.length < 1 ) {
                 logger.error("create(): Call failed to specify any listeners");
@@ -277,9 +269,7 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
             }
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + RackspaceLoadBalancers.class.getName() + ".create()");
-            }            
+            APITrace.end();
         }
     }
 
@@ -313,11 +303,7 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
 
     @Override
     public LoadBalancer getLoadBalancer(String loadBalancerId) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(RackspaceLoadBalancers.class, "std");
-        
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + RackspaceLoadBalancers.class.getName() + ".getLoadBalancer(" + loadBalancerId + ")");
-        }
+        APITrace.begin(provider, "LB.getLoadBalancer");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -350,9 +336,7 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
             }
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + RackspaceLoadBalancers.class.getName() + ".getLoadBalancer()");
-            }
+            APITrace.end();
         }
     }
 
@@ -383,45 +367,51 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
 
     @Override
     public Iterable<ResourceStatus> listLoadBalancerStatus() throws CloudException, InternalException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        NovaMethod method = new NovaMethod(provider);
-        JSONObject ob = method.getResource(SERVICE, RESOURCE, null, false);
-
-        if( ob == null ) {
-            return Collections.emptyList();
-        }
+        APITrace.begin(provider, "LB.listLoadBalancerStatus");
         try {
-            ArrayList<ResourceStatus> loadBalancers = new ArrayList<ResourceStatus>();
+            ProviderContext ctx = provider.getContext();
 
-            if( ob.has("loadBalancers") ) {
-                JSONArray lbs = ob.getJSONArray("loadBalancers");
+            if( ctx == null ) {
+                throw new InternalException("No context exists for this request");
+            }
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject ob = method.getResource(SERVICE, RESOURCE, null, false);
 
-                if( lbs.length() > 0 ) {
-                    for( int i=0; i<lbs.length(); i++ ) {
-                        JSONObject tmp = lbs.getJSONObject(i);
+            if( ob == null ) {
+                return Collections.emptyList();
+            }
+            try {
+                ArrayList<ResourceStatus> loadBalancers = new ArrayList<ResourceStatus>();
 
-                        if( tmp.has("id") ) {
-                            JSONObject actual = method.getResource(SERVICE, RESOURCE, tmp.getString("id"), false);
+                if( ob.has("loadBalancers") ) {
+                    JSONArray lbs = ob.getJSONArray("loadBalancers");
 
-                            if( actual != null && actual.has("loadBalancer") ) {
-                                ResourceStatus lb = toStatus(actual.getJSONObject("loadBalancer"));
+                    if( lbs.length() > 0 ) {
+                        for( int i=0; i<lbs.length(); i++ ) {
+                            JSONObject tmp = lbs.getJSONObject(i);
 
-                                if( lb != null ) {
-                                    loadBalancers.add(lb);
+                            if( tmp.has("id") ) {
+                                JSONObject actual = method.getResource(SERVICE, RESOURCE, tmp.getString("id"), false);
+
+                                if( actual != null && actual.has("loadBalancer") ) {
+                                    ResourceStatus lb = toStatus(actual.getJSONObject("loadBalancer"));
+
+                                    if( lb != null ) {
+                                        loadBalancers.add(lb);
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                return loadBalancers;
             }
-            return loadBalancers;
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for load balancers: " + e.getMessage());
+            }
         }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for load balancers: " + e.getMessage());
+        finally {
+            APITrace.end();
         }
     }
 
@@ -495,11 +485,7 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
 
     @Override
     public Iterable<LoadBalancer> listLoadBalancers() throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(RackspaceLoadBalancers.class, "std");
-        
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + RackspaceLoadBalancers.class.getName() + ".listLoadBalancers()");
-        }
+        APITrace.begin(provider, "LB.listLoadBalancers");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -544,19 +530,13 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
             }
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + RackspaceLoadBalancers.class.getName() + ".listLoadBalancers()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void remove(String loadBalancerId) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(RackspaceLoadBalancers.class, "std");
-        
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + RackspaceLoadBalancers.class.getName() + ".remove(" + loadBalancerId + ")");
-        }
+        APITrace.begin(provider, "LB.remove");
         try {
             NovaMethod method = new NovaMethod(provider);
             long timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
@@ -576,9 +556,7 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
             } while( System.currentTimeMillis() < timeout );
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + RackspaceLoadBalancers.class.getName() + ".remove()");
-            }
+            APITrace.end();
         }
     }
 
@@ -588,28 +566,34 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
     }
     
     public Collection<Node> getNodes(String loadBalancerId) throws CloudException, InternalException {
-        ArrayList<Node> nodes = new ArrayList<Node>();
-        NovaMethod method = new NovaMethod(provider);
-        JSONObject response = method.getResource(SERVICE, RESOURCE, loadBalancerId + "/nodes", false);
+        APITrace.begin(provider, "LB.getNodes");
+        try {
+            ArrayList<Node> nodes = new ArrayList<Node>();
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject response = method.getResource(SERVICE, RESOURCE, loadBalancerId + "/nodes", false);
 
-        if( response != null && response.has("nodes") ) {
-            try {
-                JSONArray arr = response.getJSONArray("nodes");
-                
-                for( int i=0; i<arr.length(); i++ ) {
-                    JSONObject node = arr.getJSONObject(i);
-                    Node n = new Node();
-                    
-                    n.nodeId = node.getString("id");
-                    n.address = node.getString("address");
-                    nodes.add(n);
+            if( response != null && response.has("nodes") ) {
+                try {
+                    JSONArray arr = response.getJSONArray("nodes");
+
+                    for( int i=0; i<arr.length(); i++ ) {
+                        JSONObject node = arr.getJSONObject(i);
+                        Node n = new Node();
+
+                        n.nodeId = node.getString("id");
+                        n.address = node.getString("address");
+                        nodes.add(n);
+                    }
+                }
+                catch( JSONException e ) {
+                    throw new CloudException("Unable to read nodes: " + e.getMessage());
                 }
             }
-            catch( JSONException e ) {
-                throw new CloudException("Unable to read nodes: " + e.getMessage());
-            }
+            return nodes;
         }
-        return nodes;
+        finally {
+            APITrace.end();
+        }
     }
     
     private @Nonnull Collection<String> mapNodes(@Nonnull ProviderContext ctx, @Nonnull String loadBalancerId, @Nullable String[] serverIds) throws CloudException, InternalException {
@@ -673,43 +657,49 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
 
     @Override
     public void removeServers(String fromLoadBalancerId, String... serverIdsToRemove) throws CloudException, InternalException {
-        LoadBalancer lb = getLoadBalancer(fromLoadBalancerId);
-        
-        if( lb == null || LoadBalancerState.TERMINATED.equals(lb.getCurrentState()) ) {
-            throw new CloudException("No such load balancer: " + fromLoadBalancerId);
-        }
-        while( LoadBalancerState.PENDING.equals(lb.getCurrentState()) ) {
-            try { Thread.sleep(15000L); }
-            catch( InterruptedException ignore ) { }
-            lb = getLoadBalancer(fromLoadBalancerId);
+        APITrace.begin(provider, "LB.removeServers");
+        try {
+            LoadBalancer lb = getLoadBalancer(fromLoadBalancerId);
+
             if( lb == null || LoadBalancerState.TERMINATED.equals(lb.getCurrentState()) ) {
                 throw new CloudException("No such load balancer: " + fromLoadBalancerId);
             }
-        }
-        
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        
-        Collection<String> nodeIds = mapNodes(ctx, fromLoadBalancerId, serverIdsToRemove);
-        
-        if( nodeIds.size() < 1 ) {
-            return;
-        }
-        StringBuilder nodeString = new StringBuilder();
-        
-        for( String id : nodeIds ) {
-            if( nodeString.length() > 0 ) {
-                nodeString.append("&");
+            while( LoadBalancerState.PENDING.equals(lb.getCurrentState()) ) {
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+                lb = getLoadBalancer(fromLoadBalancerId);
+                if( lb == null || LoadBalancerState.TERMINATED.equals(lb.getCurrentState()) ) {
+                    throw new CloudException("No such load balancer: " + fromLoadBalancerId);
+                }
             }
-            nodeString.append("nodeId=");
-            nodeString.append(id);
+
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                throw new InternalException("No context exists for this request");
+            }
+
+            Collection<String> nodeIds = mapNodes(ctx, fromLoadBalancerId, serverIdsToRemove);
+
+            if( nodeIds.size() < 1 ) {
+                return;
+            }
+            StringBuilder nodeString = new StringBuilder();
+
+            for( String id : nodeIds ) {
+                if( nodeString.length() > 0 ) {
+                    nodeString.append("&");
+                }
+                nodeString.append("nodeId=");
+                nodeString.append(id);
+            }
+            NovaMethod method = new NovaMethod(provider);
+
+            method.deleteResource(SERVICE, RESOURCE, fromLoadBalancerId + "/nodes?" + nodeString.toString(), null);
         }
-        NovaMethod method = new NovaMethod(provider);
-        
-        method.deleteResource(SERVICE, RESOURCE, fromLoadBalancerId + "/nodes?" + nodeString.toString(), null);
+        finally {
+            APITrace.end();
+        }
     }
     
     private @Nullable LoadBalancer toLoadBalancer(@Nonnull ProviderContext ctx, @Nullable JSONObject json, @Nullable Iterable<VirtualMachine> possibleNodes) throws JSONException, CloudException {

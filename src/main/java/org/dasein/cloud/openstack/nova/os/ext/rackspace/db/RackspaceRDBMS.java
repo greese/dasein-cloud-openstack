@@ -37,6 +37,7 @@ import org.dasein.cloud.platform.DatabaseProduct;
 import org.dasein.cloud.platform.DatabaseSnapshot;
 import org.dasein.cloud.platform.DatabaseState;
 import org.dasein.cloud.platform.RelationalDatabaseSupport;
+import org.dasein.cloud.util.APITrace;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -59,8 +60,9 @@ import java.util.Map;
  * @version 2013.02 updated for 2013.02 model
  */
 public class RackspaceRDBMS implements RelationalDatabaseSupport {
+    static private final Logger logger = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
+
     static public final String RESOURCE  = "/instances";
-    static public final String SNAPSHOTS = "/snapshots";
 
     static public final String SERVICE  = "rax:database";
 
@@ -80,11 +82,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public @Nonnull String createFromScratch(@Nonnull String dataSourceName, @Nonnull DatabaseProduct product, @Nonnull String databaseVersion, @Nonnull String withAdminUser, @Nonnull String withAdminPassword, int hostPort) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + RackspaceRDBMS.class.getName() + ".createFromScratch(" + dataSourceName + "," + product + "," + databaseVersion + "," + withAdminUser + ",XXX," + hostPort + ")");
-        }
+        APITrace.begin(provider, "RDBMS.createFromScratch");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -161,9 +159,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + RackspaceRDBMS.class.getName() + ".createFromScratch()");
-            }
+            APITrace.end();
         }
     }
 
@@ -189,16 +185,12 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public @Nullable Database getDatabase(@Nonnull String providerDatabaseId) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + RackspaceRDBMS.class.getName() + ".getDatabase(" + providerDatabaseId + ")");
-        }
+        APITrace.begin(provider, "RDBMS.getDatabase");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -213,15 +205,13 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("getDatabase(): Unable to identify expected values in JSON: " + e.getMessage());
+                logger.error("getDatabase(): Unable to identify expected values in JSON: " + e.getMessage());
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for instance");
             }
             return null;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + RackspaceRDBMS.class.getName() + ".getDatabase()");
-            }
+            APITrace.end();
         }
     }
 
@@ -247,16 +237,12 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     }
 
     public @Nullable DatabaseProduct getDatabaseProduct(@Nonnull String flavor) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + RackspaceRDBMS.class.getName() + ".getDatabaseProduct(" + flavor + ")");
-        }
+        APITrace.begin(provider, "RDBMS.getDatabaseProduct");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             int idx = flavor.indexOf(":");
@@ -275,7 +261,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                     return toProduct(ctx, size, json.getJSONObject("flavor"));
                 }
                 catch( JSONException e ) {
-                    std.error("getDatabaseProduct(): Unable to identify expected values in JSON: " + e.getMessage());
+                    logger.error("getDatabaseProduct(): Unable to identify expected values in JSON: " + e.getMessage());
                     e.printStackTrace();
                     throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors in " + json.toString());
                 }
@@ -283,81 +269,81 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             return null;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + RackspaceRDBMS.class.getName() + ".getDatabaseProduct()");
-            }
+            APITrace.end();
         }
     } 
     
     @Override
     public Iterable<DatabaseProduct> getDatabaseProducts(DatabaseEngine forEngine) throws CloudException, InternalException {
-        if( DatabaseEngine.MYSQL55.equals(forEngine) ) {
-            Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
+        APITrace.begin(provider, "RDBMS.getDatabaseProducts");
+        try {
+            if( DatabaseEngine.MYSQL55.equals(forEngine) ) {
+                Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
 
-            if( std.isTraceEnabled() ) {
-                std.trace("ENTER: " + RackspaceRDBMS.class.getName() + ".getDatabaseProducts()");
-            }
-            try {
-                ProviderContext ctx = provider.getContext();
-
-                if( ctx == null ) {
-                    std.error("No context exists for this request");
-                    throw new InternalException("No context exists for this request");
+                if( std.isTraceEnabled() ) {
+                    std.trace("ENTER: " + RackspaceRDBMS.class.getName() + ".getDatabaseProducts()");
                 }
-                NovaMethod method = new NovaMethod(provider);
+                try {
+                    ProviderContext ctx = provider.getContext();
 
-                JSONObject json = method.getResource(SERVICE, "/flavors", null, false);
-                
-                ArrayList<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
-                
-                if( json != null && json.has("flavors") ) {
-                    try {
-                        JSONArray flavors = json.getJSONArray("flavors");
-                        
-                        for( int i=0; i<flavors.length(); i++ ) {
-                            JSONObject flavor = flavors.getJSONObject(i);
-                            
-                            if( flavor != null ) {
-                                for( int size : new int[] { 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 } ) {
-                                    DatabaseProduct product = toProduct(ctx, size, flavor);
-                                    
-                                    if( product != null ) {
-                                        products.add(product);
+                    if( ctx == null ) {
+                        std.error("No context exists for this request");
+                        throw new InternalException("No context exists for this request");
+                    }
+                    NovaMethod method = new NovaMethod(provider);
+
+                    JSONObject json = method.getResource(SERVICE, "/flavors", null, false);
+
+                    ArrayList<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
+
+                    if( json != null && json.has("flavors") ) {
+                        try {
+                            JSONArray flavors = json.getJSONArray("flavors");
+
+                            for( int i=0; i<flavors.length(); i++ ) {
+                                JSONObject flavor = flavors.getJSONObject(i);
+
+                                if( flavor != null ) {
+                                    for( int size : new int[] { 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 } ) {
+                                        DatabaseProduct product = toProduct(ctx, size, flavor);
+
+                                        if( product != null ) {
+                                            products.add(product);
+                                        }
                                     }
                                 }
                             }
                         }
+                        catch( JSONException e ) {
+                            std.error("getDatabaseProducts(): Unable to identify expected values in JSON: " + e.getMessage());
+                            e.printStackTrace();
+                            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors in " + json.toString());
+                        }
                     }
-                    catch( JSONException e ) {
-                        std.error("getDatabaseProducts(): Unable to identify expected values in JSON: " + e.getMessage());
-                        e.printStackTrace();
-                        throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors in " + json.toString());
+                    return products;
+                }
+                finally {
+                    if( std.isTraceEnabled() ) {
+                        std.trace("exit - " + RackspaceRDBMS.class.getName() + ".getDatabaseProducts()");
                     }
                 }
-                return products;
             }
-            finally {
-                if( std.isTraceEnabled() ) {
-                    std.trace("exit - " + RackspaceRDBMS.class.getName() + ".getDatabaseProducts()");
-                }
+            else {
+                return Collections.emptyList();
             }
         }
-        else {
-            return Collections.emptyList();
+        finally {
+            APITrace.end();
         }
     }
 
     private @Nullable String getFlavorRef(@Nonnull String productId) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + RackspaceRDBMS.class.getName() + ".getFlavorRef(" + productId + ")");
-        }
+        APITrace.begin(provider, "RDBMS.getFlavorRef");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             int idx = productId.indexOf(":");
@@ -392,7 +378,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                     }
                 }
                 catch( JSONException e ) {
-                    std.error("getFlavorRef(): Unable to identify expected values in JSON: " + e.getMessage());
+                    logger.error("getFlavorRef(): Unable to identify expected values in JSON: " + e.getMessage());
                     e.printStackTrace();
                     throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors in " + json.toString());
                 }
@@ -400,9 +386,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             return null;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + RackspaceRDBMS.class.getName() + ".getFlavorRef()");
-            }
+            APITrace.end();
         }
     }
             
@@ -423,7 +407,13 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        return (provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        APITrace.begin(provider, "RDBMS.isSubscribed");
+        try {
+            return (provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -463,47 +453,49 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listDatabaseStatus() throws CloudException, InternalException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        NovaMethod method = new NovaMethod(provider);
-        ArrayList<ResourceStatus> databases = new ArrayList<ResourceStatus>();
-
-        JSONObject json = method.getResource(SERVICE, RESOURCE, "detail", false);
-
-        if( json != null && json.has("instances") ) {
-            try {
-                JSONArray list = json.getJSONArray("instances");
-
-                for( int i=0; i<list.length(); i++ ) {
-                    ResourceStatus db = toStatus(list.getJSONObject(i));
-
-                    if( db != null ) {
-                        databases.add(db);
-                    }
-                }
-            }
-            catch( JSONException e ) {
-                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for instances in " + json.toString());
-            }
-        }
-        return databases;
-    }
-
-    @Override
-    public Iterable<Database> listDatabases() throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + RackspaceRDBMS.class.getName() + ".listDatabases()");
-        }
+        APITrace.begin(provider, "RDBMS.listDatabaseStatus");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                throw new InternalException("No context exists for this request");
+            }
+            NovaMethod method = new NovaMethod(provider);
+            ArrayList<ResourceStatus> databases = new ArrayList<ResourceStatus>();
+
+            JSONObject json = method.getResource(SERVICE, RESOURCE, "detail", false);
+
+            if( json != null && json.has("instances") ) {
+                try {
+                    JSONArray list = json.getJSONArray("instances");
+
+                    for( int i=0; i<list.length(); i++ ) {
+                        ResourceStatus db = toStatus(list.getJSONObject(i));
+
+                        if( db != null ) {
+                            databases.add(db);
+                        }
+                    }
+                }
+                catch( JSONException e ) {
+                    throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for instances in " + json.toString());
+                }
+            }
+            return databases;
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    @Override
+    public Iterable<Database> listDatabases() throws CloudException, InternalException {
+        APITrace.begin(provider, "RDBMS.listDatabases");
+        try {
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -524,7 +516,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                     }
                 }
                 catch( JSONException e ) {
-                    std.error("listDatabases(): Unable to identify expected values in JSON: " + e.getMessage());
+                    logger.error("listDatabases(): Unable to identify expected values in JSON: " + e.getMessage());
                     e.printStackTrace();
                     throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for instances in " + json.toString());
                 }
@@ -532,11 +524,8 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             return databases;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + RackspaceRDBMS.class.getName() + ".listDatabases()");
-            }
+            APITrace.end();
         }
-
     }
 
     @Override
@@ -556,11 +545,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public void removeDatabase(String providerDatabaseId) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + RackspaceRDBMS.class.getName() + ".removeDatabase("+ providerDatabaseId + ")");
-        }
+        APITrace.begin(provider, "RDBMS.removeDatabase");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -573,9 +558,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             method.deleteResource(SERVICE, RESOURCE, providerDatabaseId, null);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + RackspaceRDBMS.class.getName() + ".removeDatabase()");
-            }
+            APITrace.end();
         }
     }
 
@@ -591,11 +574,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public void restart(String providerDatabaseId, boolean blockUntilDone) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + RackspaceRDBMS.class.getName() + ".restart(" + providerDatabaseId + "," + blockUntilDone + ")");
-        }
+        APITrace.begin(provider, "RDBMS.restart");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -611,9 +590,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             method.postString(SERVICE, RESOURCE, "action", new JSONObject(wrapper), false);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + RackspaceRDBMS.class.getName() + ".restart()");
-            }
+            APITrace.end();
         }
     }
 

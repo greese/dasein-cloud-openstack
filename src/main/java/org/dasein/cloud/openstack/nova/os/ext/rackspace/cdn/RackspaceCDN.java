@@ -27,6 +27,7 @@ import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.platform.CDNSupport;
 import org.dasein.cloud.platform.Distribution;
+import org.dasein.cloud.util.APITrace;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -53,89 +54,107 @@ public class RackspaceCDN implements CDNSupport {
     
     @Override
     public @Nonnull String create(@Nonnull String origin, @Nonnull String name, boolean active, @Nullable String... aliases) throws InternalException, CloudException {
-        HashMap<String,String> customHeaders = new HashMap<String,String>();
+        APITrace.begin(provider, "CDN.create");
+        try {
+            HashMap<String,String> customHeaders = new HashMap<String,String>();
 
-        customHeaders.put("X-Log-Retention", "True");
-        customHeaders.put("X-CDN-Enabled", "True");
-        NovaMethod method = new NovaMethod(provider);
+            customHeaders.put("X-Log-Retention", "True");
+            customHeaders.put("X-CDN-Enabled", "True");
+            NovaMethod method = new NovaMethod(provider);
 
-        method.putResourceHeaders(SERVICE, RESOURCE, origin, customHeaders);
-        return origin;
+            method.putResourceHeaders(SERVICE, RESOURCE, origin, customHeaders);
+            return origin;
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public void delete(@Nonnull String distributionId) throws InternalException, CloudException {
-        HashMap<String,String> customHeaders = new HashMap<String,String>();
+        APITrace.begin(provider, "CDN.delete");
+        try {
+            HashMap<String,String> customHeaders = new HashMap<String,String>();
 
-        customHeaders.put("X-Log-Retention", "True");
-        customHeaders.put("X-CDN-Enabled", "False");
+            customHeaders.put("X-Log-Retention", "True");
+            customHeaders.put("X-CDN-Enabled", "False");
 
-        NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(provider);
 
-        method.putResourceHeaders(SERVICE, RESOURCE, distributionId, customHeaders);
+            method.putResourceHeaders(SERVICE, RESOURCE, distributionId, customHeaders);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public @Nullable Distribution getDistribution(@Nonnull String distributionId) throws InternalException, CloudException {
-        ProviderContext ctx = provider.getContext();
+        APITrace.begin(provider, "CDN.getDistribution");
+        try {
+            ProviderContext ctx = provider.getContext();
 
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        NovaMethod method = new NovaMethod(provider);
-        Map<String,String> metaData = method.headResource(SERVICE, RESOURCE, distributionId);
-
-        if( metaData == null ) {
-            return null;
-        }
-        Distribution distribution = new Distribution();
-            
-        distribution.setActive(true);
-        distribution.setAliases(new String[0]);
-
-        String dnsName = null, cdnUri = null;
-        boolean enabled = false;
-
-        for( String key : metaData.keySet() ) {
-            if( key.equalsIgnoreCase("X-CDN-Enabled") ) {
-                String value = metaData.get(key);
-
-                enabled = (value != null && value.equalsIgnoreCase("true"));
+            if( ctx == null ) {
+                throw new InternalException("No context exists for this request");
             }
-            else if( key.equalsIgnoreCase("X-CDN-SSL-URI") ) {
-                dnsName = metaData.get(key);
-            }
-            else if( key.equalsIgnoreCase("X-CDN-URI") ) {
-                cdnUri = metaData.get(key);
-            }
-        }
-        distribution.setDeployed(enabled);
-        
-        String prefix = "http://";
-        
-        if( dnsName == null ) {
-            dnsName = cdnUri;
-            if( dnsName == null ) {
+            NovaMethod method = new NovaMethod(provider);
+            Map<String,String> metaData = method.headResource(SERVICE, RESOURCE, distributionId);
+
+            if( metaData == null ) {
                 return null;
             }
-            if( dnsName.startsWith("http://") ) {
-                dnsName = dnsName.substring("http://".length());
+            Distribution distribution = new Distribution();
+
+            distribution.setActive(true);
+            distribution.setAliases(new String[0]);
+
+            String dnsName = null, cdnUri = null;
+            boolean enabled = false;
+
+            for( String key : metaData.keySet() ) {
+                if( key.equalsIgnoreCase("X-CDN-Enabled") ) {
+                    String value = metaData.get(key);
+
+                    enabled = (value != null && value.equalsIgnoreCase("true"));
+                }
+                else if( key.equalsIgnoreCase("X-CDN-SSL-URI") ) {
+                    dnsName = metaData.get(key);
+                }
+                else if( key.equalsIgnoreCase("X-CDN-URI") ) {
+                    cdnUri = metaData.get(key);
+                }
             }
-        }
-        else {
-            if( dnsName.startsWith("https://") ) {
-                dnsName = dnsName.substring("https://".length());
-                prefix = "https://";
+            distribution.setDeployed(enabled);
+
+            String prefix = "http://";
+
+            if( dnsName == null ) {
+                dnsName = cdnUri;
+                if( dnsName == null ) {
+                    return null;
+                }
+                if( dnsName.startsWith("http://") ) {
+                    dnsName = dnsName.substring("http://".length());
+                }
             }
+            else {
+                if( dnsName.startsWith("https://") ) {
+                    dnsName = dnsName.substring("https://".length());
+                    prefix = "https://";
+                }
+            }
+            distribution.setDnsName(dnsName);
+            distribution.setLocation(prefix + distribution.getDnsName() + "/" + distributionId);
+            distribution.setLogDirectory(null);
+            distribution.setLogName(null);
+            distribution.setName(distributionId);
+            distribution.setProviderDistributionId(distributionId);
+            distribution.setProviderOwnerId(ctx.getAccountNumber());
+            return distribution;
         }
-        distribution.setDnsName(dnsName);
-        distribution.setLocation(prefix + distribution.getDnsName() + "/" + distributionId);
-        distribution.setLogDirectory(null);
-        distribution.setLogName(null);
-        distribution.setName(distributionId);
-        distribution.setProviderDistributionId(distributionId);
-        distribution.setProviderOwnerId(ctx.getAccountNumber());
-        return distribution;
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -145,53 +164,71 @@ public class RackspaceCDN implements CDNSupport {
 
     @Override
     public boolean isSubscribed() throws InternalException, CloudException {
-        return (provider.getProviderName().equals("Rackspace") && provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        APITrace.begin(provider, "CDN.isSubscribed");
+        try {
+            return (provider.getProviderName().equals("Rackspace") && provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public @Nonnull Collection<Distribution> list() throws InternalException, CloudException {
-        ProviderContext ctx = provider.getContext();
+        APITrace.begin(provider, "CDN.list");
+        try {
+            ProviderContext ctx = provider.getContext();
 
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        ArrayList<Distribution> distributions = new ArrayList<Distribution>();
-        NovaMethod method = new NovaMethod(provider);
-        String[] list = method.getItemList(SERVICE, RESOURCE, false);
+            if( ctx == null ) {
+                throw new InternalException("No context exists for this request");
+            }
+            ArrayList<Distribution> distributions = new ArrayList<Distribution>();
+            NovaMethod method = new NovaMethod(provider);
+            String[] list = method.getItemList(SERVICE, RESOURCE, false);
 
-        if( list != null ) {
-            for( String container : list ) {
-                Distribution d = toDistribution(ctx, container);
+            if( list != null ) {
+                for( String container : list ) {
+                    Distribution d = toDistribution(ctx, container);
 
-                if( d != null ) {
-                    distributions.add(d);
+                    if( d != null ) {
+                        distributions.add(d);
+                    }
                 }
             }
+            return distributions;
         }
-        return distributions;
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listDistributionStatus() throws InternalException, CloudException {
-        ProviderContext ctx = provider.getContext();
+        APITrace.begin(provider, "CDN.listDistributionStatus");
+        try {
+            ProviderContext ctx = provider.getContext();
 
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        ArrayList<ResourceStatus> distributions = new ArrayList<ResourceStatus>();
-        NovaMethod method = new NovaMethod(provider);
-        String[] list = method.getItemList(SERVICE, RESOURCE, false);
+            if( ctx == null ) {
+                throw new InternalException("No context exists for this request");
+            }
+            ArrayList<ResourceStatus> distributions = new ArrayList<ResourceStatus>();
+            NovaMethod method = new NovaMethod(provider);
+            String[] list = method.getItemList(SERVICE, RESOURCE, false);
 
-        if( list != null ) {
-            for( String container : list ) {
-                ResourceStatus d = toStatus(container);
+            if( list != null ) {
+                for( String container : list ) {
+                    ResourceStatus d = toStatus(container);
 
-                if( d != null ) {
-                    distributions.add(d);
+                    if( d != null ) {
+                        distributions.add(d);
+                    }
                 }
             }
+            return distributions;
         }
-        return distributions;
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -201,14 +238,20 @@ public class RackspaceCDN implements CDNSupport {
 
     @Override
     public void update(@Nonnull String distributionId, @Nonnull String name, boolean active, @Nullable String... aliases) throws InternalException, CloudException {
-        HashMap<String,String> customHeaders = new HashMap<String,String>();
+        APITrace.begin(provider, "CDN.update");
+        try {
+            HashMap<String,String> customHeaders = new HashMap<String,String>();
 
-        customHeaders.put("X-Log-Retention", "True");
-        customHeaders.put("X-CDN-Enabled", active ? "True" : "False");
+            customHeaders.put("X-Log-Retention", "True");
+            customHeaders.put("X-CDN-Enabled", active ? "True" : "False");
 
-        NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(provider);
 
-        method.putResourceHeaders(SERVICE, RESOURCE, distributionId, customHeaders);
+            method.putResourceHeaders(SERVICE, RESOURCE, distributionId, customHeaders);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     private @Nullable Distribution toDistribution(@Nonnull ProviderContext ctx, @Nullable String container) throws CloudException, InternalException {
