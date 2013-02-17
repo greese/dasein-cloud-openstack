@@ -82,6 +82,20 @@ public class NovaMethod extends AbstractMethod {
         }
     }
 
+    public @Nullable String postServersForString(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
+        AuthenticationContext context = provider.getAuthenticationContext();
+
+        if( resourceId != null ) {
+            resource = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
+        }
+        String computeEndpoint = context.getComputeUrl();
+
+        if( computeEndpoint == null ) {
+            throw new CloudException("No compute endpoint exists");
+        }
+        return postString(context.getAuthToken(), computeEndpoint, resource, body.toString());
+    }
+
     public @Nullable JSONObject postServers(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
 

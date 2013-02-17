@@ -95,6 +95,30 @@ public class NovaServer extends AbstractVMSupport {
     }
 
     @Override
+    public @Nonnull String getConsoleOutput(@Nonnull String vmId) throws CloudException, InternalException {
+        APITrace.begin(getProvider(), "VM.getConsoleOutput");
+        try {
+            VirtualMachine vm = getVirtualMachine(vmId);
+
+            if( vm == null ) {
+                throw new CloudException("No such virtual machine: " + vmId);
+            }
+            HashMap<String,Object> json = new HashMap<String,Object>();
+
+            json.put("os-getConsoleOutput", new HashMap<String,Object>());
+
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+
+            String console = method.postServersForString("/servers", vmId, new JSONObject(json), true);
+
+            return (console == null ? "" : console);
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    @Override
     public @Nullable VirtualMachineProduct getProduct(@Nonnull String productId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.getProduct");
         try {
