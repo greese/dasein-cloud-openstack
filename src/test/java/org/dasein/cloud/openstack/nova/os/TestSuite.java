@@ -18,13 +18,7 @@
 
 package org.dasein.cloud.openstack.nova.os;
 
-import junit.framework.Test;
+import org.dasein.cloud.test.GlobalTestSuite;
 
-import org.dasein.cloud.test.ComprehensiveTestSuite;
-import org.dasein.cloud.test.TestConfigurationException;
-
-public class NovaOpenStackTestSuite  {
-    static public Test suite() throws TestConfigurationException {
-        return new ComprehensiveTestSuite(NovaOpenStack.class);
-    }
+public class TestSuite extends GlobalTestSuite {
 }
