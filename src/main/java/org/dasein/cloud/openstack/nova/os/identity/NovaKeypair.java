@@ -280,7 +280,7 @@ public class NovaKeypair implements ShellKeySupport {
     public boolean isSubscribed() throws InternalException, CloudException {
         APITrace.begin(provider, "Keypair.isSubscribed");
         try {
-            return (provider.getMajorVersion() > 1 && provider.getComputeServices().getVirtualMachineSupport().isSubscribed() && verifySupport());
+            return (provider.getComputeServices().getVirtualMachineSupport().isSubscribed() && verifySupport());
         }
         finally {
             APITrace.end();
