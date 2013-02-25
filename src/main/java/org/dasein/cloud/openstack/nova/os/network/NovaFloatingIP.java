@@ -147,8 +147,45 @@ public class NovaFloatingIP implements IpAddressSupport {
         }
     }
 
-    private String getPool() throws CloudException, InternalException {
-        return null;
+    private Iterable<String> listPools() throws CloudException, InternalException {
+        APITrace.begin(provider, "listPools");
+        try {
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject ob = method.getServers(getEndpoint(), null, false);
+            ArrayList<String> pools = new ArrayList<String>();
+            ArrayList<String> tmp = new ArrayList<String>();
+
+
+            try {
+                if( ob != null && ob.has("floating_ip_pools") ) {
+                    JSONArray list = ob.getJSONArray("floating_ip_pools");
+
+                    for( int i=0; i<list.length(); i++ ) {
+                        JSONObject p = list.getJSONObject(i);
+
+                        if( p.has("name") ) {
+                            String n = p.getString("name");
+
+                            if( n.equals("default") ) {
+                                pools.add(n);
+                            }
+                            else {
+                                tmp.add(n);
+                            }
+                        }
+                    }
+                    pools.addAll(tmp);
+                }
+            }
+            catch( JSONException e ) {
+                logger.error("Unable to identify expected values in JSON: " + e.getMessage());
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for IP address");
+            }
+            return pools;
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -442,6 +479,25 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public @Nonnull String request(@Nonnull IPVersion version) throws InternalException, CloudException {
+        try {
+            return request(version, null);
+        }
+        catch( CloudException e ) {
+            if( e.getMessage().contains("FloatingIpPoolNotFound") ) {
+                for( String pool : listPools() ) {
+                    try {
+                        return request(version, pool);
+                    }
+                    catch( CloudException ignore ) {
+                        // ignore
+                    }
+                }
+            }
+            throw e;
+        }
+    }
+
+    private @Nonnull String request(@Nonnull IPVersion version, @Nullable String pool) throws InternalException, CloudException {
         APITrace.begin(provider, "IpAddress.request");
         try {
             if( !getVersions().contains(version) ) {
@@ -456,6 +512,9 @@ public class NovaFloatingIP implements IpAddressSupport {
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
             NovaMethod method = new NovaMethod(provider);
 
+            if( pool != null ) {
+                wrapper.put("pool", pool);
+            }
             JSONObject result = method.postServers(getEndpoint(), null, new JSONObject(wrapper), false);
 
             if( result != null && result.has("floating_ip") ) {
