@@ -1214,6 +1214,14 @@ public class NovaServer extends AbstractVMSupport {
                         break;
                     }
                 }
+                if( vm.getProviderAssignedIpAddressId() == null ) {
+                    for( IpAddress addr : ipv6 ) {
+                        if( addr.getServerId().equals(vm.getProviderVirtualMachineId()) ) {
+                            vm.setProviderAssignedIpAddressId(addr.getProviderIpAddressId());
+                            break;
+                        }
+                    }
+                }
             }
         }
         vm.setProviderRegionId(getContext().getRegionId());
