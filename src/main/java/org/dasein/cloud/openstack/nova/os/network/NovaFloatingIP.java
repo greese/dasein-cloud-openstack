@@ -63,8 +63,8 @@ import java.util.Locale;
 public class NovaFloatingIP implements IpAddressSupport {
     static private final Logger logger = NovaOpenStack.getLogger(NovaFloatingIP.class, "std");
 
-    static public final String QUANTIUM_TARGET = "floating-ips";
-    static public final String NOVA_TARGET     = "os-floating-ips";
+    static public final String QUANTIUM_TARGET = "/floating-ips";
+    static public final String NOVA_TARGET     = "/os-floating-ips";
 
     private NovaOpenStack provider;
     
@@ -145,6 +145,10 @@ public class NovaFloatingIP implements IpAddressSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    private String getPool() throws CloudException, InternalException {
+        return null;
     }
 
     @Override
