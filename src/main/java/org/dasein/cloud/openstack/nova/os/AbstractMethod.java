@@ -67,6 +67,7 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.openstack.nova.os.ext.hp.db.HPRDBMS;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -1537,6 +1538,46 @@ public abstract class AbstractMethod {
 
             std.debug("HTTP STATUS: " + code);
 
+            if( code == HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE ) {
+                String data = null;
+
+                try {
+                    HttpEntity entity = response.getEntity();
+
+                    if( entity != null ) {
+                        data = EntityUtils.toString(entity);
+                        if( wire.isDebugEnabled() ) {
+                            wire.debug(data);
+                            wire.debug("");
+                        }
+                    }
+                }
+                catch( IOException e ) {
+                    std.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
+                    e.printStackTrace();
+                    throw new CloudException(e);
+                }
+                try {
+                    if( data != null ) {
+                        JSONObject ob = new JSONObject(data);
+
+                        if( ob.has("overLimit") ) {
+                            ob = ob.getJSONObject("overLimit");
+                            if( ob.has("retryAfter") ) {
+                                int min = ob.getInt("retryAfter");
+
+                                try { Thread.sleep(CalendarWrapper.MINUTE * min); }
+                                catch( InterruptedException ignore ) { }
+                                return postHeaders(authToken, endpoint, resource, customHeaders);
+                            }
+                        }
+                    }
+                }
+                catch( JSONException e ) {
+                    throw new CloudException(e);
+                }
+            }
+
             if( code != HttpServletResponse.SC_ACCEPTED && code != HttpServletResponse.SC_NO_CONTENT ) {
                 std.error("postString(): Expected ACCEPTED for POST request, got " + code);
                 String data = null;
@@ -1709,6 +1750,45 @@ public abstract class AbstractMethod {
             int code = response.getStatusLine().getStatusCode();
 
             std.debug("HTTP STATUS: " + code);
+            if( code == HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE ) {
+                String data = null;
+
+                try {
+                    HttpEntity entity = response.getEntity();
+
+                    if( entity != null ) {
+                        data = EntityUtils.toString(entity);
+                        if( wire.isDebugEnabled() ) {
+                            wire.debug(data);
+                            wire.debug("");
+                        }
+                    }
+                }
+                catch( IOException e ) {
+                    std.error("Failed to read response error due to a cloud I/O error: " + e.getMessage());
+                    e.printStackTrace();
+                    throw new CloudException(e);
+                }
+                try {
+                    if( data != null ) {
+                        JSONObject ob = new JSONObject(data);
+
+                        if( ob.has("overLimit") ) {
+                            ob = ob.getJSONObject("overLimit");
+                            if( ob.has("retryAfter") ) {
+                                int min = ob.getInt("retryAfter");
+
+                                try { Thread.sleep(CalendarWrapper.MINUTE * min); }
+                                catch( InterruptedException ignore ) { }
+                                return postString(authToken, endpoint, resource, payload);
+                            }
+                        }
+                    }
+                }
+                catch( JSONException e ) {
+                    throw new CloudException(e);
+                }
+            }
             if( code != HttpServletResponse.SC_OK && code != HttpServletResponse.SC_ACCEPTED && code != HttpServletResponse.SC_NO_CONTENT && code != HttpServletResponse.SC_CREATED ) {
                 std.error("postString(): Expected OK, ACCEPTED, or NO CONTENT for POST request, got " + code);
                 String data = null;
@@ -1730,7 +1810,7 @@ public abstract class AbstractMethod {
                     throw new CloudException(e);
                 }
                 NovaException.ExceptionItems items = NovaException.parseException(code, data);
-                
+
                 if( items == null ) {
                     items = new NovaException.ExceptionItems();
                     items.code = 404;
