@@ -299,7 +299,7 @@ public class NovaKeypair implements ShellKeySupport {
 
     @Override
     public boolean isSubscribed() throws InternalException, CloudException {
-        return (provider.getMajorVersion() > 1 && provider.getComputeServices().getVirtualMachineSupport().isSubscribed() && verifySupport());
+        return (provider.getComputeServices().getVirtualMachineSupport().isSubscribed() && verifySupport());
     }
 
     @Override
