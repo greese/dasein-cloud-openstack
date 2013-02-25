@@ -73,7 +73,7 @@ public class NovaFloatingIP implements IpAddressSupport {
     }
 
     private String getEndpoint() {
-        return QUANTIUM_TARGET;
+        return NOVA_TARGET;
     }
 
     @Override
