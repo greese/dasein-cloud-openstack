@@ -63,12 +63,19 @@ import java.util.Locale;
 public class NovaFloatingIP implements IpAddressSupport {
     static private final Logger logger = NovaOpenStack.getLogger(NovaFloatingIP.class, "std");
 
+    static public final String QUANTIUM_TARGET = "floating-ips";
+    static public final String NOVA_TARGET     = "os-floating-ips";
+
     private NovaOpenStack provider;
     
     NovaFloatingIP(NovaOpenStack cloud) {
         provider = cloud;
     }
-    
+
+    private String getEndpoint() {
+        return QUANTIUM_TARGET;
+    }
+
     @Override
     public void assign(@Nonnull String addressId, @Nonnull String serverId) throws InternalException, CloudException {
         APITrace.begin(provider, "IpAddress.assign");
@@ -114,7 +121,7 @@ public class NovaFloatingIP implements IpAddressSupport {
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
-            JSONObject ob = method.getServers("/os-floating-ips", addressId, false);
+            JSONObject ob = method.getServers(getEndpoint(), addressId, false);
 
             if( ob == null ) {
                 return null;
@@ -191,7 +198,7 @@ public class NovaFloatingIP implements IpAddressSupport {
             NovaMethod method = new NovaMethod(provider);
 
             try {
-                method.getServers("/os-floating-ips", null, false);
+                method.getServers(getEndpoint(), null, false);
                 return true;
             }
             catch( CloudException e ) {
@@ -248,7 +255,7 @@ public class NovaFloatingIP implements IpAddressSupport {
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
-            JSONObject ob = method.getServers("/os-floating-ips", null, false);
+            JSONObject ob = method.getServers(getEndpoint(), null, false);
             ArrayList<IpAddress> addresses = new ArrayList<IpAddress>();
 
             try {
@@ -299,7 +306,7 @@ public class NovaFloatingIP implements IpAddressSupport {
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
-            JSONObject ob = method.getServers("/os-floating-ips", null, false);
+            JSONObject ob = method.getServers(getEndpoint(), null, false);
             ArrayList<ResourceStatus> addresses = new ArrayList<ResourceStatus>();
 
             try {
@@ -375,7 +382,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
             do {
                 try {
-                    method.deleteServers("/os-floating-ips", addressId);
+                    method.deleteServers(getEndpoint(), addressId);
                     return;
                 }
                 catch( NovaException e ) {
@@ -445,7 +452,7 @@ public class NovaFloatingIP implements IpAddressSupport {
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
             NovaMethod method = new NovaMethod(provider);
 
-            JSONObject result = method.postServers("/os-floating-ips", null, new JSONObject(wrapper), false);
+            JSONObject result = method.postServers(getEndpoint(), null, new JSONObject(wrapper), false);
 
             if( result != null && result.has("floating_ip") ) {
                 try {
