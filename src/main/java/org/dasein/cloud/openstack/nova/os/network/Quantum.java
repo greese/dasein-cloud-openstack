@@ -5,6 +5,7 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.ComputeServices;
 import org.dasein.cloud.compute.VirtualMachine;
@@ -291,6 +292,11 @@ public class Quantum extends AbstractVLANSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    @Override
+    public @Nonnull Requirement getSubnetSupport() {
+        return (((NovaOpenStack)getProvider()).isRackspace() ? Requirement.NONE : Requirement.REQUIRED);
     }
 
     @Override
