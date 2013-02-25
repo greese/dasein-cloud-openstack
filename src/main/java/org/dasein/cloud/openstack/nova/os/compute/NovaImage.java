@@ -616,7 +616,7 @@ public class NovaImage extends AbstractImageSupport {
             }
             JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
 
-            if( md != null ) {
+            if( md != null && md.has("owner") ) {
                 owner = md.getString("owner");
             }
             if( json.has("status") ) {
