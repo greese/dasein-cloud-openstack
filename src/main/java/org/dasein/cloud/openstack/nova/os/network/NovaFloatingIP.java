@@ -483,14 +483,12 @@ public class NovaFloatingIP implements IpAddressSupport {
             return request(version, null);
         }
         catch( CloudException e ) {
-            if( e.getMessage().contains("FloatingIpPoolNotFound") ) {
-                for( String pool : listPools() ) {
-                    try {
-                        return request(version, pool);
-                    }
-                    catch( CloudException ignore ) {
-                        // ignore
-                    }
+            for( String pool : listPools() ) {
+                try {
+                    return request(version, pool);
+                }
+                catch( CloudException ignore ) {
+                    // ignore
                 }
             }
             throw e;
