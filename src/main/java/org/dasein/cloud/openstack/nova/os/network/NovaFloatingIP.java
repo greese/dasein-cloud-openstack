@@ -482,13 +482,15 @@ public class NovaFloatingIP implements IpAddressSupport {
         try {
             return request(version, null);
         }
-        catch( CloudException e ) {
-            for( String pool : listPools() ) {
-                try {
-                    return request(version, pool);
-                }
-                catch( CloudException ignore ) {
-                    // ignore
+        catch( NovaException e ) {
+            if( e.getHttpCode() == 404 ) {
+                for( String pool : listPools() ) {
+                    try {
+                        return request(version, pool);
+                    }
+                    catch( CloudException ignore ) {
+                        // ignore
+                    }
                 }
             }
             throw e;
