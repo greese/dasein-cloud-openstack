@@ -483,6 +483,9 @@ public class NovaFloatingIP implements IpAddressSupport {
             return request(version, null);
         }
         catch( NovaException e ) {
+            System.out.println("Nova exception:");
+            System.out.println("Code = " + e.getHttpCode());
+            System.out.println("Message = " + e.getMessage());
             if( e.getHttpCode() == 404 ) {
                 for( String pool : listPools() ) {
                     try {
