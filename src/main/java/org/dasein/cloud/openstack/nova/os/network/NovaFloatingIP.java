@@ -151,7 +151,7 @@ public class NovaFloatingIP implements IpAddressSupport {
         APITrace.begin(provider, "listPools");
         try {
             NovaMethod method = new NovaMethod(provider);
-            JSONObject ob = method.getServers(getEndpoint(), null, false);
+            JSONObject ob = method.getServers("/os-floating-ip-pools", null, false);
             ArrayList<String> pools = new ArrayList<String>();
             ArrayList<String> tmp = new ArrayList<String>();
 
@@ -487,7 +487,9 @@ public class NovaFloatingIP implements IpAddressSupport {
             System.out.println("Code = " + e.getHttpCode());
             System.out.println("Message = " + e.getMessage());
             if( e.getHttpCode() == 404 ) {
+                System.out.println("Looking through pools...");
                 for( String pool : listPools() ) {
+                    System.out.println("Checking: " + pool);
                     try {
                         return request(version, pool);
                     }
