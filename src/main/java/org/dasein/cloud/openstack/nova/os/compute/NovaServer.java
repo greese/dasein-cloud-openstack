@@ -1322,6 +1322,22 @@ public class NovaServer implements VirtualMachineSupport {
                     }
                 }
             }
+            if( vm.getProviderAssignedIpAddressId() == null ) {
+                for( IpAddress addr : ipv4 ) {
+                    if( addr.getServerId().equals(vm.getProviderVirtualMachineId()) ) {
+                        vm.setProviderAssignedIpAddressId(addr.getProviderIpAddressId());
+                        break;
+                    }
+                }
+                if( vm.getProviderAssignedIpAddressId() == null ) {
+                    for( IpAddress addr : ipv6 ) {
+                        if( addr.getServerId().equals(vm.getProviderVirtualMachineId()) ) {
+                            vm.setProviderAssignedIpAddressId(addr.getProviderIpAddressId());
+                            break;
+                        }
+                    }
+                }
+            }
             vm.setProviderRegionId(provider.getContext().getRegionId());
             vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
             vm.setTerminationTimestamp(-1L);
