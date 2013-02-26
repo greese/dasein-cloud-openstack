@@ -1207,19 +1207,20 @@ public class NovaServer extends AbstractVMSupport {
                     }
                 }
             }
+
+        }
+        if( vm.getProviderAssignedIpAddressId() == null ) {
+            for( IpAddress addr : ipv4 ) {
+                if( addr.getServerId().equals(vm.getProviderVirtualMachineId()) ) {
+                    vm.setProviderAssignedIpAddressId(addr.getProviderIpAddressId());
+                    break;
+                }
+            }
             if( vm.getProviderAssignedIpAddressId() == null ) {
-                for( IpAddress addr : ipv4 ) {
+                for( IpAddress addr : ipv6 ) {
                     if( addr.getServerId().equals(vm.getProviderVirtualMachineId()) ) {
                         vm.setProviderAssignedIpAddressId(addr.getProviderIpAddressId());
                         break;
-                    }
-                }
-                if( vm.getProviderAssignedIpAddressId() == null ) {
-                    for( IpAddress addr : ipv6 ) {
-                        if( addr.getServerId().equals(vm.getProviderVirtualMachineId()) ) {
-                            vm.setProviderAssignedIpAddressId(addr.getProviderIpAddressId());
-                            break;
-                        }
                     }
                 }
             }
