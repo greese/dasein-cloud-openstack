@@ -97,7 +97,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
             HashMap<String,Object> json = new HashMap<String,Object>();
             NovaMethod method = new NovaMethod(provider);
 
-            json.put("flavorRef", product.getProductSize());
+            json.put("flavorRef", getFlavorRef(product.getProductSize()));
    
             json.put("name", dataSourceName);
             json.put("port", hostPort > 0 ? hostPort : 3306);
@@ -196,7 +196,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
             HashMap<String,Object> json = new HashMap<String,Object>();
             NovaMethod method = new NovaMethod(provider);
 
-            json.put("flavorRef", productSize);
+            json.put("flavorRef", getFlavorRef(productSize));
 
             json.put("name", dataSourceName);
             json.put("port", hostPort > 0 ? hostPort : 3306);
@@ -322,9 +322,14 @@ public class HPRDBMS implements RelationalDatabaseSupport {
     }
 
     public @Nullable DatabaseProduct getDatabaseProduct(String flavor) throws CloudException, InternalException {
+        boolean hasSize = flavor.contains(":");
+
         for( DatabaseEngine engine : DatabaseEngine.values() ) {
             for( DatabaseProduct product : getDatabaseProducts(engine) ) {
-                if( product.getProductSize().equals(flavor) ) {
+                if( hasSize && product.getProductSize().equals(flavor) ) {
+                    return product;
+                }
+                else if( !hasSize && product.getProductSize().startsWith(flavor) ) {
                     return product;
                 }
             }
@@ -334,7 +339,6 @@ public class HPRDBMS implements RelationalDatabaseSupport {
     
     @Override
     public Iterable<DatabaseProduct> getDatabaseProducts(DatabaseEngine forEngine) throws CloudException, InternalException {
-        /*
         if( DatabaseEngine.MYSQL55.equals(forEngine) ) {
             Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
 
@@ -389,20 +393,65 @@ public class HPRDBMS implements RelationalDatabaseSupport {
         else {
             return Collections.emptyList();
         }
-*/
-        // TODO: HP needs to provide a flavor lookup API call before this can be considered ready
-        DatabaseProduct product = new DatabaseProduct("medium");
+    }
 
-        product.setCurrency("USD");
-        product.setEngine(forEngine);
-        product.setHighAvailability(false);
-        product.setName("medium");
-        product.setProductSize("medium");
-        product.setStandardHourlyRate(0.01f);
-        product.setStandardIoRate(0.01f);
-        product.setStandardStorageRate(0.01f);
-        product.setStorageInGigabytes(10);
-        return Collections.singleton(product);
+    private @Nullable String getFlavorRef(@Nonnull String productId) throws CloudException, InternalException {
+        Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
+
+        if( std.isTraceEnabled() ) {
+            std.trace("ENTER: " + HPRDBMS.class.getName() + ".getFlavorRef(" + productId + ")");
+        }
+        try {
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                std.error("No context exists for this request");
+                throw new InternalException("No context exists for this request");
+            }
+            int idx = productId.indexOf(":");
+
+            if( idx > -1 ) {
+                productId = productId.substring(0, idx);
+            }
+            NovaMethod method = new NovaMethod(provider);
+
+            JSONObject json = method.getResource(SERVICE, "/flavors", productId, false);
+
+            if( json != null && json.has("flavor") ) {
+                try {
+                    JSONObject flavor = json.getJSONObject("flavor");
+
+                    if( flavor.has("links") ) {
+                        JSONArray links = flavor.getJSONArray("links");
+
+                        if( links != null ) {
+                            for( int i=0; i<links.length(); i++ ) {
+                                JSONObject link = links.getJSONObject(i);
+
+                                if( link.has("rel") ) {
+                                    String rel = link.getString("rel");
+
+                                    if( rel != null && rel.equalsIgnoreCase("self") ) {
+                                        return link.getString("href");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch( JSONException e ) {
+                    std.error("getFlavorRef(): Unable to identify expected values in JSON: " + e.getMessage());
+                    e.printStackTrace();
+                    throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors in " + json.toString());
+                }
+            }
+            return null;
+        }
+        finally {
+            if( std.isTraceEnabled() ) {
+                std.trace("exit - " + HPRDBMS.class.getName() + ".getFlavorRef()");
+            }
+        }
     }
 
     @Override
@@ -825,6 +874,21 @@ public class HPRDBMS implements RelationalDatabaseSupport {
                 }
             }
             String flavor = (json.has("flavorRef") ? json.getString("flavorRef") : null);
+
+            if( flavor == null ) {
+                JSONObject f = (json.has("flavor") ? json.getJSONObject("flavor") : null);
+
+                if( f != null && f.has("id") ) {
+                    flavor = f.getString("id");
+                }
+            }
+            else {
+                int idx = flavor.lastIndexOf("/");
+
+                if( idx > -1 ) {
+                    flavor = flavor.substring(idx+1);
+                }
+            }
             int port = (json.has("port") ? json.getInt("port") : 3306);
             DatabaseEngine engine = DatabaseEngine.MYSQL55;
             
