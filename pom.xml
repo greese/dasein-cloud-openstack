@@ -220,7 +220,7 @@
                 </property>
             </systemProperties>
           <includes>
-              <!-- <include>**/NovaOpenStackTestSuite.java</include> -->
+             <!-- <include>**/NovaOpenStackTestSuite.java</include> -->
           </includes>
         </configuration>
       </plugin>     
