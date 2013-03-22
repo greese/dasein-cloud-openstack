@@ -1207,14 +1207,31 @@ public class NovaServer extends AbstractVMSupport {
                     }
                 }
             }
+            if( vm.getProviderAssignedIpAddressId() == null ) {
+                for( IpAddress addr : ipv4 ) {
+                    String serverId = addr.getServerId();
 
-        }
-        if( vm.getProviderAssignedIpAddressId() == null ) {
-            for( IpAddress addr : ipv4 ) {
-                if( addr.getServerId().equals(vm.getProviderVirtualMachineId()) ) {
-                    vm.setProviderAssignedIpAddressId(addr.getProviderIpAddressId());
-                    break;
+                    if( serverId != null && serverId.equals(vm.getProviderVirtualMachineId()) ) {
+                        vm.setProviderAssignedIpAddressId(addr.getProviderIpAddressId());
+                        break;
+                    }
                 }
+                if( vm.getProviderAssignedIpAddressId() == null ) {
+                    for( IpAddress addr : ipv6 ) {
+                        String serverId = addr.getServerId();
+
+                        if( serverId != null && addr.getServerId().equals(vm.getProviderVirtualMachineId()) ) {
+                            vm.setProviderAssignedIpAddressId(addr.getProviderIpAddressId());
+                            break;
+                        }
+                    }
+                }
+            }
+            vm.setProviderRegionId(getContext().getRegionId());
+            vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
+            vm.setTerminationTimestamp(-1L);
+            if( vm.getProviderVirtualMachineId() == null ) {
+                return null;
             }
             if( vm.getProviderAssignedIpAddressId() == null ) {
                 for( IpAddress addr : ipv6 ) {

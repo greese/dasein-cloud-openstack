@@ -26,7 +26,7 @@ import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.VirtualMachine;
-import org.dasein.cloud.identity.ServiceAction;
+import org.dasein.cloud.network.AbstractLoadBalancerSupport;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.LbAlgorithm;
 import org.dasein.cloud.network.LbListener;
@@ -35,7 +35,6 @@ import org.dasein.cloud.network.LoadBalancer;
 import org.dasein.cloud.network.LoadBalancerAddressType;
 import org.dasein.cloud.network.LoadBalancerServer;
 import org.dasein.cloud.network.LoadBalancerState;
-import org.dasein.cloud.network.LoadBalancerSupport;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -57,7 +56,7 @@ import java.util.Map;
 import java.util.TreeSet;
 
 
-public class RackspaceLoadBalancers implements LoadBalancerSupport {
+public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpenStack> {
     static private final Logger logger = NovaOpenStack.getLogger(RackspaceLoadBalancers.class, "std");
 
     static public final String RESOURCE = "/loadbalancers";
@@ -65,11 +64,9 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
 
     private NovaOpenStack provider;
     
-    public RackspaceLoadBalancers(NovaOpenStack provider) { this.provider = provider; }
-
-    @Override
-    public void addDataCenters(String toLoadBalancerId, String... dataCenterIdsToAdd) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("No support for data-center constrained load balancers");
+    public RackspaceLoadBalancers(NovaOpenStack provider) {
+        super(provider);
+        this.provider = provider;
     }
 
     @Override
@@ -159,7 +156,7 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
     }
 
     @Override
-    public @Nonnull String create(@Nonnull String name, @Nonnull String description, @Nonnull String addressId, @Nonnull String[] dataCenterIds, @Nonnull LbListener[] listeners, @Nonnull String[] serverIds) throws CloudException, InternalException {
+    public @Nonnull String create(@Nonnull String name, @Nonnull String description, @Nullable String addressId, @Nonnull String[] dataCenterIds, @Nonnull LbListener[] listeners, @Nonnull String[] serverIds) throws CloudException, InternalException {
         APITrace.begin(provider, "LB.create");
         try {
             if( listeners == null || listeners.length < 1 ) {
@@ -459,21 +456,6 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
     }
 
     @Override
-    public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
-        return new String[0];
-    }
-
-    @Override
-    public boolean requiresListenerOnCreate() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public boolean requiresServerOnCreate() throws CloudException, InternalException {
-        return true;
-    }
-
-    @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         return (provider.testContext() != null);
     }
@@ -484,7 +466,7 @@ public class RackspaceLoadBalancers implements LoadBalancerSupport {
     }
 
     @Override
-    public Iterable<LoadBalancer> listLoadBalancers() throws CloudException, InternalException {
+    public @Nonnull Iterable<LoadBalancer> listLoadBalancers() throws CloudException, InternalException {
         APITrace.begin(provider, "LB.listLoadBalancers");
         try {
             ProviderContext ctx = provider.getContext();

@@ -422,12 +422,12 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     }
 
     @Override
-    public boolean isSupportsHighAvailability() throws CloudException, InterruptedException {
+    public boolean isSupportsHighAvailability() throws CloudException, InternalException {
         return false;
     }
 
     @Override
-    public boolean isSupportsLowAvailability() throws CloudException, InterruptedException {
+    public boolean isSupportsLowAvailability() throws CloudException, InternalException {
         return true;
     }
 
