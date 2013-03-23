@@ -182,7 +182,12 @@ public abstract class AbstractMethod {
                 std.debug("authenticateKeystone(): tenantId=" + provider.getContext().getAccountNumber());
             }
             if( !provider.getProviderName().equals("Rackspace") ) {
-                json.put("tenantId", provider.getContext().getAccountNumber());
+                if( provider.getProviderName().equals("HP") ) {
+                    json.put("tenantId", provider.getContext().getAccountNumber());
+                }
+                else {
+                    json.put("tenantName", provider.getContext().getAccountNumber());
+                }
             }
             HashMap<String,Object> jsonAuth = new HashMap<String,Object>();
             
