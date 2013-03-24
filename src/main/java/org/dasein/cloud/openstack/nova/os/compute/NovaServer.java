@@ -409,6 +409,73 @@ public class NovaServer extends AbstractVMSupport {
         }
     }
 
+    private @Nonnull Iterable<String> listFirewalls(@Nonnull String vmId, @Nonnull JSONObject server) throws InternalException, CloudException {
+        try {
+            if( server.has("security_groups") ) {
+                NetworkServices services = getProvider().getNetworkServices();
+                Collection<Firewall> firewalls = null;
+
+                if( services != null ) {
+                    FirewallSupport support = services.getFirewallSupport();
+
+                    if( support != null ) {
+                        firewalls = support.list();
+                    }
+                }
+                if( firewalls == null ) {
+                    firewalls = Collections.emptyList();
+                }
+                JSONArray groups = server.getJSONArray("security_groups");
+                ArrayList<String> results = new ArrayList<String>();
+
+                for( int i=0; i<groups.length(); i++ ) {
+                    JSONObject group = groups.getJSONObject(i);
+                    String id = group.has("id") ? group.getString("id") : null;
+                    String name = group.has("name") ? group.getString("name") : null;
+
+                    if( id != null || name != null  ) {
+                        for( Firewall fw : firewalls ) {
+                            if( id != null ) {
+                                if( id.equals(fw.getProviderFirewallId()) ) {
+                                    results.add(id);
+                                }
+                            }
+                            else if( name.equals(fw.getName()) ) {
+                                results.add(fw.getProviderFirewallId());
+                            }
+                        }
+                    }
+                }
+                return results;
+            }
+            else {
+                NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+                JSONObject ob = method.getServers("/servers", vmId + "/os-security-groups", true);
+
+                if( ob == null ) {
+                    throw new CloudException("No such server: " + vmId);
+                }
+                ArrayList<String> results = new ArrayList<String>();
+
+                if( ob.has("security_groups") ) {
+                    JSONArray groups = ob.getJSONArray("security_groups");
+
+                    for( int i=0; i<groups.length(); i++ ) {
+                        JSONObject group = groups.getJSONObject(i);
+
+                        if( group.has("id") ) {
+                            results.add(group.getString("id"));
+                        }
+                    }
+                }
+                return results;
+            }
+        }
+        catch( JSONException e ) {
+            throw new CloudException(e);
+        }
+    }
+
     @Override
     public @Nonnull Iterable<String> listFirewalls(@Nonnull String vmId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.listFirewalls");
@@ -423,54 +490,7 @@ public class NovaServer extends AbstractVMSupport {
                 if( ob.has("server") ) {
                     JSONObject server = ob.getJSONObject("server");
 
-                    if( server.has("security_groups") ) {
-                        NetworkServices services = getProvider().getNetworkServices();
-                        Collection<Firewall> firewalls = null;
-
-                        if( services != null ) {
-                            FirewallSupport support = services.getFirewallSupport();
-
-                            if( support != null ) {
-                                firewalls = support.list();
-                            }
-                        }
-                        if( firewalls == null ) {
-                            firewalls = Collections.emptyList();
-                        }
-                        JSONArray groups = server.getJSONArray("security_groups");
-                        ArrayList<String> results = new ArrayList<String>();
-
-                        for( int i=0; i<groups.length(); i++ ) {
-                            JSONObject group = groups.getJSONObject(i);
-
-                            if( group.has("name") ) {
-                                String name = group.getString("name");
-                                
-                                for( Firewall fw : firewalls ) {
-                                    if( fw.getName().equals(name) ) {
-                                        results.add(fw.getProviderFirewallId());
-                                    }
-                                }
-                            }
-                        }
-                        return results;
-                    }
-                    else {
-                        ob = method.getServers("/servers", vmId + "/os-security-groups", true);
-                        if( ob.has("security_groups") ) {
-                            JSONArray groups = ob.getJSONArray("security_groups");
-                            ArrayList<String> results = new ArrayList<String>();
-
-                            for( int i=0; i<groups.length(); i++ ) {
-                                JSONObject group = groups.getJSONObject(i);
-
-                                if( group.has("id") ) {
-                                    results.add(group.getString("id"));
-                                }
-                            }
-                            return results;
-                        }
-                    }
+                    return listFirewalls(vmId, server);
                 }
                 throw new CloudException("No such server: " + vmId);
             }
@@ -1268,6 +1288,20 @@ public class NovaServer extends AbstractVMSupport {
             }
             vm.setPlatform(p);
         }
+        Iterable<String> fwIds = listFirewalls(vm.getProviderVirtualMachineId(), server);
+        int count = 0;
+
+        //noinspection UnusedDeclaration
+        for( String id : fwIds ) {
+            count++;
+        }
+        String[] ids = new String[count];
+        int i = 0;
+
+        for( String id : fwIds ) {
+            ids[i++] = id;
+        }
+        vm.setProviderFirewallIds(ids);
         return vm;
     }
 

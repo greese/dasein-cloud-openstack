@@ -240,7 +240,7 @@ public class CinderVolume extends AbstractVolumeSupport {
 
     @Override
     public @Nonnull Requirement getVolumeProductRequirement() throws InternalException, CloudException {
-        return Requirement.OPTIONAL;
+        return (((NovaOpenStack)getProvider()).isHP() ? Requirement.NONE : Requirement.OPTIONAL);
     }
 
     @Override
@@ -527,6 +527,9 @@ public class CinderVolume extends AbstractVolumeSupport {
             if( json.has("volume_type") ) {
                 productId = json.getString("volume_type");
             }
+            else if( json.has("volumeType") ) {
+                productId = json.getString("volumeType");
+            }
             String vmId = null, deviceId = null;
 
             if( json.has("attachments") ) {
@@ -616,6 +619,9 @@ public class CinderVolume extends AbstractVolumeSupport {
             }
             if( volume.getProviderProductId() == null ) {
                 volume.setProviderProductId(productId);
+            }
+            if( volume.getType() == null ) {
+                volume.setType(VolumeType.HDD);
             }
             return volume;
         }

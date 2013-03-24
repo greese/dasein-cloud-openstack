@@ -82,6 +82,9 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
     public @Nonnull Blob createBucket(@Nonnull String bucketName, boolean findFreeName) throws InternalException, CloudException {
         APITrace.begin(provider, "Blob.createBucket");
         try {
+            if( bucketName.contains("/") ) {
+                throw new OperationNotSupportedException("Nested buckets are not supported");
+            }
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
@@ -208,7 +211,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
         APITrace.begin(provider, "Blob.getObject");
         try {
             if( bucketName == null ) {
-                throw new CloudException("No bucket was specified for this request");
+                return null;
             }
             for( Blob blob : list(bucketName) ) {
                 String name = blob.getObjectName();
@@ -462,7 +465,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
                 throw new CloudException(e);
             }
             for( String container : containers ) {
-                iterator.push(Blob.getInstance(regionId, "/" + container, container, -1L));
+                iterator.push(Blob.getInstance(regionId, "/" + container, container, 0L));
             }
         }
         finally {
@@ -498,7 +501,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
             for( String info : files ) {
                 Map<String,String> metaData = method.head(bucketName, info);
 
-                iterator.push(Blob.getInstance(regionId, "/" + bucketName + "/" + info, bucketName, info, -1L, new Storage<Byte>(getMetaDataLength(metaData), Storage.BYTE)));
+                iterator.push(Blob.getInstance(regionId, "/" + bucketName + "/" + info, bucketName, info, 0L, new Storage<Byte>(getMetaDataLength(metaData), Storage.BYTE)));
             }
         }
         finally {
@@ -686,7 +689,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
         APITrace.begin(provider, "Blob.upload");
         try {
             if( bucket == null ) {
-                throw new CloudException("No bucket was specified for this request");
+                throw new OperationNotSupportedException("No bucket was specified for this request");
             }
             if( !exists(bucket) ) {
                 createBucket(bucket, false);
