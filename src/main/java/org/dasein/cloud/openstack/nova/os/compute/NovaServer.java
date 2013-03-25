@@ -53,9 +53,11 @@ import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.compute.VmStatistics;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.network.Firewall;
+import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.IpAddress;
 import org.dasein.cloud.network.IpAddressSupport;
+import org.dasein.cloud.network.NetworkServices;
 import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
@@ -408,72 +410,91 @@ public class NovaServer implements VirtualMachineSupport {
         return launch(options);
     }
 
-    @Override
-    public @Nonnull Iterable<String> listFirewalls(@Nonnull String vmId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaServer.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaServer.class.getName() + ".listFirewalls(" + vmId + ")");
-        }
+    private @Nonnull Iterable<String> listFirewalls(@Nonnull String vmId, @Nonnull JSONObject server) throws InternalException, CloudException {
         try {
-            NovaMethod method = new NovaMethod(provider);
-            JSONObject ob = method.getServers("/servers", vmId, true);
+            if( server.has("security_groups") ) {
+                NetworkServices services = provider.getNetworkServices();
+                Collection<Firewall> firewalls = null;
 
-            if( ob == null ) {
-                return Collections.emptyList();
-            }
-            try {
-                if( ob.has("server") ) {
-                    JSONObject server = ob.getJSONObject("server");
+                if( services != null ) {
+                    FirewallSupport support = services.getFirewallSupport();
 
-                    if( server.has("security_groups") ) {
-                        Collection<Firewall> firewalls = provider.getNetworkServices().getFirewallSupport().list();
-                        JSONArray groups = server.getJSONArray("security_groups");
-                        ArrayList<String> results = new ArrayList<String>();
-
-                        for( int i=0; i<groups.length(); i++ ) {
-                            JSONObject group = groups.getJSONObject(i);
-
-                            if( group.has("name") ) {
-                                String name = group.getString("name");
-                                
-                                for( Firewall fw : firewalls ) {
-                                    if( fw.getName().equals(name) ) {
-                                        results.add(fw.getProviderFirewallId());
-                                    }
-                                }
-                            }
-                        }
-                        return results;
+                    if( support != null ) {
+                        firewalls = support.list();
                     }
-                    else {
-                        ob = method.getServers("/servers", vmId + "/os-security-groups", true);
-                        if( ob.has("security_groups") ) {
-                            JSONArray groups = ob.getJSONArray("security_groups");
-                            ArrayList<String> results = new ArrayList<String>();
+                }
+                if( firewalls == null ) {
+                    firewalls = Collections.emptyList();
+                }
+                JSONArray groups = server.getJSONArray("security_groups");
+                ArrayList<String> results = new ArrayList<String>();
 
-                            for( int i=0; i<groups.length(); i++ ) {
-                                JSONObject group = groups.getJSONObject(i);
+                for( int i=0; i<groups.length(); i++ ) {
+                    JSONObject group = groups.getJSONObject(i);
+                    String id = group.has("id") ? group.getString("id") : null;
+                    String name = group.has("name") ? group.getString("name") : null;
 
-                                if( group.has("id") ) {
-                                    results.add(group.getString("id"));
+                    if( id != null || name != null  ) {
+                        for( Firewall fw : firewalls ) {
+                            if( id != null ) {
+                                if( id.equals(fw.getProviderFirewallId()) ) {
+                                    results.add(id);
                                 }
                             }
-                            return results;
+                            else if( name.equals(fw.getName()) ) {
+                                results.add(fw.getProviderFirewallId());
+                            }
                         }
                     }
                 }
-                throw new CloudException("No such server: " + vmId);
+                return results;
             }
-            catch( JSONException e ) {
-                std.error("listFirewalls(): Unable to identify expected values in JSON: " + e.getMessage());
-                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for servers");
+            else {
+                NovaMethod method = new NovaMethod(provider);
+                JSONObject ob = method.getServers("/servers", vmId + "/os-security-groups", true);
+
+                if( ob == null ) {
+                    throw new CloudException("No such server: " + vmId);
+                }
+                ArrayList<String> results = new ArrayList<String>();
+
+                if( ob.has("security_groups") ) {
+                    JSONArray groups = ob.getJSONArray("security_groups");
+
+                    for( int i=0; i<groups.length(); i++ ) {
+                        JSONObject group = groups.getJSONObject(i);
+
+                        if( group.has("id") ) {
+                            results.add(group.getString("id"));
+                        }
+                    }
+                }
+                return results;
             }
         }
-        finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("EXIT: " + NovaServer.class.getName() + ".getVirtualMachine()");
+        catch( JSONException e ) {
+            throw new CloudException(e);
+        }
+    }
+
+    @Override
+    public @Nonnull Iterable<String> listFirewalls(@Nonnull String vmId) throws InternalException, CloudException {
+        NovaMethod method = new NovaMethod(provider);
+        JSONObject ob = method.getServers("/servers", vmId, true);
+
+        if( ob == null ) {
+            return Collections.emptyList();
+        }
+        try {
+            if( ob.has("server") ) {
+                JSONObject server = ob.getJSONObject("server");
+
+                return listFirewalls(vmId, server);
             }
+            throw new CloudException("No such server: " + vmId);
+        }
+        catch( JSONException e ) {
+            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for servers");
         }
     }
 
