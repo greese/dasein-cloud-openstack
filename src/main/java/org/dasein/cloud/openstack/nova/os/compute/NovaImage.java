@@ -52,6 +52,7 @@ import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.APITrace;
 import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -401,7 +402,18 @@ public class NovaImage implements MachineImageSupport {
 
     @Override
     public boolean isImageSharedWithPublic(@Nonnull String machineImageId) throws CloudException, InternalException {
-        return false;
+        MachineImage img = getImage(machineImageId);
+        String ownerId = (img != null ? img.getProviderOwnerId() : null);
+
+        if( ownerId == null ) {
+            return false;
+        }
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new CloudException("No context for this request");
+        }
+        return !ownerId.equals(ctx.getAccountNumber());
     }
 
     @Override
