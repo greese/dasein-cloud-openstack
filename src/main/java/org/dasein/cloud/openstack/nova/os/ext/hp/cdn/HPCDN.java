@@ -280,7 +280,7 @@ public class HPCDN implements CDNSupport {
 
 
         distribution.setName(container);
-        distribution.setActive(true);
+        distribution.setActive(enabled != null && enabled.equalsIgnoreCase("true"));
         distribution.setAliases(new String[0]);
         distribution.setDeployed(enabled != null && enabled.equalsIgnoreCase("true"));
         distribution.setDnsName(dns);

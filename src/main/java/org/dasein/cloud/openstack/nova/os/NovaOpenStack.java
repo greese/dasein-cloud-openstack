@@ -376,9 +376,6 @@ public class NovaOpenStack extends AbstractCloud {
             }
             catch( Throwable t ) {
                 logger.warn("Failed to test OpenStack connection context: " + t.getMessage());
-                if( logger.isTraceEnabled() ) {
-                    t.printStackTrace();
-                }
                 return null;
             }
         }

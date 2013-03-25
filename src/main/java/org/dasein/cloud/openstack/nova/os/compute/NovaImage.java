@@ -272,7 +272,16 @@ public class NovaImage extends AbstractImageSupport {
 
     @Override
     public boolean isImageSharedWithPublic(@Nonnull String machineImageId) throws CloudException, InternalException {
-        return false;
+        APITrace.begin(getProvider(), "Image.isImageSharedWithPublic");
+        try {
+            MachineImage img = getImage(machineImageId);
+            String ownerId = (img != null ? img.getProviderOwnerId() : null);
+
+            return (ownerId != null && !ownerId.equals(getContext().getAccountNumber()));
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -465,14 +474,15 @@ public class NovaImage extends AbstractImageSupport {
             if( json == null ) {
                 return null;
             }
+
             try {
                 String imageId = (json.has("id") ? json.getString("id") : null);
                 String name = (json.has("name") ? json.getString("name") : null);
                 String description = (json.has("description") ? json.getString("description") : null);
                 JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
-                String owner = getContext().getAccountNumber();
                 Architecture architecture = Architecture.I64;
                 Platform platform = Platform.UNKNOWN;
+                String owner = "--public--";
 
                 if( md != null ) {
                     if( description == null && md.has("org.dasein.description") ) {
@@ -490,7 +500,7 @@ public class NovaImage extends AbstractImageSupport {
                     String a = null;
 
                     for( String key : akeys ) {
-                        if( md.has(key) ) {
+                        if( md.has(key) && !md.isNull(key) ) {
                             a = md.getString(key);
                             if( a != null ) {
                                 break;
@@ -509,7 +519,7 @@ public class NovaImage extends AbstractImageSupport {
                             architecture = Architecture.POWER;
                         }
                     }
-                    if( md.has("os_type") ) {
+                    if( md.has("os_type") && !md.isNull("os_type") ) {
                         Platform p = Platform.guess(md.getString("os_type"));
 
                         if( !p.equals(Platform.UNKNOWN) ) {
@@ -521,11 +531,10 @@ public class NovaImage extends AbstractImageSupport {
                             }
                         }
                     }
-                    if( md.has("owner") ) {
+                    if( md.has("owner") && !md.isNull("owner")) {
                         owner = md.getString("owner");
                     }
                 }
-
                 long created = (json.has("created") ? ((NovaOpenStack)getProvider()).parseTimestamp(json.getString("created")) : -1L);
 
                 MachineImageState currentState = MachineImageState.PENDING;
