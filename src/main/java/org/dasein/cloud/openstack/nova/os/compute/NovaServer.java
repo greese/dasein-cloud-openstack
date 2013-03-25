@@ -449,22 +449,22 @@ public class NovaServer extends AbstractVMSupport {
                 return results;
             }
             else {
+                ArrayList<String> results = new ArrayList<String>();
+
                 NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
                 JSONObject ob = method.getServers("/servers", vmId + "/os-security-groups", true);
 
-                if( ob == null ) {
-                    throw new CloudException("No such server: " + vmId);
-                }
-                ArrayList<String> results = new ArrayList<String>();
+                if( ob != null ) {
 
-                if( ob.has("security_groups") ) {
-                    JSONArray groups = ob.getJSONArray("security_groups");
+                    if( ob.has("security_groups") ) {
+                        JSONArray groups = ob.getJSONArray("security_groups");
 
-                    for( int i=0; i<groups.length(); i++ ) {
-                        JSONObject group = groups.getJSONObject(i);
+                        for( int i=0; i<groups.length(); i++ ) {
+                            JSONObject group = groups.getJSONObject(i);
 
-                        if( group.has("id") ) {
-                            results.add(group.getString("id"));
+                            if( group.has("id") ) {
+                                results.add(group.getString("id"));
+                            }
                         }
                     }
                 }
@@ -1019,6 +1019,7 @@ public class NovaServer extends AbstractVMSupport {
             return null;
         }
         VirtualMachine vm = new VirtualMachine();
+        String description = null;
 
         vm.setCurrentState(VmState.RUNNING);
         vm.setArchitecture(Architecture.I64);
@@ -1038,8 +1039,8 @@ public class NovaServer extends AbstractVMSupport {
         if( server.has("name") ) {
             vm.setName(server.getString("name"));
         }
-        if( server.has("description") ) {
-            vm.setDescription(server.getString("description"));
+        if( server.has("description") && !server.isNull("description") ) {
+            description = server.getString("description");
         }
         if( server.has("kernel_id") ) {
             vm.setProviderKernelImageId(server.getString("kernel_id"));
@@ -1047,49 +1048,54 @@ public class NovaServer extends AbstractVMSupport {
         if( server.has("ramdisk_id") ) {
             vm.setProviderRamdiskImageId(server.getString("ramdisk_id"));
         }
-        if( vm.getDescription() == null ) {
-            HashMap<String,String> map = new HashMap<String,String>();
+        JSONObject md = (server.has("metadata") && !server.isNull("metadata")) ? server.getJSONObject("metadata") : null;
 
-            if( server.has("metadata") ) {
-                JSONObject md = server.getJSONObject("metadata");
+        HashMap<String,String> map = new HashMap<String,String>();
+        boolean imaging = false;
 
-                if( md.has("org.dasein.description") && vm.getDescription() == null ) {
-                    vm.setDescription(md.getString("org.dasein.description"));
+        if( md != null ) {
+            if( md.has("org.dasein.description") && vm.getDescription() == null ) {
+                    description = md.getString("org.dasein.description");
+            }
+            else if( md.has("Server Label") ) {
+                description = md.getString("Server Label");
+            }
+            if( md.has("org.dasein.platform") ) {
+                try {
+                    vm.setPlatform(Platform.valueOf(md.getString("org.dasein.platform")));
                 }
-                else if( md.has("Server Label") ) {
-                    vm.setDescription(md.getString("Server Label"));
+                catch( Throwable ignore ) {
+                    // ignore
                 }
-                if( md.has("org.dasein.platform") ) {
-                    try {
-                        vm.setPlatform(Platform.valueOf(md.getString("org.dasein.platform")));
-                    }
-                    catch( Throwable ignore ) {
-                        // ignore
-                    }
-                }
-                String[] keys = JSONObject.getNames(md);
+            }
+            String[] keys = JSONObject.getNames(md);
 
-                if( keys != null ) {
-                    for( String key : keys ) {
-                        String value = md.getString(key);
+            if( keys != null ) {
+                for( String key : keys ) {
+                    String value = md.getString(key);
 
-                        if( value != null ) {
-                            map.put(key, value);
-                        }
+                    if( value != null ) {
+                        map.put(key, value);
                     }
                 }
             }
-            if( vm.getDescription() == null ) {
-                if( vm.getName() == null ) {
-                    vm.setName(vm.getProviderVirtualMachineId());
-                }
-                vm.setDescription(vm.getName());
+            if( md.has("OS-EXT-STS:task_state") && !md.isNull("OS-EXT-STS:task_state") ) {
+                imaging = md.getString("OS-EXT-STS:task_state").equalsIgnoreCase("image_snapshot");
             }
-            if( server.has("hostId") ) {
-                map.put("host", server.getString("hostId"));
-            }
-            vm.setTags(map);
         }
+        if( description == null ) {
+            if( vm.getName() == null ) {
+                vm.setName(vm.getProviderVirtualMachineId());
+            }
+            vm.setDescription(vm.getName());
+        }
+        else {
+            vm.setDescription(description);
+        }
+        if( server.has("hostId") ) {
+            map.put("host", server.getString("hostId"));
+        }
+        vm.setTags(map);
         if( server.has("image") ) {
             JSONObject img = server.getJSONObject("image");
 
@@ -1153,6 +1159,9 @@ public class NovaServer extends AbstractVMSupport {
                 logger.warn("toVirtualMachine(): Unknown server state: " + s);
                 vm.setCurrentState(VmState.PENDING);
             }
+        }
+        if( vm.getCurrentState().equals(VmState.RUNNING) && imaging ) {
+            vm.setCurrentState(VmState.PENDING);
         }
         if( server.has("created") ) {
             vm.setCreationTimestamp(((NovaOpenStack)getProvider()).parseTimestamp(server.getString("created")));

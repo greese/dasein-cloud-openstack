@@ -482,7 +482,7 @@ public class NovaImage extends AbstractImageSupport {
                 JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
                 Architecture architecture = Architecture.I64;
                 Platform platform = Platform.UNKNOWN;
-                String owner = "--public--";
+                String owner = (getProvider().getProviderName().equals("Rackspace") ? getContext().getAccountNumber() : "--public--");
 
                 if( md != null ) {
                     if( description == null && md.has("org.dasein.description") ) {
@@ -533,6 +533,9 @@ public class NovaImage extends AbstractImageSupport {
                     }
                     if( md.has("owner") && !md.isNull("owner")) {
                         owner = md.getString("owner");
+                    }
+                    else if( md.has("image_type") && !md.isNull("image_type") && md.getString("image_type").equals("base") ) {
+                        owner = "--public--";
                     }
                 }
                 long created = (json.has("created") ? ((NovaOpenStack)getProvider()).parseTimestamp(json.getString("created")) : -1L);

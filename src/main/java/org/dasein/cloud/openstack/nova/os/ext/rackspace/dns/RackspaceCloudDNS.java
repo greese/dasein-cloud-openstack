@@ -59,7 +59,7 @@ public class RackspaceCloudDNS implements DNSSupport {
     static private final Logger logger = NovaOpenStack.getLogger(RackspaceCloudDNS.class, "std");
 
     static private final String RESOURCE = "/domains";
-    static private final String SERVICE = "dnsextension:dns";
+    static private final String SERVICE = "rax:dns";
     
     private NovaOpenStack provider;
     

@@ -20,6 +20,7 @@ import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.AbstractVolumeSupport;
@@ -35,6 +36,7 @@ import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
+import org.dasein.util.CalendarWrapper;
 import org.dasein.util.uom.storage.Gigabyte;
 import org.dasein.util.uom.storage.Storage;
 import org.json.JSONArray;
@@ -100,6 +102,9 @@ public class CinderVolume extends AbstractVolumeSupport {
 
     @Override
     public @Nonnull String createVolume(@Nonnull VolumeCreateOptions options) throws InternalException, CloudException {
+        if( options.getVlanId() != null ) {
+            throw new OperationNotSupportedException("Creating NFS volumes is not supported in " + getProvider().getCloudName());
+        }
         APITrace.begin(getProvider(), "Volume.createVolume");
         try {
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
@@ -423,6 +428,25 @@ public class CinderVolume extends AbstractVolumeSupport {
     public void remove(@Nonnull String volumeId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "Volume.remove");
         try {
+            long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 10L);
+            Volume v = getVolume(volumeId);
+
+            while( timeout > System.currentTimeMillis() ) {
+                if( v == null ) {
+                    return;
+                }
+                if( !VolumeState.PENDING.equals(v.getCurrentState()) ) {
+                    break;
+                }
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+                try {
+                    v = getVolume(volumeId);
+                }
+                catch( Throwable ignore ) {
+                    // ignore
+                }
+            }
             NovaMethod method = new NovaMethod(((NovaOpenStack)getProvider()));
 
             method.deleteResource(SERVICE, getResource(), volumeId, null);
