@@ -1383,6 +1383,20 @@ public class NovaServer implements VirtualMachineSupport {
                 }
                 vm.setPlatform(p);
             }
+            Iterable<String> fwIds = listFirewalls(vm.getProviderVirtualMachineId(), server);
+            int count = 0;
+
+            //noinspection UnusedDeclaration
+            for( String id : fwIds ) {
+                count++;
+            }
+            String[] ids = new String[count];
+            int i = 0;
+
+            for( String id : fwIds ) {
+                ids[i++] = id;
+            }
+            vm.setProviderFirewallIds(ids);
             return vm;
         }
         finally {
