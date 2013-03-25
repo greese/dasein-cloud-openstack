@@ -52,7 +52,6 @@ import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
-import org.dasein.cloud.util.APITrace;
 import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -745,11 +744,9 @@ public class NovaImage implements MachineImageSupport {
                 return null;
             }
             MachineImage image = new MachineImage();
+            String description = (json.has("description") && !json.isNull("description") ? json.getString("description") : null);
 
             image.setImageClass(ImageClass.MACHINE); // TODO: really?
-            image.setArchitecture(Architecture.I64);
-            image.setPlatform(Platform.UNKNOWN);
-            image.setProviderOwnerId(provider.getContext().getAccountNumber());
             image.setProviderRegionId(provider.getContext().getRegionId());
             image.setTags(new HashMap<String,String>());
             image.setType(MachineImageType.VOLUME);
@@ -760,16 +757,63 @@ public class NovaImage implements MachineImageSupport {
             if( json.has("name") ) {
                 image.setName(json.getString("name"));
             }
-            if( json.has("description") ) {
-                image.setDescription(json.getString("description"));
-            }
-            if( json.has("metadata") ) {
-                JSONObject md = json.getJSONObject("metadata");
-                
-                if( image.getDescription() == null && md.has("dsnDescription") ) {
-                    image.setDescription(md.getString("dsnDescription"));
+            JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
+            Architecture architecture = Architecture.I64;
+            Platform platform = Platform.UNKNOWN;
+            String owner = "--public--";
+
+            if( md != null ) {
+                if( description == null && md.has("org.dasein.description") ) {
+                    description = md.getString("org.dasein.description");
+                }
+                if( md.has("org.dasein.platform") ) {
+                    try {
+                        platform = Platform.valueOf(md.getString("org.dasein.platform"));
+                    }
+                    catch( Throwable ignore ) {
+                        // ignore
+                    }
+                }
+                String[] akeys = { "arch", "architecture", "org.openstack__1__architecture", "com.hp__1__architecture" };
+                String a = null;
+
+                for( String key : akeys ) {
+                    if( md.has(key) && !md.isNull(key) ) {
+                        a = md.getString(key);
+                        if( a != null ) {
+                            break;
+                        }
+                    }
+                }
+                if( a != null ) {
+                    a = a.toLowerCase();
+                    if( a.contains("32") ) {
+                        architecture = Architecture.I32;
+                    }
+                    else if( a.contains("sparc") ) {
+                        architecture = Architecture.SPARC;
+                    }
+                    else if( a.contains("power") ) {
+                        architecture = Architecture.POWER;
+                    }
+                }
+                if( md.has("os_type") && !md.isNull("os_type") ) {
+                    Platform p = Platform.guess(md.getString("os_type"));
+
+                    if( !p.equals(Platform.UNKNOWN) ) {
+                        if( platform.equals(Platform.UNKNOWN) ) {
+                            platform = p;
+                        }
+                        else if( platform.equals(Platform.UNIX) && !p.equals(Platform.UNIX) ) {
+                            platform = p;
+                        }
+                    }
+                }
+                if( md.has("owner") && !md.isNull("owner")) {
+                    owner = md.getString("owner");
                 }
             }
+            image.setProviderOwnerId(owner);
             if( json.has("status") ) {
                 String s = json.getString("status").toLowerCase();
                 
@@ -796,10 +840,19 @@ public class NovaImage implements MachineImageSupport {
             if( image.getName() == null ) {
                 image.setName(image.getProviderMachineImageId());
             }
-            if( image.getDescription() == null ) {
+            if( description == null ) {
                 image.setDescription(image.getName());
             }
-            image.setPlatform(Platform.guess(image.getName() + " " + image.getDescription()));
+            else {
+                image.setDescription(description);
+            }
+            if( platform.equals(Platform.UNKNOWN) ) {
+                image.setPlatform(Platform.guess(image.getName() + " " + image.getDescription()));
+            }
+            else {
+                image.setPlatform(platform);
+            }
+            image.setArchitecture(architecture);
             return image;
         }
         finally {
