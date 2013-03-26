@@ -448,7 +448,7 @@ public class NovaImage implements MachineImageSupport {
 
                     for( int i=0; i<list.length(); i++ ) {
                         JSONObject image = list.getJSONObject(i);
-                        ResourceStatus img = toStatus(ctx, image);
+                        ResourceStatus img = toStatus(ctx, image, cls);
 
                         if( img != null ) {
                             images.add(img);
@@ -492,7 +492,7 @@ public class NovaImage implements MachineImageSupport {
                         JSONObject image = list.getJSONObject(i);
                         MachineImage img = toImage(ctx, image);
 
-                        if( img != null ) {
+                        if( img != null && img.getProviderOwnerId().equals(ctx.getAccountNumber()) && img.getImageClass().equals(cls) ) {
                             images.add(img);
                         }
 
@@ -642,10 +642,6 @@ public class NovaImage implements MachineImageSupport {
         if( ctx == null ) {
             throw new CloudException("No context was set for this request");
         }
-        if( accountNumber != null && !accountNumber.equals(ctx.getAccountNumber()) ) {
-            return Collections.emptyList();
-        }
-
         NovaMethod method = new NovaMethod(provider);
         JSONObject ob = method.getServers("/images", null, true);
         ArrayList<MachineImage> images = new ArrayList<MachineImage>();
@@ -659,6 +655,9 @@ public class NovaImage implements MachineImageSupport {
                     MachineImage img = toImage(ctx, image);
 
                     if( img != null ) {
+                        if( accountNumber != null && !accountNumber.equals(img.getProviderOwnerId()) ) {
+                            continue;
+                        }
                         if( architecture != null ) {
                             if( !architecture.equals(img.getArchitecture()) ) {
                                 continue;
@@ -693,6 +692,19 @@ public class NovaImage implements MachineImageSupport {
                                 }
                             }
                         }
+                        if( imageClasses != null && imageClasses.length > 0 ) {
+                            boolean ok = false;
+
+                            for( ImageClass cls : imageClasses ) {
+                                if( cls.equals(img.getImageClass()) ) {
+                                    ok = true;
+                                    break;
+                                }
+                            }
+                            if( !ok ) {
+                                continue;
+                            }
+                        }
                         images.add(img);
                     }
 
@@ -707,7 +719,84 @@ public class NovaImage implements MachineImageSupport {
 
     @Override
     public @Nonnull Iterable<MachineImage> searchPublicImages(@Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass... imageClasses) throws CloudException, InternalException {
-        return Collections.emptyList();
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new CloudException("No context was set for this request");
+        }
+        NovaMethod method = new NovaMethod(provider);
+        JSONObject ob = method.getServers("/images", null, true);
+        ArrayList<MachineImage> images = new ArrayList<MachineImage>();
+
+        try {
+            if( ob != null && ob.has("images") ) {
+                JSONArray list = ob.getJSONArray("images");
+
+                for( int i=0; i<list.length(); i++ ) {
+                    JSONObject image = list.getJSONObject(i);
+                    MachineImage img = toImage(ctx, image);
+
+                    if( img != null ) {
+                        if( ctx.getAccountNumber().equals(img.getProviderOwnerId()) ) {
+                            continue;
+                        }
+                        if( architecture != null ) {
+                            if( !architecture.equals(img.getArchitecture()) ) {
+                                continue;
+                            }
+                        }
+                        if( platform != null && !platform.equals(Platform.UNKNOWN) ) {
+                            Platform p = img.getPlatform();
+
+                            if( p.equals(Platform.UNKNOWN) ) {
+                                continue;
+                            }
+                            else if( platform.isWindows() ) {
+                                if( !p.isWindows() ) {
+                                    continue;
+                                }
+                            }
+                            else if( platform.equals(Platform.UNIX) ) {
+                                if( !p.isUnix() ) {
+                                    continue;
+                                }
+                            }
+                            else if( !platform.equals(p) ) {
+                                continue;
+                            }
+                        }
+                        if( keyword != null ) {
+                            if( !img.getName().contains(keyword) ) {
+                                if( !img.getDescription().contains(keyword) ) {
+                                    if( !img.getProviderMachineImageId().contains(keyword) ) {
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                        if( imageClasses != null && imageClasses.length > 0 ) {
+                            boolean ok = false;
+
+                            for( ImageClass cls : imageClasses ) {
+                                if( cls.equals(img.getImageClass()) ) {
+                                    ok = true;
+                                    break;
+                                }
+                            }
+                            if( !ok ) {
+                                continue;
+                            }
+                        }
+                        images.add(img);
+                    }
+
+                }
+            }
+        }
+        catch( JSONException e ) {
+            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for images: " + e.getMessage());
+        }
+        return images;
     }
 
     @Override
@@ -882,7 +971,7 @@ public class NovaImage implements MachineImageSupport {
         }
     }
 
-    public @Nullable ResourceStatus toStatus(@Nonnull ProviderContext ctx, @Nullable JSONObject json) throws CloudException, InternalException {
+    public @Nullable ResourceStatus toStatus(@Nonnull ProviderContext ctx, @Nullable JSONObject json, @Nonnull ImageClass cls) throws CloudException, InternalException {
 
         if( json == null ) {
             return null;
@@ -896,6 +985,9 @@ public class NovaImage implements MachineImageSupport {
                 id = json.getString("id");
             }
             if( id == null ) {
+                return null;
+            }
+            if( !ImageClass.MACHINE.equals(cls) ) {
                 return null;
             }
             JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
