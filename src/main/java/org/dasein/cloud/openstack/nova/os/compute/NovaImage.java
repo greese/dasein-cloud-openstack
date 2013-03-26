@@ -411,18 +411,15 @@ public class NovaImage implements MachineImageSupport {
 
     @Override
     public boolean isImageSharedWithPublic(@Nonnull String machineImageId) throws CloudException, InternalException {
-        MachineImage img = getImage(machineImageId);
-        String ownerId = (img != null ? img.getProviderOwnerId() : null);
-
-        if( ownerId == null ) {
-            return false;
-        }
         ProviderContext ctx = provider.getContext();
 
         if( ctx == null ) {
-            throw new CloudException("No context for this request");
+            throw new CloudException("No context was set for this request");
         }
-        return !ownerId.equals(ctx.getAccountNumber());
+        MachineImage img = getImage(machineImageId);
+        String ownerId = (img != null ? img.getProviderOwnerId() : null);
+
+        return (ownerId != null && !ownerId.equals(ctx.getAccountNumber()));
     }
 
     @Override
