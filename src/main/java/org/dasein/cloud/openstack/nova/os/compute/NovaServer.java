@@ -1079,9 +1079,12 @@ public class NovaServer extends AbstractVMSupport {
                     }
                 }
             }
-            if( md.has("OS-EXT-STS:task_state") && !md.isNull("OS-EXT-STS:task_state") ) {
-                imaging = md.getString("OS-EXT-STS:task_state").equalsIgnoreCase("image_snapshot");
-            }
+        }
+        if( server.has("OS-EXT-STS:task_state") && !server.isNull("OS-EXT-STS:task_state") ) {
+            String t = server.getString("OS-EXT-STS:task_state");
+
+            map.put("OS-EXT-STS:task_state", t);
+            imaging = t.equalsIgnoreCase("image_snapshot");
         }
         if( description == null ) {
             if( vm.getName() == null ) {

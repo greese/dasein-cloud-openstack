@@ -38,6 +38,7 @@ import org.dasein.cloud.platform.DatabaseSnapshot;
 import org.dasein.cloud.platform.DatabaseState;
 import org.dasein.cloud.platform.RelationalDatabaseSupport;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -556,6 +557,23 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             NovaMethod method = new NovaMethod(provider);
 
             method.deleteResource(SERVICE, RESOURCE, providerDatabaseId, null);
+
+            long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 5L);
+
+            while( timeout > System.currentTimeMillis() ) {
+                try {
+                    Database db = getDatabase(providerDatabaseId);
+
+                    if( db == null || DatabaseState.DELETED.equals(db.getCurrentState()) ) {
+                        return;
+                    }
+                }
+                catch( Throwable ignore ) {
+                    // ignore
+                }
+                try { Thread.sleep(15000L); }
+                catch( Throwable ignore ) { }
+            }
         }
         finally {
             APITrace.end();

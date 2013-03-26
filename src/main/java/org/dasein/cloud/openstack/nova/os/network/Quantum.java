@@ -433,6 +433,9 @@ public class Quantum extends AbstractVLANSupport {
                         ResourceStatus status = toStatus(net);
 
                         if( status != null ) {
+                            if( status.getProviderResourceId().equals("00000000-0000-0000-0000-000000000000") || status.getProviderResourceId().equals("11111111-1111-1111-1111-111111111111") ) {
+                                continue;
+                            }
                             networks.add(status);
                         }
 

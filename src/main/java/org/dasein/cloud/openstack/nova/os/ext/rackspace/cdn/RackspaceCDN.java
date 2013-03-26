@@ -105,7 +105,6 @@ public class RackspaceCDN implements CDNSupport {
             }
             Distribution distribution = new Distribution();
 
-            distribution.setActive(true);
             distribution.setAliases(new String[0]);
 
             String dnsName = null, cdnUri = null;
@@ -124,6 +123,7 @@ public class RackspaceCDN implements CDNSupport {
                     cdnUri = metaData.get(key);
                 }
             }
+            distribution.setActive(enabled);
             distribution.setDeployed(enabled);
 
             String prefix = "http://";

@@ -24,21 +24,29 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.network.AbstractLoadBalancerSupport;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.LbAlgorithm;
+import org.dasein.cloud.network.LbEndpointState;
+import org.dasein.cloud.network.LbEndpointType;
 import org.dasein.cloud.network.LbListener;
+import org.dasein.cloud.network.LbPersistence;
 import org.dasein.cloud.network.LbProtocol;
 import org.dasein.cloud.network.LoadBalancer;
 import org.dasein.cloud.network.LoadBalancerAddressType;
-import org.dasein.cloud.network.LoadBalancerServer;
+import org.dasein.cloud.network.LoadBalancerCreateOptions;
+import org.dasein.cloud.network.LoadBalancerEndpoint;
 import org.dasein.cloud.network.LoadBalancerState;
+import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.Cache;
+import org.dasein.cloud.util.CacheLevel;
 import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -69,6 +77,90 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         this.provider = provider;
     }
 
+    public void addIPEndpoints(@Nonnull String toLoadBalancerId, @Nonnull String ... ipAddresses) throws CloudException, InternalException {
+        APITrace.begin(provider, "LB.addIPEndpoints");
+        try {
+            ArrayList<HashMap<String,Object>> nodes = new ArrayList<HashMap<String,Object>>();
+            LoadBalancer lb = getLoadBalancer(toLoadBalancerId);
+            int port = -1;
+
+            if( lb == null ) {
+                logger.error("No such load balancer: " + toLoadBalancerId);
+                throw new CloudException("No such load balancer: " + toLoadBalancerId);
+            }
+            long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 5L);
+
+            while( timeout > System.currentTimeMillis() ) {
+                if( lb == null ) {
+                    return;
+                }
+                if( !LoadBalancerState.PENDING.equals(lb.getCurrentState()) ) {
+                    break;
+                }
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+                try {
+                    lb = getLoadBalancer(toLoadBalancerId);
+                    if( lb == null ) {
+                        return;
+                    }
+                    if( !LoadBalancerState.PENDING.equals(lb.getCurrentState()) ) {
+                        break;
+                    }
+                }
+                catch( Throwable ignore ) {
+                    // ignore
+                }
+            }
+            LbListener[] listeners = lb.getListeners();
+
+            if( listeners != null && listeners.length > 0 ) {
+                port = listeners[0].getPrivatePort();
+                if( port == -1 ) {
+                    port = listeners[0].getPublicPort();
+                }
+            }
+            if( port == -1 ) {
+                if( lb.getPublicPorts() != null && lb.getPublicPorts().length > 0 ) {
+                    port = lb.getPublicPorts()[0];
+                }
+                if( port == -1 ) {
+                    logger.error("Could not determine a proper private port for mapping");
+                    throw new CloudException("No port understanding exists for this load balancer");
+                }
+            }
+            for( String address : ipAddresses ) {
+                if( logger.isTraceEnabled() ) {
+                    logger.trace("Adding " + address + "...");
+                }
+                HashMap<String,Object> node = new HashMap<String,Object>();
+
+
+                node.put("address", address);
+                node.put("condition", "ENABLED");
+                node.put("port", port);
+                nodes.add(node);
+            }
+            if( !nodes.isEmpty() ) {
+                HashMap<String,Object> json = new HashMap<String,Object>();
+
+                json.put("nodes", nodes);
+                NovaMethod method = new NovaMethod(provider);
+
+                if( logger.isTraceEnabled() ) {
+                    logger.trace("Calling cloud...");
+                }
+                method.postString(SERVICE, RESOURCE, toLoadBalancerId + "/nodes", new JSONObject(json), false);
+                if( logger.isTraceEnabled() ) {
+                    logger.trace("Done.");
+                }
+            }
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
     @Override
     public void addServers(@Nonnull String toLoadBalancerId, @Nonnull String... serverIdsToAdd) throws CloudException, InternalException {
         APITrace.begin(provider, "LB.addServers");
@@ -80,6 +172,30 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
             if( lb == null ) {
                 logger.error("addServers(): No such load balancer: " + toLoadBalancerId);
                 throw new CloudException("No such load balancer: " + toLoadBalancerId);
+            }
+            long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 5L);
+
+            while( timeout > System.currentTimeMillis() ) {
+                if( lb == null ) {
+                    return;
+                }
+                if( !LoadBalancerState.PENDING.equals(lb.getCurrentState()) ) {
+                    break;
+                }
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+                try {
+                    lb = getLoadBalancer(toLoadBalancerId);
+                    if( lb == null ) {
+                        return;
+                    }
+                    if( !LoadBalancerState.PENDING.equals(lb.getCurrentState()) ) {
+                        break;
+                    }
+                }
+                catch( Throwable ignore ) {
+                    // ignore
+                }
             }
             LbListener[] listeners = lb.getListeners();
             
@@ -111,14 +227,14 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
                 String address = null;
                 
                 if( vm.getProviderRegionId().equals(provider.getContext().getRegionId()) ) {
-                    String[] possibles = vm.getPrivateIpAddresses();
-                    address = ((possibles != null && possibles.length > 0) ? possibles[0] : null);
+                    RawAddress[] possibles = vm.getPrivateAddresses();
+                    address = ((possibles != null && possibles.length > 0) ? possibles[0].getIpAddress() : null);
 
                 }
                 if( address == null ) {
-                    String[] possibles = vm.getPublicIpAddresses();
+                    RawAddress[] possibles = vm.getPublicAddresses();
                         
-                    address = ((possibles != null && possibles.length > 0) ? possibles[0] : null);
+                    address = ((possibles != null && possibles.length > 0) ? possibles[0].getIpAddress() : null);
                 }
                 if( address == null ) {
                     logger.error("addServers(): No address exists for mapping the load balancer to this server");
@@ -155,17 +271,43 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
-    public @Nonnull String create(@Nonnull String name, @Nonnull String description, @Nullable String addressId, @Nonnull String[] dataCenterIds, @Nonnull LbListener[] listeners, @Nonnull String[] serverIds) throws CloudException, InternalException {
+    @Deprecated
+    public @Nonnull String create(@Nonnull String name, @Nonnull String description, @Nullable String addressId, @Nullable String[] dataCenterIds, @Nullable LbListener[] listeners, @Nullable String[] serverIds) throws CloudException, InternalException {
+        LoadBalancerCreateOptions options;
+
+        if( addressId == null ) {
+            options = LoadBalancerCreateOptions.getInstance(name, description);
+        }
+        else {
+            options = LoadBalancerCreateOptions.getInstance(name, description, addressId);
+        }
+        if( dataCenterIds != null ) {
+            options.limitedTo(dataCenterIds);
+        }
+        if( listeners != null ) {
+            options.havingListeners(listeners);
+        }
+        if( serverIds != null ) {
+            options.withVirtualMachines(serverIds);
+        }
+        return createLoadBalancer(options);
+    }
+
+    @Override
+    public @Nonnull String createLoadBalancer(@Nonnull LoadBalancerCreateOptions options) throws CloudException, InternalException {
         APITrace.begin(provider, "LB.create");
         try {
+            LbListener[] listeners = options.getListeners();
+
             if( listeners == null || listeners.length < 1 ) {
                 logger.error("create(): Call failed to specify any listeners");
                 throw new CloudException("Rackspace requires exactly one listener");
             }
             HashMap<String,Object> lb = new HashMap<String,Object>();
             
-            lb.put("name", name);
+            lb.put("name", options.getName());
             lb.put("port", listeners[0].getPublicPort());
             if( listeners[0].getNetworkProtocol().equals(LbProtocol.HTTP) ) {
                 lb.put("protocol", "HTTP");
@@ -177,7 +319,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
                 lb.put("protocol", matchProtocol(listeners[0].getPublicPort()));
             }
             else {
-                logger.error("create(): Invalid protocol: " + listeners[0].getNetworkProtocol());
+                logger.error("Invalid protocol: " + listeners[0].getNetworkProtocol());
                 throw new CloudException("Unsupported protocol: " + listeners[0].getNetworkProtocol());
             }
             if( listeners[0].getAlgorithm().equals(LbAlgorithm.LEAST_CONN) ) {
@@ -198,34 +340,45 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
             lb.put("virtualIps", ips);
             
             ArrayList<Map<String,Object>> nodes = new ArrayList<Map<String,Object>>();
-            
-            for( String id : serverIds ) {
-                VirtualMachine vm = provider.getComputeServices().getVirtualMachineSupport().getVirtualMachine(id);
-                
-                if( vm != null ) {
-                    String address = null;
-                    
-                    if( vm.getProviderRegionId().equals(provider.getContext().getRegionId()) ) {
-                        String[] tmp = vm.getPrivateIpAddresses();
-                        
-                        if( tmp != null && tmp.length > 0 ) {
-                            address = tmp[0];
-                        }
-                    }
-                    if( address == null ) {
-                        String[] tmp = vm.getPublicIpAddresses();
+            LoadBalancerEndpoint[] endpoints = options.getEndpoints();
 
-                        if( tmp != null && tmp.length > 0 ) {
-                            address = tmp[0];
+            if( endpoints != null ) {
+                TreeSet<String> addresses = new TreeSet<String>();
+
+                for( LoadBalancerEndpoint endpoint : endpoints ) {
+                    String address = null;
+
+                    if( endpoint.getEndpointType().equals(LbEndpointType.IP) ) {
+                        address = endpoint.getEndpointValue();
+                    }
+                    else {
+                        VirtualMachine vm = provider.getComputeServices().getVirtualMachineSupport().getVirtualMachine(endpoint.getEndpointValue());
+
+                        if( vm != null ) {
+                            if( vm.getProviderRegionId().equals(provider.getContext().getRegionId()) ) {
+                                RawAddress[] tmp = vm.getPrivateAddresses();
+
+                                if( tmp != null && tmp.length > 0 ) {
+                                    address = tmp[0].getIpAddress();
+                                }
+                            }
+                            if( address == null ) {
+                                RawAddress[] tmp = vm.getPublicAddresses();
+
+                                if( tmp != null && tmp.length > 0 ) {
+                                    address = tmp[0].getIpAddress();
+                                }
+                            }
                         }
                     }
-                    if( address != null ) {
+                    if( address != null && !addresses.contains(address) ) {
                         HashMap<String,Object> node = new HashMap<String,Object>();
-                    
+
                         node.put("address", address);
                         node.put("condition", "ENABLED");
                         node.put("port", listeners[0].getPrivatePort());
                         nodes.add(node);
+                        addresses.add(address);
                     }
                 }
             }
@@ -270,6 +423,14 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         }
     }
 
+    public @Nonnull Iterable<LbEndpointType> listSupportedEndpointTypes() throws CloudException, InternalException {
+        ArrayList<LbEndpointType> types = new ArrayList<LbEndpointType>();
+
+        types.add(LbEndpointType.IP);
+        types.add(LbEndpointType.VM);
+        return types;
+    }
+
     private String matchProtocol(int port) throws CloudException, InternalException {
         NovaMethod method = new NovaMethod(provider);
         JSONObject ob = method.getResource(SERVICE, RESOURCE, "protocols", false);
@@ -299,7 +460,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
     }
 
     @Override
-    public LoadBalancer getLoadBalancer(String loadBalancerId) throws CloudException, InternalException {
+    public @Nullable LoadBalancer getLoadBalancer(@Nonnull String loadBalancerId) throws CloudException, InternalException {
         APITrace.begin(provider, "LB.getLoadBalancer");
         try {
             ProviderContext ctx = provider.getContext();
@@ -319,7 +480,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
             
             try {
                 if( ob.has("loadBalancer") ) {
-                    LoadBalancer lb = toLoadBalancer(ctx, ob.getJSONObject("loadBalancer"), vms);
+                    LoadBalancer lb = toLoadBalancer(ob.getJSONObject("loadBalancer"), vms);
                         
                     if( lb != null ) {
                         return lb;
@@ -338,17 +499,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
     }
 
     @Override
-    public Iterable<LoadBalancerServer> getLoadBalancerServerHealth(String loadBalancerId) throws CloudException, InternalException {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public Iterable<LoadBalancerServer> getLoadBalancerServerHealth(String loadBalancerId, String... serverIdsToCheck) throws CloudException, InternalException {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public LoadBalancerAddressType getAddressType() throws CloudException, InternalException {
+    public @Nonnull LoadBalancerAddressType getAddressType() throws CloudException, InternalException {
         return LoadBalancerAddressType.IP;
     }
 
@@ -358,12 +509,194 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
     }
 
     @Override
-    public String getProviderTermForLoadBalancer(Locale locale) {
+    public @Nonnull String getProviderTermForLoadBalancer(@Nonnull Locale locale) {
         return "load balancer";
     }
 
     @Override
-    public Iterable<ResourceStatus> listLoadBalancerStatus() throws CloudException, InternalException {
+    public @Nonnull Iterable<LoadBalancerEndpoint> listEndpoints(@Nonnull String loadBalancerId) throws CloudException, InternalException {
+        APITrace.begin(provider, "LB.listEndpoints");
+        try {
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                logger.error("No context exists for this request");
+                throw new InternalException("No context exists for this request");
+            }
+
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject ob = method.getResource(SERVICE, RESOURCE, loadBalancerId, false);
+
+            if( ob == null ) {
+                return Collections.emptyList();
+            }
+            try {
+                if( ob.has("loadBalancer") && !ob.isNull("loadBalancer") ) {
+                    JSONObject json = ob.getJSONObject("loadBalancer");
+
+                    if( json.has("nodes") ) {
+                        ArrayList<LoadBalancerEndpoint> endpoints = new ArrayList<LoadBalancerEndpoint>();
+                        JSONArray arr = json.getJSONArray("nodes");
+
+                        for( int i=0; i<arr.length(); i++ ) {
+                            LbEndpointState state = LbEndpointState.ACTIVE;
+                            JSONObject item = arr.getJSONObject(i);
+
+                            if( item.has("condition") && !item.getString("condition").equalsIgnoreCase("enabled") ) {
+                                state = LbEndpointState.INACTIVE;
+                            }
+                            if( item.has("address") && !item.isNull("address")) {
+                                String addr = item.getString("address");
+                                VirtualMachine node = null;
+
+                                for( VirtualMachine vm : getProvider().getComputeServices().getVirtualMachineSupport().listVirtualMachines() ) {
+                                    RawAddress[] addrs = vm.getPublicAddresses();
+
+                                    for( RawAddress a : addrs ){
+                                        if( addr.equals(a.getIpAddress()) ) {
+                                            node = vm;
+                                            break;
+                                        }
+                                    }
+                                    if( node == null ) {
+                                        addrs = vm.getPrivateAddresses();
+                                        for( RawAddress a : addrs ){
+                                            if( addr.equals(a.getIpAddress()) ) {
+                                                node = vm;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if( node != null ) {
+                                    endpoints.add(LoadBalancerEndpoint.getInstance(LbEndpointType.VM, node.getProviderVirtualMachineId(), state));
+                                }
+                                else {
+                                    endpoints.add(LoadBalancerEndpoint.getInstance(LbEndpointType.IP, addr, state));
+                                }
+                            }
+                        }
+                        return endpoints;
+                    }
+                }
+                return Collections.emptyList();
+            }
+            catch( JSONException e ) {
+                logger.error("Unable to identify expected values in JSON: " + e.getMessage());
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for load balancers: " + e.getMessage());
+            }
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    @Override
+    public @Nonnull Iterable<LoadBalancerEndpoint> listEndpoints(@Nonnull String loadBalancerId, @Nonnull LbEndpointType type, @Nonnull String ... values) throws CloudException, InternalException {
+        APITrace.begin(provider, "LB.listEndpoints");
+        try {
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                logger.error("No context exists for this request");
+                throw new InternalException("No context exists for this request");
+            }
+
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject ob = method.getResource(SERVICE, RESOURCE, loadBalancerId, false);
+
+            if( ob == null ) {
+                return Collections.emptyList();
+            }
+            try {
+                if( ob.has("loadBalancer") && !ob.isNull("loadBalancer") ) {
+                    JSONObject json = ob.getJSONObject("loadBalancer");
+
+                    if( json.has("nodes") ) {
+                        ArrayList<LoadBalancerEndpoint> endpoints = new ArrayList<LoadBalancerEndpoint>();
+                        JSONArray arr = json.getJSONArray("nodes");
+
+                        for( int i=0; i<arr.length(); i++ ) {
+                            LbEndpointState state = LbEndpointState.ACTIVE;
+                            JSONObject item = arr.getJSONObject(i);
+
+                            if( item.has("condition") && !item.getString("condition").equalsIgnoreCase("enabled") ) {
+                                state = LbEndpointState.INACTIVE;
+                            }
+                            if( item.has("address") && !item.isNull("address")) {
+                                String addr = item.getString("address");
+                                VirtualMachine node = null;
+
+                                for( VirtualMachine vm : getProvider().getComputeServices().getVirtualMachineSupport().listVirtualMachines() ) {
+                                    RawAddress[] addrs = vm.getPublicAddresses();
+
+                                    for( RawAddress a : addrs ){
+                                        if( addr.equals(a.getIpAddress()) ) {
+                                            node = vm;
+                                            break;
+                                        }
+                                    }
+                                    if( node == null ) {
+                                        addrs = vm.getPrivateAddresses();
+                                        for( RawAddress a : addrs ){
+                                            if( addr.equals(a.getIpAddress()) ) {
+                                                node = vm;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if( node != null && type.equals(LbEndpointType.VM) ) {
+                                    boolean included = true;
+
+                                    if( values.length > 0 ) {
+                                        included = false;
+                                        for( String value : values ) {
+                                            if( value.equals(node.getProviderVirtualMachineId()) ) {
+                                                included = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if( included ) {
+                                        endpoints.add(LoadBalancerEndpoint.getInstance(LbEndpointType.VM, node.getProviderVirtualMachineId(), state));
+                                    }
+                                }
+                                else if( node == null && type.equals(LbEndpointType.IP) ) {
+                                    boolean included = true;
+
+                                    if( values.length > 0 ) {
+                                        included = false;
+                                        for( String value : values ) {
+                                            if( value.equals(addr) ) {
+                                                included = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if( included ) {
+                                        endpoints.add(LoadBalancerEndpoint.getInstance(LbEndpointType.IP, addr, LbEndpointState.ACTIVE));
+                                    }
+                                }
+                            }
+                        }
+                        return endpoints;
+                    }
+                }
+                return Collections.emptyList();
+            }
+            catch( JSONException e ) {
+                logger.error("Unable to identify expected values in JSON: " + e.getMessage());
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for load balancers: " + e.getMessage());
+            }
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    @Override
+    public @Nonnull Iterable<ResourceStatus> listLoadBalancerStatus() throws CloudException, InternalException {
         APITrace.begin(provider, "LB.listLoadBalancerStatus");
         try {
             ProviderContext ctx = provider.getContext();
@@ -415,7 +748,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
     static private transient Collection<LbAlgorithm> supportedAlgorithms;
     
     @Override
-    public Iterable<LbAlgorithm> listSupportedAlgorithms() throws CloudException, InternalException {
+    public @Nonnull Iterable<LbAlgorithm> listSupportedAlgorithms() throws CloudException, InternalException {
         if( supportedAlgorithms == null ) {
             ArrayList<LbAlgorithm> algorithms = new ArrayList<LbAlgorithm>();
             
@@ -431,18 +764,55 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         return Collections.singletonList(IPVersion.IPV4);
     }
 
-    static private transient Collection<LbProtocol> supportedProtocols;
-    
     @Override
-    public Iterable<LbProtocol> listSupportedProtocols() throws CloudException, InternalException {
-        if( supportedProtocols == null ) {
-            ArrayList<LbProtocol> protocols = new ArrayList<LbProtocol>();
-            
-            protocols.add(LbProtocol.HTTP);
-            protocols.add(LbProtocol.HTTPS);
-            supportedProtocols = Collections.unmodifiableList(protocols);
+    public @Nonnull Iterable<LbProtocol> listSupportedProtocols() throws CloudException, InternalException {
+        Cache<LbProtocol> cache = Cache.getInstance(getProvider(), "lbProtocols", LbProtocol.class, CacheLevel.REGION_ACCOUNT);
+        Iterable<LbProtocol> protocols = cache.get(getContext());
+
+        if( protocols != null ) {
+            return protocols;
         }
-        return supportedProtocols;
+        NovaMethod method = new NovaMethod(provider);
+        JSONObject ob = method.getResource(SERVICE, RESOURCE, "protocols", false);
+
+        if( ob == null || !ob.has("protocols") || ob.isNull("protocols")) {
+            return Collections.singletonList(LbProtocol.RAW_TCP);
+        }
+        ArrayList<LbProtocol> list = new ArrayList<LbProtocol>();
+
+        list.add(LbProtocol.RAW_TCP);
+        try {
+            JSONArray matches = ob.getJSONArray("protocols");
+
+            for( int i=0; i<matches.length(); i++ ) {
+                JSONObject p = matches.getJSONObject(i);
+                String name = (p.has("name") && !p.isNull("name")) ? p.getString("name") : null;
+
+                if( name != null ) {
+                    if( name.equalsIgnoreCase("http") ) {
+                        list.add(LbProtocol.HTTP);
+                    }
+                    else if( name.equalsIgnoreCase("https") ) {
+                        list.add(LbProtocol.HTTPS);
+                    }
+                }
+            }
+        }
+        catch( JSONException e ) {
+            throw new CloudException("Unable to parse protocols from Rackspace: " + e.getMessage());
+        }
+        cache.put(getContext(), list);
+        return list;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyEndpointsOnCreateRequirement() throws CloudException, InternalException {
+        return Requirement.REQUIRED;
+    }
+
+    @Override
+    public @Nonnull Requirement identifyListenersOnCreateRequirement() throws CloudException, InternalException {
+        return Requirement.REQUIRED;
     }
 
     @Override
@@ -458,11 +828,6 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         return (provider.testContext() != null);
-    }
-
-    @Override
-    public boolean supportsMonitoring() throws CloudException, InternalException {
-        return false;
     }
 
     @Override
@@ -494,7 +859,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
                                 JSONObject actual = method.getResource(SERVICE, RESOURCE, tmp.getString("id"), false);
                                 
                                 if( actual != null && actual.has("loadBalancer") ) {
-                                    LoadBalancer lb = this.toLoadBalancer(ctx, actual.getJSONObject("loadBalancer"), vms);
+                                    LoadBalancer lb = this.toLoadBalancer(actual.getJSONObject("loadBalancer"), vms);
                                 
                                     if( lb != null ) {
                                         loadBalancers.add(lb);
@@ -516,12 +881,40 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Override
-    public void remove(String loadBalancerId) throws CloudException, InternalException {
-        APITrace.begin(provider, "LB.remove");
+    @Deprecated
+    public void remove(@Nonnull String loadBalancerId) throws CloudException, InternalException {
+        removeLoadBalancer(loadBalancerId);
+    }
+
+    @Override
+    public void removeLoadBalancer(@Nonnull String loadBalancerId) throws CloudException, InternalException {
+        APITrace.begin(provider, "LB.removeLoadBalancer");
         try {
+            long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 5L);
+            LoadBalancer lb;
+
+            while( timeout > System.currentTimeMillis() ) {
+                try {
+                    lb = getLoadBalancer(loadBalancerId);
+                    if( lb == null ) {
+                        return;
+                    }
+                    if( !LoadBalancerState.PENDING.equals(lb.getCurrentState()) ) {
+                        break;
+                    }
+                }
+                catch( Throwable ignore ) {
+                    // ignore
+                }
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+            }
+
             NovaMethod method = new NovaMethod(provider);
-            long timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
+
+            timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
 
             do {
                 try {
@@ -547,7 +940,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         public String address;
     }
     
-    public Collection<Node> getNodes(String loadBalancerId) throws CloudException, InternalException {
+    public @Nonnull Collection<Node> getNodes(@Nonnull String loadBalancerId) throws CloudException, InternalException {
         APITrace.begin(provider, "LB.getNodes");
         try {
             ArrayList<Node> nodes = new ArrayList<Node>();
@@ -577,7 +970,25 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
             APITrace.end();
         }
     }
-    
+
+    private @Nonnull Collection<String> mapIPs(@Nonnull String loadBalancerId, @Nullable String[] addresses) throws CloudException, InternalException {
+        TreeSet<String> nodeIds = new TreeSet<String>();
+
+        if( addresses != null && addresses.length > 0 ) {
+            Collection<Node> nodes = getNodes(loadBalancerId);
+
+            for( String address : addresses ) {
+                for( Node n : nodes ) {
+                    if( n.address.equals(address) ) {
+                        nodeIds.add(n.nodeId);
+                        break;
+                    }
+                }
+            }
+        }
+        return nodeIds;
+    }
+
     private @Nonnull Collection<String> mapNodes(@Nonnull ProviderContext ctx, @Nonnull String loadBalancerId, @Nullable String[] serverIds) throws CloudException, InternalException {
         TreeSet<String> nodeIds = new TreeSet<String>();
 
@@ -591,40 +1002,36 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
                     boolean there = false;
                     
                     if( vm.getProviderRegionId().equals(ctx.getRegionId()) ) {
-                        String[] addrs = vm.getPrivateIpAddresses();
+                        RawAddress[] addrs = vm.getPrivateAddresses();
                         
-                        if( addrs != null ) {
-                            for( String addr : addrs ) {
-                                for( Node n : nodes ) {
-                                    if( n.address.equals(addr) ) {
-                                        nodeIds.add(n.nodeId);
-                                        there = true;
-                                        break;
-                                    }
-                                }
-                                if( there ) {
+                        for( RawAddress addr : addrs ) {
+                            for( Node n : nodes ) {
+                                if( n.address.equals(addr.getIpAddress()) ) {
+                                    nodeIds.add(n.nodeId);
+                                    there = true;
                                     break;
                                 }
+                            }
+                            if( there ) {
+                                break;
                             }
                         }
                     }
                     if( !there ) {
-                        String[] addrs = vm.getPublicIpAddresses();
+                        RawAddress[] addrs = vm.getPublicAddresses();
                         
-                        if( addrs != null ) {
-                            for( String addr : addrs ) {
-                                for( Node n : nodes ) {
-                                    if( n.address.equals(addr) ) {
-                                        nodeIds.add(n.nodeId);
-                                        there = true;
-                                        break;
-                                    }
-                                }
-                                if( there ) {
+                        for( RawAddress addr : addrs ) {
+                            for( Node n : nodes ) {
+                                if( n.address.equals(addr.getIpAddress()) ) {
+                                    nodeIds.add(n.nodeId);
+                                    there = true;
                                     break;
                                 }
                             }
-                        }                        
+                            if( there ) {
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -633,12 +1040,59 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
     }
     
     @Override
-    public void removeDataCenters(String fromLoadBalancerId, String... dataCenterIdsToRemove) throws CloudException, InternalException {
+    public void removeDataCenters(@Nonnull String fromLoadBalancerId, @Nonnull String... dataCenterIdsToRemove) throws CloudException, InternalException {
         throw new OperationNotSupportedException("No data center constraints in Rackspace");
     }
 
     @Override
-    public void removeServers(String fromLoadBalancerId, String... serverIdsToRemove) throws CloudException, InternalException {
+    public void removeIPEndpoints(@Nonnull String fromLoadBalancerId, @Nonnull String ... addresses) throws CloudException, InternalException {
+        APITrace.begin(provider, "LB.removeIPEndpoints");
+        try {
+            LoadBalancer lb = getLoadBalancer(fromLoadBalancerId);
+
+            if( lb == null || LoadBalancerState.TERMINATED.equals(lb.getCurrentState()) ) {
+                throw new CloudException("No such load balancer: " + fromLoadBalancerId);
+            }
+            while( LoadBalancerState.PENDING.equals(lb.getCurrentState()) ) {
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+                lb = getLoadBalancer(fromLoadBalancerId);
+                if( lb == null || LoadBalancerState.TERMINATED.equals(lb.getCurrentState()) ) {
+                    throw new CloudException("No such load balancer: " + fromLoadBalancerId);
+                }
+            }
+
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                throw new InternalException("No context exists for this request");
+            }
+
+            Collection<String> nodeIds = mapIPs(fromLoadBalancerId, addresses);
+
+            if( nodeIds.size() < 1 ) {
+                return;
+            }
+            StringBuilder nodeString = new StringBuilder();
+
+            for( String id : nodeIds ) {
+                if( nodeString.length() > 0 ) {
+                    nodeString.append("&");
+                }
+                nodeString.append("id=");
+                nodeString.append(id);
+            }
+            NovaMethod method = new NovaMethod(provider);
+
+            method.deleteResource(SERVICE, RESOURCE, fromLoadBalancerId + "/nodes?" + nodeString.toString(), null);
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    @Override
+    public void removeServers(@Nonnull String fromLoadBalancerId, @Nonnull String... serverIdsToRemove) throws CloudException, InternalException {
         APITrace.begin(provider, "LB.removeServers");
         try {
             LoadBalancer lb = getLoadBalancer(fromLoadBalancerId);
@@ -672,7 +1126,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
                 if( nodeString.length() > 0 ) {
                     nodeString.append("&");
                 }
-                nodeString.append("nodeId=");
+                nodeString.append("id=");
                 nodeString.append(id);
             }
             NovaMethod method = new NovaMethod(provider);
@@ -683,41 +1137,67 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
             APITrace.end();
         }
     }
-    
-    private @Nullable LoadBalancer toLoadBalancer(@Nonnull ProviderContext ctx, @Nullable JSONObject json, @Nullable Iterable<VirtualMachine> possibleNodes) throws JSONException, CloudException {
+
+
+    @Override
+    public boolean supportsAddingEndpoints() throws CloudException, InternalException {
+        return true;
+    }
+
+    @Override
+    public boolean supportsMonitoring() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsMultipleTrafficTypes() throws CloudException, InternalException {
+        return false;
+    }
+
+    private @Nullable LoadBalancer toLoadBalancer(@Nullable JSONObject json, @Nullable Iterable<VirtualMachine> possibleNodes) throws JSONException, CloudException {
         if( json == null ) {
             return null;
         }
-        LoadBalancer loadBalancer = new LoadBalancer();
-        
-        loadBalancer.setProviderDataCenterIds(new String[] { ctx.getRegionId() + "-a" });
-        loadBalancer.setProviderOwnerId(ctx.getAccountNumber());
-        loadBalancer.setProviderRegionId(ctx.getRegionId());
-        loadBalancer.setAddressType(LoadBalancerAddressType.IP);
-        loadBalancer.setSupportedTraffic(new IPVersion[] { IPVersion.IPV4 });
-        if( json.has("id") ) {
-            loadBalancer.setProviderLoadBalancerId(json.getString("id"));
+        String[] dataCenterIds = new String[] { getContext().getRegionId() + "-a" };
+        String owner = getContext().getAccountNumber();
+        String regionId = getContext().getRegionId();
+        String id = (json.has("id") && !json.isNull("id")) ? json.getString("id") : null;
+        String name = (json.has("name") && !json.isNull("name")) ? json.getString("name") : null;
+        long created = 0L;
+
+        if( id == null ) {
+            return null;
         }
-        if( json.has("name") ) {
-            loadBalancer.setName(json.getString("name"));
+        if( regionId == null ) {
+            throw new CloudException("No region was set for this request");
         }
-        if( json.has("created") ) {
+        if( name == null ) {
+            name = id;
+        }
+        if( json.has("created") && !json.isNull("created") ) {
             JSONObject ob = json.getJSONObject("created");
             
-            if( ob.has("time") ) {
-                loadBalancer.setCreationTimestamp(provider.parseTimestamp(ob.getString("time")));
+            if( ob.has("time") && !ob.isNull("time") ) {
+                created = provider.parseTimestamp(ob.getString("time"));
             }
         }
-        if( json.has("status") ) {
+        LoadBalancerState state = LoadBalancerState.PENDING;
+
+        if( json.has("status") && !json.isNull("status")) {
             String s = json.getString("status").toLowerCase();
             
-            if( s.equals("active") ) {
-                loadBalancer.setCurrentState(LoadBalancerState.ACTIVE);                
+            if( s.equalsIgnoreCase("active") ) {
+                state = LoadBalancerState.ACTIVE;
+            }
+            else if( s.equalsIgnoreCase("pending_delete") || s.equalsIgnoreCase("deleted") ) {
+                state = LoadBalancerState.TERMINATED;
             }
             else {
-                loadBalancer.setCurrentState(LoadBalancerState.PENDING);
+                state = LoadBalancerState.PENDING;
             }
         }
+        String address = null;
+
         if( json.has("virtualIps") ) {
             JSONArray arr = json.getJSONArray("virtualIps");
             
@@ -726,46 +1206,44 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
                 
                 if( ob.has("ipVersion") && ob.getString("ipVersion").equalsIgnoreCase("ipv4") ) {
                     if( ob.has("address") ) {
-                        loadBalancer.setAddress(ob.getString("address"));
+                        address = ob.getString("address");
                         break;
                     }
                 }
             }
         }
+        if( address == null ) {
+            return null;
+        }
+        ArrayList<String> nodes = new ArrayList<String>();
         int privatePort = -1;
         
-        loadBalancer.setProviderServerIds(new String[0]);
         if( json.has("nodes") ) {
-            ArrayList<String> nodes = new ArrayList<String>();
             JSONArray arr = json.getJSONArray("nodes");
             
             for( int i=0; i<arr.length(); i++ ) {
                 JSONObject ob = arr.getJSONObject(i);
                 
                 if( ob.has("address") ) {
-                    String address = ob.getString("address");
+                    String addr = ob.getString("address");
                     VirtualMachine node = null;
 
                     if( possibleNodes != null ) {
                         for( VirtualMachine vm : possibleNodes ) {
-                            String[] addrs = vm.getPublicIpAddresses();
+                            RawAddress[] addrs = vm.getPublicAddresses();
 
-                            if( addrs != null ) {
-                                for( String addr : addrs ){
-                                    if( address.equals(addr) ) {
-                                        node = vm;
-                                        break;
-                                    }
+                            for( RawAddress a : addrs ){
+                                if( addr.equals(a.getIpAddress()) ) {
+                                    node = vm;
+                                    break;
                                 }
                             }
                             if( node == null ) {
-                                addrs = vm.getPrivateIpAddresses();
-                                if( addrs != null ) {
-                                    for( String addr : addrs ){
-                                        if( address.equals(addr) ) {
-                                            node = vm;
-                                            break;
-                                        }
+                                addrs = vm.getPrivateAddresses();
+                                for( RawAddress a : addrs ){
+                                    if( addr.equals(a.getIpAddress()) ) {
+                                        node = vm;
+                                        break;
                                     }
                                 }
                             }
@@ -779,10 +1257,6 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
                     privatePort = ob.getInt("port");
                 }
             }
-            loadBalancer.setProviderServerIds(nodes.toArray(new String[nodes.size()]));
-        }
-        if( loadBalancer.getProviderLoadBalancerId() == null ) {
-            return null;
         }
         int port = -1;
         
@@ -792,7 +1266,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
                 privatePort = port;
             }
         }
-        loadBalancer.setPublicPorts(new int[] { port });
+        int[] ports = new int[] { port };
 
         LbProtocol protocol = LbProtocol.RAW_TCP;
         
@@ -822,20 +1296,16 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
                 algorithm = LbAlgorithm.LEAST_CONN;
             }
         }
-        LbListener l = new LbListener();
-        
-        l.setAlgorithm(algorithm);
-        l.setNetworkProtocol(protocol);
-        l.setPublicPort(port);
-        l.setPrivatePort(privatePort);
-        loadBalancer.setListeners(new LbListener[] { l });
-        if( loadBalancer.getName() == null ) {
-            loadBalancer.setName(loadBalancer.getProviderLoadBalancerId());
+        LoadBalancer lb = LoadBalancer.getInstance(owner, regionId, id, state, name, name + " [" + address + "]", LoadBalancerAddressType.IP, address,  ports).createdAt(created);
+
+        lb.operatingIn(dataCenterIds);
+        lb.supportingTraffic(IPVersion.IPV4);
+        lb.withListeners(LbListener.getInstance(algorithm, LbPersistence.NONE, protocol, port, privatePort));
+        if( !nodes.isEmpty() ) {
+            //noinspection deprecation
+            lb.setProviderServerIds(nodes.toArray(new String[nodes.size()]));
         }
-        if( loadBalancer.getDescription() == null ) {
-            loadBalancer.setDescription(loadBalancer.getName());
-        }
-        return loadBalancer;
+        return lb;
     }
 
     private @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws JSONException, CloudException {
@@ -854,6 +1324,9 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
 
             if( s.equals("active") ) {
                 state = LoadBalancerState.ACTIVE;
+            }
+            else if( s.equalsIgnoreCase("pending_delete") || s.equalsIgnoreCase("deleted") ) {
+                state = LoadBalancerState.TERMINATED;
             }
             else {
                 state = LoadBalancerState.PENDING;

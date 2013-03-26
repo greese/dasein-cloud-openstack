@@ -233,16 +233,39 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
     public void remove(@Nonnull String snapshotId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "Snapshot.remove");
         try {
+            long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 15L);
+
+            while( System.currentTimeMillis() < timeout ) {
+                try {
+                    Snapshot s = getSnapshot(snapshotId);
+
+                    if( s == null || s.getCurrentState().equals(SnapshotState.DELETED) ) {
+                        return;
+                    }
+                    if( s.getCurrentState().equals(SnapshotState.AVAILABLE) ) {
+                        break;
+                    }
+                }
+                catch( Throwable ignore ) {
+                    // ignore
+                }
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+            }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             method.deleteResource(SERVICE, getResource(), snapshotId, null);
-            long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 5L);
-
+            timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 5L);
             while( System.currentTimeMillis() < timeout ) {
-                Snapshot s = getSnapshot(snapshotId);
+                try {
+                    Snapshot s = getSnapshot(snapshotId);
 
-                if( s == null || s.getCurrentState().equals(SnapshotState.DELETED) ) {
-                    return;
+                    if( s == null || s.getCurrentState().equals(SnapshotState.DELETED) ) {
+                        return;
+                    }
+                }
+                catch( Throwable ignore ) {
+                    // ignore
                 }
                 try { Thread.sleep(15000L); }
                 catch( InterruptedException ignore ) { }

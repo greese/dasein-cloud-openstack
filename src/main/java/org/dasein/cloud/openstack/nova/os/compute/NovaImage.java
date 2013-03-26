@@ -136,7 +136,11 @@ public class NovaImage extends AbstractImageSupport {
                         }
                         platform = vm.getPlatform();
                         if( !VmState.PENDING.equals(vm.getCurrentState()) ) {
-                            break;
+                            String tag = (String)vm.getTag("OS-EXT-STS:task_state");
+
+                            if( tag == null || !tag.equalsIgnoreCase("image_snapshot") ) {
+                                break;
+                            }
                         }
                     }
                     catch( Throwable ignore ) {
@@ -628,8 +632,11 @@ public class NovaImage extends AbstractImageSupport {
             }
             JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
 
-            if( md != null && md.has("owner") ) {
+            if( md != null && md.has("owner") && !md.isNull("owner")) {
                 owner = md.getString("owner");
+            }
+            else if( md != null && md.has("image_type") && !md.isNull("image_type") && md.getString("image_type").equals("base") ) {
+                owner = "--public--";
             }
             if( json.has("status") ) {
                 String s = json.getString("status").toLowerCase();
