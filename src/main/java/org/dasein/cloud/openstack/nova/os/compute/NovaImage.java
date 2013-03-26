@@ -134,6 +134,11 @@ public class NovaImage implements MachineImageSupport {
     }
 
     private MachineImage captureImage(@Nonnull ImageCreateOptions options, @Nullable AsynchronousTask<MachineImage> task) throws CloudException, InternalException {
+        ProviderContext ctx = provider.getContext();
+
+        if( ctx == null ) {
+            throw new CloudException("No context was set for this request");
+        }
         NovaMethod method = new NovaMethod(provider);
         HashMap<String,Object> action = new HashMap<String,Object>();
 
@@ -186,7 +191,7 @@ public class NovaImage implements MachineImageSupport {
         if( result != null && result.has("image") ) {
             try {
                 JSONObject img = result.getJSONObject("image");
-                MachineImage image = toImage(img);
+                MachineImage image = toImage(ctx, img);
 
                 if( image != null ) {
                     if( task != null ) {
@@ -293,10 +298,15 @@ public class NovaImage implements MachineImageSupport {
             if( ob == null ) {
                 return null;
             }
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                throw new CloudException("No context was set for this request");
+            }
             try {
                 if( ob.has("image") ) {
                     JSONObject server = ob.getJSONObject("image");
-                    MachineImage img = toImage(server);
+                    MachineImage img = toImage(ctx, server);
 
                     if( img != null ) {
                         return img;
@@ -468,6 +478,11 @@ public class NovaImage implements MachineImageSupport {
             logger.trace("enter - " + NovaImage.class.getName() + ".listImages(" + cls + ")");
         }
         try {
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                throw new CloudException("No context was set for this request");
+            }
             NovaMethod method = new NovaMethod(provider);
             JSONObject ob = method.getServers("/images", null, true);
             ArrayList<MachineImage> images = new ArrayList<MachineImage>();
@@ -478,7 +493,7 @@ public class NovaImage implements MachineImageSupport {
 
                     for( int i=0; i<list.length(); i++ ) {
                         JSONObject image = list.getJSONObject(i);
-                        MachineImage img = toImage(image);
+                        MachineImage img = toImage(ctx, image);
 
                         if( img != null ) {
                             images.add(img);
@@ -644,7 +659,7 @@ public class NovaImage implements MachineImageSupport {
 
                 for( int i=0; i<list.length(); i++ ) {
                     JSONObject image = list.getJSONObject(i);
-                    MachineImage img = toImage(image);
+                    MachineImage img = toImage(ctx, image);
 
                     if( img != null ) {
                         if( architecture != null ) {
@@ -738,7 +753,7 @@ public class NovaImage implements MachineImageSupport {
         // NO-OP
     }
 
-    public @Nullable MachineImage toImage(@Nullable JSONObject json) throws JSONException {
+    public @Nullable MachineImage toImage(@Nonnull ProviderContext ctx, @Nullable JSONObject json) throws JSONException {
         Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
         
         if( logger.isTraceEnabled() ) {
@@ -765,7 +780,7 @@ public class NovaImage implements MachineImageSupport {
             JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
             Architecture architecture = Architecture.I64;
             Platform platform = Platform.UNKNOWN;
-            String owner = "--public--";
+            String owner = (provider.getProviderName().equals("Rackspace") ? ctx.getAccountNumber() : "--public--");
 
             if( md != null ) {
                 if( description == null && md.has("org.dasein.description") ) {
@@ -816,6 +831,9 @@ public class NovaImage implements MachineImageSupport {
                 }
                 if( md.has("owner") && !md.isNull("owner")) {
                     owner = md.getString("owner");
+                }
+                else if( md.has("image_type") && !md.isNull("image_type") && md.getString("image_type").equals("base") ) {
+                    owner = "--public--";
                 }
             }
             image.setProviderOwnerId(owner);
