@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * Copyright (C) 2009-2012 Enstratius, Inc.
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,6 +38,7 @@ import org.dasein.cloud.platform.DatabaseSnapshot;
 import org.dasein.cloud.platform.DatabaseSnapshotState;
 import org.dasein.cloud.platform.DatabaseState;
 import org.dasein.cloud.platform.RelationalDatabaseSupport;
+import org.dasein.cloud.util.APITrace;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -59,6 +60,8 @@ import java.util.Locale;
  * @version updated for 2013.02 model
  */
 public class HPRDBMS implements RelationalDatabaseSupport {
+    static private final Logger logger = NovaOpenStack.getLogger(HPRDBMS.class, "std");
+
     static public final String RESOURCE  = "/instances";
     static public final String SNAPSHOTS = "/snapshots";
     
@@ -80,11 +83,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public @Nonnull String createFromScratch(@Nonnull String dataSourceName, @Nonnull DatabaseProduct product, @Nonnull String databaseVersion, @Nonnull String withAdminUser, @Nonnull String withAdminPassword, int hostPort) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPRDBMS.class.getName() + ".createFromScratch(" + dataSourceName + "," + product + "," + databaseVersion + "," + withAdminUser + ",XXX," + hostPort + ")");
-        }
+        APITrace.begin(provider, "RDBMS.createFromScratch");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -144,19 +143,13 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPRDBMS.class.getName() + ".createFromScratch()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public String createFromLatest(String dataSourceName, String providerDatabaseId, String productSize, String providerDataCenterId, int hostPort) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + HPRDBMS.class.getName() + ".createFromLatest(" + dataSourceName + "," + providerDatabaseId + "," + productSize + "," + providerDataCenterId + "," + hostPort + ")");
-        }
+        APITrace.begin(provider, "RDBMS.createFromLatest");
         try {
             DatabaseSnapshot snapshot = null;
             
@@ -171,19 +164,13 @@ public class HPRDBMS implements RelationalDatabaseSupport {
             return createFromSnapshot(dataSourceName, providerDatabaseId, snapshot.getProviderSnapshotId(), productSize, providerDataCenterId, hostPort);
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPRDBMS.class.getName() + ".createFromLatest()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public String createFromSnapshot(String dataSourceName, String providerDatabaseId, String providerDbSnapshotId, String productSize, String providerDataCenterId, int hostPort) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPRDBMS.class.getName() + ".createFromSnapshot(" + dataSourceName + "," + providerDatabaseId + "," + providerDbSnapshotId + "," + productSize + "," + providerDataCenterId + "," + hostPort + ")");
-        }
+        APITrace.begin(provider, "RDBMS.createFromSnapshot");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -224,19 +211,13 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPRDBMS.class.getName() + ".createFromSnapshot()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public String createFromTimestamp(String dataSourceName, String providerDatabaseId, long beforeTimestamp, String productSize, String providerDataCenterId, int hostPort) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + HPRDBMS.class.getName() + ".createFromTimestamp(" + dataSourceName + "," + providerDatabaseId + "," + beforeTimestamp + "," + productSize + "," + providerDataCenterId + "," + hostPort + ")");
-        }
+        APITrace.begin(provider, "RDBMS.createFromTimestamp");
         try {
             DatabaseSnapshot snapshot = null;
 
@@ -251,9 +232,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
             return createFromSnapshot(dataSourceName, providerDatabaseId, snapshot.getProviderSnapshotId(), productSize, providerDataCenterId, hostPort);
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPRDBMS.class.getName() + ".createFromTimestamp()");
-            }
+            APITrace.end();
         }
     }
 
@@ -264,16 +243,12 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public @Nullable Database getDatabase(@Nonnull String providerDatabaseId) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + HPRDBMS.class.getName() + ".getDatabase(" + providerDatabaseId + ")");
-        }
+        APITrace.begin(provider, "RDBMS.getDatabase");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -288,15 +263,13 @@ public class HPRDBMS implements RelationalDatabaseSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("getDatabase(): Unable to identify expected values in JSON: " + e.getMessage());
+                logger.error("getDatabase(): Unable to identify expected values in JSON: " + e.getMessage());
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for instance");
             }
             return null;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPRDBMS.class.getName() + ".getDatabase()");
-            }
+            APITrace.end();
         }
     }
 
@@ -466,16 +439,12 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public DatabaseSnapshot getSnapshot(String providerDbSnapshotId) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("enter - " + HPRDBMS.class.getName() + ".getSnapshot(" + providerDbSnapshotId + ")");
-        }
+        APITrace.begin(provider, "RDBMS.getSnapshot");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -490,21 +459,25 @@ public class HPRDBMS implements RelationalDatabaseSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("getSnapshot(): Unable to identify expected values in JSON: " + e.getMessage());
+                logger.error("getSnapshot(): Unable to identify expected values in JSON: " + e.getMessage());
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for snapshots");
             }
             return null;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPRDBMS.class.getName() + ".getSnapshots()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        return (provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        APITrace.begin(provider, "RDBMS.isSubscribed");
+        try {
+            return (provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -513,12 +486,12 @@ public class HPRDBMS implements RelationalDatabaseSupport {
     }
 
     @Override
-    public boolean isSupportsHighAvailability() throws CloudException, InterruptedException {
+    public boolean isSupportsHighAvailability() throws CloudException, InternalException {
         return false;
     }
 
     @Override
-    public boolean isSupportsLowAvailability() throws CloudException, InterruptedException {
+    public boolean isSupportsLowAvailability() throws CloudException, InternalException {
         return true;
     }
 
@@ -544,48 +517,45 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listDatabaseStatus() throws CloudException, InternalException {
-        ProviderContext ctx = provider.getContext();
+        APITrace.begin(provider, "RDBMS.listDatabaseStatus");
+        try {
+            NovaMethod method = new NovaMethod(provider);
+            ArrayList<ResourceStatus> databases = new ArrayList<ResourceStatus>();
 
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        NovaMethod method = new NovaMethod(provider);
-        ArrayList<ResourceStatus> databases = new ArrayList<ResourceStatus>();
+            JSONObject json = method.getResource(SERVICE, RESOURCE, null, false);
 
-        JSONObject json = method.getResource(SERVICE, RESOURCE, null, false);
+            if( json != null && json.has("instances") ) {
+                try {
+                    JSONArray list = json.getJSONArray("instances");
 
-        if( json != null && json.has("instances") ) {
-            try {
-                JSONArray list = json.getJSONArray("instances");
+                    for( int i=0; i<list.length(); i++ ) {
+                        ResourceStatus db = toStatus(list.getJSONObject(i));
 
-                for( int i=0; i<list.length(); i++ ) {
-                    ResourceStatus db = toStatus(list.getJSONObject(i));
-
-                    if( db != null ) {
-                        databases.add(db);
+                        if( db != null ) {
+                            databases.add(db);
+                        }
                     }
                 }
+                catch( JSONException e ) {
+                    e.printStackTrace();
+                    throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for instances in " + json.toString());
+                }
             }
-            catch( JSONException e ) {
-                e.printStackTrace();
-                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for instances in " + json.toString());
-            }
+            return databases;
         }
-        return databases;
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public Iterable<Database> listDatabases() throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + HPRDBMS.class.getName() + ".listDatabases()");
-        }
+        APITrace.begin(provider, "RDBMS.listDatabases");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -606,7 +576,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
                     }
                 }
                 catch( JSONException e ) {
-                    std.error("listDatabases(): Unable to identify expected values in JSON: " + e.getMessage());
+                    logger.error("listDatabases(): Unable to identify expected values in JSON: " + e.getMessage());
                     e.printStackTrace();
                     throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for instances in " + json.toString());
                 }
@@ -614,11 +584,8 @@ public class HPRDBMS implements RelationalDatabaseSupport {
             return databases;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPRDBMS.class.getName() + ".listDatabases()");
-            }
+            APITrace.end();
         }
-
     }
 
     @Override
@@ -628,16 +595,12 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public Iterable<DatabaseSnapshot> listSnapshots(String forOptionalProviderDatabaseId) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + HPRDBMS.class.getName() + ".listSnapshots()");
-        }
+        APITrace.begin(provider, "RDBMS.listSnapshots");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -658,7 +621,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
                     }
                 }
                 catch( JSONException e ) {
-                    std.error("listSnapshots(): Unable to identify expected values in JSON: " + e.getMessage());
+                    logger.error("listSnapshots(): Unable to identify expected values in JSON: " + e.getMessage());
                     e.printStackTrace();
                     throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for snapshots in " + json.toString());
                 }
@@ -666,9 +629,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
             return snapshots;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPRDBMS.class.getName() + ".listSnapshots()");
-            }
+            APITrace.end();
         }
     }
 
@@ -679,11 +640,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public void removeDatabase(String providerDatabaseId) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPRDBMS.class.getName() + ".removeDatabase("+ providerDatabaseId + ")");
-        }
+        APITrace.begin(provider, "RDBMS.removeDatabase");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -696,19 +653,13 @@ public class HPRDBMS implements RelationalDatabaseSupport {
             method.deleteResource(SERVICE, RESOURCE, providerDatabaseId, null);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPRDBMS.class.getName() + ".removeDatabase()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void removeSnapshot(String providerSnapshotId) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPRDBMS.class.getName() + ".removeSnapshot("+ providerSnapshotId + ")");
-        }
+        APITrace.begin(provider, "RDBMS.removeSnapshot");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -721,9 +672,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
             method.deleteResource(SERVICE, SNAPSHOTS, providerSnapshotId, null);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPRDBMS.class.getName() + ".removeSnapshot()");
-            }
+            APITrace.end();
         }
     }
 
@@ -734,11 +683,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public void restart(String providerDatabaseId, boolean blockUntilDone) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPRDBMS.class.getName() + ".restart(" + providerDatabaseId + "," + blockUntilDone + ")");
-        }
+        APITrace.begin(provider, "RDBMS.restart");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -753,9 +698,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPRDBMS.class.getName() + ".restart()");
-            }
+            APITrace.end();
         }
     }
 
@@ -771,11 +714,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public DatabaseSnapshot snapshot(String providerDatabaseId, String name) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(HPRDBMS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + HPRDBMS.class.getName() + ".snapshot(" + providerDatabaseId + "," + name + ")");
-        }
+        APITrace.begin(provider, "RDBMS.snapshot");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -813,9 +752,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + HPRDBMS.class.getName() + ".snapshot()");
-            }
+            APITrace.end();
         }
     }
 

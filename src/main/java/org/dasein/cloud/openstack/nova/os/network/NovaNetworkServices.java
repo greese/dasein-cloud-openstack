@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * Copyright (C) 2009-2012 Enstratius, Inc.
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -72,5 +72,10 @@ public class NovaNetworkServices extends AbstractNetworkServices {
             return new RackspaceLoadBalancers(provider);
         }
         return null;
+    }
+
+    @Override
+    public @Nullable Quantum getVlanSupport() {
+        return new Quantum(provider);
     }
 }

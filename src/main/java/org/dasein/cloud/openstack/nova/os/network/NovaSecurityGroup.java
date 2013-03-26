@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * Copyright (C) 2009-2012 Enstratius, Inc.
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,14 +23,13 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
-import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
-import org.dasein.cloud.identity.ServiceAction;
+import org.dasein.cloud.network.AbstractFirewallSupport;
 import org.dasein.cloud.network.Direction;
 import org.dasein.cloud.network.Firewall;
+import org.dasein.cloud.network.FirewallCreateOptions;
 import org.dasein.cloud.network.FirewallRule;
-import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.Permission;
 import org.dasein.cloud.network.Protocol;
 import org.dasein.cloud.network.RuleTarget;
@@ -38,6 +37,7 @@ import org.dasein.cloud.network.RuleTargetType;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.APITrace;
 import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -59,118 +59,26 @@ import java.util.Locale;
  * @since 2011.10
  * @version 2011.10
  * @version 2012.04.1 Added some intelligence around features Rackspace does not support
+ * @version 2013.04 Added API tracing
  */
-public class NovaSecurityGroup implements FirewallSupport {
-    private NovaOpenStack provider;
+public class NovaSecurityGroup extends AbstractFirewallSupport {
+    static private final Logger logger = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
 
     NovaSecurityGroup(NovaOpenStack cloud) {
-        provider = cloud;
-    }
-
-    @Override
-    public @Nonnull String authorize(@Nonnull String firewallId, @Nullable String cidr, @Nonnull Protocol protocol, int beginPort, int endPort) throws CloudException, InternalException {
-        if( cidr == null ) {
-            cidr = "0.0.0.0/0";
-        }
-        return authorize(firewallId, Direction.INGRESS, cidr, protocol, beginPort, endPort);
-    }
-
-    @Override
-    public @Nonnull String authorize(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull String cidr, @Nonnull Protocol protocol, int beginPort, int endPort) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".authorize(" + firewallId + "," + direction + "," + cidr + "," + protocol + "," + beginPort + "," + endPort + ")");
-        }
-        try {
-            if( direction.equals(Direction.EGRESS) ) {
-                throw new OperationNotSupportedException(provider.getCloudName() + " does not support egress rules.");
-            }
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                logger.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-            HashMap<String,Object> wrapper = new HashMap<String,Object>();
-            HashMap<String,Object> json = new HashMap<String,Object>();
-            NovaMethod method = new NovaMethod(provider);
-
-            json.put("ip_protocol", protocol.name().toLowerCase());
-            json.put("from_port", beginPort);
-            json.put("to_port", endPort);
-            json.put("parent_group_id", firewallId);
-            json.put("cidr", cidr);
-            wrapper.put("security_group_rule", json);
-            JSONObject result = method.postServers("/os-security-group-rules", null, new JSONObject(wrapper), false);
-
-            if( result != null && result.has("security_group_rule") ) {
-                try {
-                    JSONObject rule = result.getJSONObject("security_group_rule");
-
-                    return rule.getString("id");
-                }
-                catch( JSONException e ) {
-                    logger.error("Invalid JSON returned from rule creation: " + e.getMessage());
-                    throw new CloudException(e);
-                }
-            }
-            logger.error("authorize(): No firewall rule was created by the create attempt, and no error was returned");
-            throw new CloudException("No firewall rule was created");
-        }
-        finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("EXIT: " + NovaSecurityGroup.class.getName() + ".authorize()");
-            }
-        }
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull String authorize(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull Permission permission, @Nonnull String source, @Nonnull Protocol protocol, int beginPort, int endPort) throws CloudException, InternalException {
-        RuleTarget sourceTarget = RuleTarget.getCIDR(source);
-
-        if( direction.equals(Direction.INGRESS) ) {
-            return authorize(firewallId, direction, permission, sourceTarget, protocol, RuleTarget.getGlobal(firewallId), beginPort, endPort, 0);
-        }
-        else {
-            return authorize(firewallId, direction, permission, RuleTarget.getGlobal(firewallId), protocol, sourceTarget, beginPort, endPort, 0);
-        }
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull String authorize(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull Permission permission, @Nonnull String source, @Nonnull Protocol protocol, @Nonnull RuleTarget target, int beginPort, int endPort) throws CloudException, InternalException {
-        RuleTarget sourceTarget = RuleTarget.getCIDR(source);
-
-        if( direction.equals(Direction.INGRESS) ) {
-            return authorize(firewallId, direction, permission, sourceTarget, protocol, target, beginPort, endPort, 0);
-        }
-        else {
-            return authorize(firewallId, direction, permission, target, protocol, sourceTarget, beginPort, endPort, 0);
-        }
+        super(cloud);
     }
 
     @Override
     public @Nonnull String authorize(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull Permission permission, @Nonnull RuleTarget sourceEndpoint, @Nonnull Protocol protocol, @Nonnull RuleTarget destinationEndpoint, int beginPort, int endPort, @Nonnegative int precedence) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".authorize(" + firewallId + "," + direction + "," + permission + "," + sourceEndpoint + "," + protocol + "," + destinationEndpoint + "," + beginPort + "," + endPort + "," + precedence + ")");
-        }
+        APITrace.begin(getProvider(), "Firewall.authorize");
         try {
             if( direction.equals(Direction.EGRESS) ) {
-                throw new OperationNotSupportedException(provider.getCloudName() + " does not support egress rules.");
+                throw new OperationNotSupportedException(getProvider().getCloudName() + " does not support egress rules.");
             }
-            ProviderContext ctx = provider.getContext();
 
-            if( ctx == null ) {
-                logger.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
             HashMap<String,Object> json = new HashMap<String,Object>();
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             json.put("ip_protocol", protocol.name().toLowerCase());
             json.put("from_port", beginPort);
@@ -187,7 +95,7 @@ public class NovaSecurityGroup implements FirewallSupport {
                     if( targetGroup == null ) {
                         throw new CloudException("No such source endpoint firewall: " + sourceEndpoint.getProviderFirewallId());
                     }
-                    g.put("tenant_id", ctx.getAccountNumber());
+                    g.put("tenant_id", getContext().getAccountNumber());
                     g.put("name", targetGroup.getName());
                     json.put("group", g);
                     break;
@@ -211,39 +119,30 @@ public class NovaSecurityGroup implements FirewallSupport {
             throw new CloudException("No firewall rule was created");
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("EXIT: " + NovaSecurityGroup.class.getName() + ".authorize()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
-    public @Nonnull String create(@Nonnull String name, @Nonnull String description) throws InternalException, CloudException {
-        Logger logger = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".create(" + name + "," + description + ")");
-        }
+    public @Nonnull String create(@Nonnull FirewallCreateOptions options) throws InternalException, CloudException {
+        APITrace.begin(getProvider(), "Firewall.create");
         try {
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                logger.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
+            if( options.getProviderVlanId() != null ) {
+                throw new OperationNotSupportedException("Creating IP addresses in VLANs is not supported");
             }
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
             HashMap<String,Object> json = new HashMap<String,Object>();
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
-            json.put("name", name);
-            json.put("description", description);
+            json.put("name", options.getName());
+            json.put("description", options.getDescription());
             wrapper.put("security_group", json);
             JSONObject result = method.postServers("/os-security-groups", null, new JSONObject(wrapper), false);
 
             if( result != null && result.has("security_group") ) {
                 try {
                     JSONObject ob = result.getJSONObject("security_group");
-                    Firewall fw = toFirewall(ctx, ob);
+                    Firewall fw = toFirewall(ob);
 
                     if( fw != null ) {
                         String id = fw.getProviderFirewallId();
@@ -255,9 +154,7 @@ public class NovaSecurityGroup implements FirewallSupport {
                 }
                 catch( JSONException e ) {
                     logger.error("create(): Unable to understand create response: " + e.getMessage());
-                    if( logger.isTraceEnabled() ) {
-                        e.printStackTrace();
-                    }
+                    e.printStackTrace();
                     throw new CloudException(e);
                 }
             }
@@ -266,32 +163,15 @@ public class NovaSecurityGroup implements FirewallSupport {
 
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("EXIT: " + NovaSecurityGroup.class.getName() + ".create()");
-            }
+            APITrace.end();
         }
-    }
-
-    @Override
-    public @Nonnull String createInVLAN(@Nonnull String name, @Nonnull String description, @Nonnull String providerVlanId) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("VLAN security groups are not currently supported");
     }
 
     @Override
     public void delete(@Nonnull String firewallId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".delete(" + firewallId + ")");
-        }
+        APITrace.begin(getProvider(), "Firewall.delete");
         try {
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                std.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             long timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
 
             do {
@@ -309,27 +189,15 @@ public class NovaSecurityGroup implements FirewallSupport {
             } while( System.currentTimeMillis() < timeout );
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("EXIT: " + NovaSecurityGroup.class.getName() + ".delete()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public @Nullable Firewall getFirewall(@Nonnull String firewallId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".getFirewall(" + firewallId + ")");
-        }
+        APITrace.begin(getProvider(), "Firewall.getFirewall");
         try {
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                std.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/os-security-groups", firewallId, false);
 
             if( ob == null ) {
@@ -338,7 +206,7 @@ public class NovaSecurityGroup implements FirewallSupport {
             try {
                 if( ob.has("security_group") ) {
                     JSONObject json = ob.getJSONObject("security_group");
-                    Firewall fw = toFirewall(ctx, json);
+                    Firewall fw = toFirewall(json);
 
                     if( fw != null ) {
                         return fw;
@@ -346,15 +214,13 @@ public class NovaSecurityGroup implements FirewallSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("getRule(): Unable to identify expected values in JSON: " + e.getMessage());
+                logger.error("getRule(): Unable to identify expected values in JSON: " + e.getMessage());
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for security group");
             }
             return null;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("EXIT: " + NovaSecurityGroup.class.getName() + ".getFirewall()");
-            }
+            APITrace.end();
         }
     }
 
@@ -365,19 +231,10 @@ public class NovaSecurityGroup implements FirewallSupport {
 
     @Override
     public @Nonnull Collection<FirewallRule> getRules(@Nonnull String firewallId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".getFirewall(" + firewallId + ")");
-        }
+        APITrace.begin(getProvider(), "Firewall.getRules");
         try {
-            ProviderContext ctx = provider.getContext();
 
-            if( ctx == null ) {
-                std.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/os-security-groups", firewallId, false);
 
             if( ob == null ) {
@@ -425,7 +282,7 @@ public class NovaSecurityGroup implements FirewallSupport {
                             else {
                                 String o = (g.has("tenant_id") ? g.getString("tenant_id") : null);
 
-                                if( ctx.getAccountNumber().equals(o) ) {
+                                if( getContext().getAccountNumber().equals(o) ) {
                                     String n = (g.has("name") ? g.getString("name") : null);
 
                                     if( n != null ) {
@@ -478,15 +335,13 @@ public class NovaSecurityGroup implements FirewallSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("getRules(): Unable to identify expected values in JSON: " + e.getMessage());
+                logger.error("getRules(): Unable to identify expected values in JSON: " + e.getMessage());
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for security groups");
             }
             return null;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("EXIT: " + NovaSecurityGroup.class.getName() + ".getFirewall()");
-            }
+            APITrace.end();
         }
     }
 
@@ -496,30 +351,42 @@ public class NovaSecurityGroup implements FirewallSupport {
     }
 
     private boolean verifySupport() throws InternalException, CloudException {
-        NovaMethod method = new NovaMethod(provider);
-
+        APITrace.begin(getProvider(), "Firewall.verifySupport");
         try {
-            method.getServers("/os-security-groups", null, false);
-            return true;
-        }
-        catch( CloudException e ) {
-            if( e.getHttpCode() == 404 ) {
-                return false;
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+
+            try {
+                method.getServers("/os-security-groups", null, false);
+                return true;
             }
-            throw e;
+            catch( CloudException e ) {
+                if( e.getHttpCode() == 404 ) {
+                    return false;
+                }
+                throw e;
+            }
+        }
+        finally {
+            APITrace.end();
         }
     }
     
     @SuppressWarnings("SimplifiableIfStatement")
     @Override
     public boolean isSubscribed() throws InternalException, CloudException {
-        if( provider.getMajorVersion() > 1 && provider.getComputeServices().getVirtualMachineSupport().isSubscribed() ) {
-            return verifySupport();
+        APITrace.begin(getProvider(), "Firewall.isSubscribed");
+        try {
+            if( ((NovaOpenStack)getProvider()).getMajorVersion() > 1 && ((NovaOpenStack)getProvider()).getComputeServices().getVirtualMachineSupport().isSubscribed() ) {
+                return verifySupport();
+            }
+            if( ((NovaOpenStack)getProvider()).getMajorVersion() == 1 && ((NovaOpenStack)getProvider()).getMinorVersion() >= 1  &&  ((NovaOpenStack)getProvider()).getComputeServices().getVirtualMachineSupport().isSubscribed() ) {
+                return verifySupport();
+            }
+            return false;
         }
-        if( provider.getMajorVersion() == 1 && provider.getMinorVersion() >= 1  &&  provider.getComputeServices().getVirtualMachineSupport().isSubscribed() ) {
-            return verifySupport();
+        finally {
+            APITrace.end();
         }
-        return false;
     }
 
     @Override
@@ -529,19 +396,9 @@ public class NovaSecurityGroup implements FirewallSupport {
 
     @Override
     public @Nonnull Collection<Firewall> list() throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(NovaSecurityGroup.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + NovaSecurityGroup.class.getName() + ".list()");
-        }
+        APITrace.begin(getProvider(), "Firewall.list");
         try {
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                std.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/os-security-groups", null, false);
             ArrayList<Firewall> firewalls = new ArrayList<Firewall>();
 
@@ -551,71 +408,61 @@ public class NovaSecurityGroup implements FirewallSupport {
 
                     for( int i=0; i<list.length(); i++ ) {
                         JSONObject json = list.getJSONObject(i);
+                        Firewall fw = toFirewall(json);
+    
+                        if( fw != null ) {
+                            firewalls.add(fw);
+                        }
+                    }
+                }
+            }
+            catch( JSONException e ) {
+                logger.error("list(): Unable to identify expected values in JSON: " + e.getMessage());                e.printStackTrace();
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for security groups in " + ob.toString());
+            }
+            return firewalls;
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    @Override
+    public @Nonnull Iterable<ResourceStatus> listFirewallStatus() throws InternalException, CloudException {
+        APITrace.begin(getProvider(), "Firewall.listFirewallStatus");
+        try {
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            JSONObject ob = method.getServers("/os-security-groups", null, false);
+            ArrayList<ResourceStatus> firewalls = new ArrayList<ResourceStatus>();
+
+            try {
+                if( ob != null && ob.has("security_groups") ) {
+                    JSONArray list = ob.getJSONArray("security_groups");
+
+                    for( int i=0; i<list.length(); i++ ) {
+                        JSONObject json = list.getJSONObject(i);
 
                         try {
-                            Firewall fw = toFirewall(ctx, json);
-    
+                            ResourceStatus fw = toStatus(json);
+
                             if( fw != null ) {
                                 firewalls.add(fw);
                             }
                         }
                         catch( JSONException e ) {
-                            std.error("Invalid JSON from cloud: " + e.getMessage());
                             throw new CloudException("Invalid JSON from cloud: " + e.getMessage());
                         }
                     }
                 }
             }
             catch( JSONException e ) {
-                std.error("list(): Unable to identify expected values in JSON: " + e.getMessage());                e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for security groups in " + ob.toString());
             }
             return firewalls;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + NovaSecurityGroup.class.getName() + ".list()");
-            }
+            APITrace.end();
         }
-    }
-
-    @Override
-    public @Nonnull Iterable<ResourceStatus> listFirewallStatus() throws InternalException, CloudException {
-
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        NovaMethod method = new NovaMethod(provider);
-        JSONObject ob = method.getServers("/os-security-groups", null, false);
-        ArrayList<ResourceStatus> firewalls = new ArrayList<ResourceStatus>();
-
-        try {
-            if( ob != null && ob.has("security_groups") ) {
-                JSONArray list = ob.getJSONArray("security_groups");
-
-                for( int i=0; i<list.length(); i++ ) {
-                    JSONObject json = list.getJSONObject(i);
-
-                    try {
-                        ResourceStatus fw = toStatus(json);
-
-                        if( fw != null ) {
-                            firewalls.add(fw);
-                        }
-                    }
-                    catch( JSONException e ) {
-                        throw new CloudException("Invalid JSON from cloud: " + e.getMessage());
-                    }
-                }
-            }
-        }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for security groups in " + ob.toString());
-        }
-        return firewalls;
-
     }
 
     @Override
@@ -655,28 +502,29 @@ public class NovaSecurityGroup implements FirewallSupport {
     }
 
     @Override
-    public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
-        return new String[0];
-    }
-
-    @Override
     public void revoke(@Nonnull String providerFirewallRuleId) throws InternalException, CloudException {
-        NovaMethod method = new NovaMethod(provider);
-        long timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
+        APITrace.begin(getProvider(), "Firewall.revoke");
+        try {
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            long timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
 
-        do {
-            try {
-                method.deleteServers("/os-security-group-rules", providerFirewallRuleId);
-                return;
-            }
-            catch( NovaException e ) {
-                if( e.getHttpCode() != HttpServletResponse.SC_CONFLICT ) {
-                    throw e;
+            do {
+                try {
+                    method.deleteServers("/os-security-group-rules", providerFirewallRuleId);
+                    return;
                 }
-            }
-            try { Thread.sleep(CalendarWrapper.MINUTE); }
-            catch( InterruptedException e ) { /* ignore */ }
-        } while( System.currentTimeMillis() < timeout );
+                catch( NovaException e ) {
+                    if( e.getHttpCode() != HttpServletResponse.SC_CONFLICT ) {
+                        throw e;
+                    }
+                }
+                try { Thread.sleep(CalendarWrapper.MINUTE); }
+                catch( InterruptedException e ) { /* ignore */ }
+            } while( System.currentTimeMillis() < timeout );
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -699,57 +547,89 @@ public class NovaSecurityGroup implements FirewallSupport {
 
     @Override
     public void revoke(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull Permission permission, @Nonnull String source, @Nonnull Protocol protocol, @Nonnull RuleTarget target, int beginPort, int endPort) throws CloudException, InternalException {
-        if( direction.equals(Direction.EGRESS) ) {
-            throw new OperationNotSupportedException(provider.getCloudName() + " does not support egress rules.");
-        }
-        ProviderContext ctx = provider.getContext();
+        APITrace.begin(getProvider(), "Firewall.revoke");
+        try {
+            if( direction.equals(Direction.EGRESS) ) {
+                throw new OperationNotSupportedException(getProvider().getCloudName() + " does not support egress rules.");
+            }
+            FirewallRule targetRule = null;
 
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        FirewallRule targetRule = null;
+            for( FirewallRule rule : getRules(firewallId) ) {
+                RuleTarget t = rule.getSourceEndpoint();
 
-        for( FirewallRule rule : getRules(firewallId) ) {
-            RuleTarget t = rule.getSourceEndpoint();
+                if( t.getRuleTargetType().equals(RuleTargetType.CIDR) && source.equals(t.getCidr()) ) {
+                    RuleTarget rt = rule.getDestinationEndpoint();
 
-            if( t.getRuleTargetType().equals(RuleTargetType.CIDR) && source.equals(t.getCidr()) ) {
-                RuleTarget rt = rule.getDestinationEndpoint();
+                    if( target.getRuleTargetType().equals(rt.getRuleTargetType()) ) {
+                        boolean matches = false;
 
-                if( target.getRuleTargetType().equals(rt.getRuleTargetType()) ) {
-                    boolean matches = false;
-
-                    switch( rt.getRuleTargetType() ) {
-                        case CIDR:
-                            //noinspection ConstantConditions
-                            matches = target.getCidr().equals(rt.getCidr());
-                            break;
-                        case GLOBAL:
-                            //noinspection ConstantConditions
-                            matches = target.getProviderFirewallId().equals(rt.getProviderFirewallId());
-                            break;
-                        case VLAN:
-                            //noinspection ConstantConditions
-                            matches = target.getProviderVlanId().equals(rt.getProviderVlanId());
-                            break;
-                        case VM:
-                            //noinspection ConstantConditions
-                            matches = target.getProviderVirtualMachineId().equals(rt.getProviderVirtualMachineId());
-                            break;
-                    }
-                    if( matches && rule.getProtocol().equals(protocol) && rule.getPermission().equals(permission) && rule.getDirection().equals(direction) ) {
-                        if( rule.getStartPort() == beginPort && rule.getEndPort() == endPort ) {
-                            targetRule = rule;
-                            break;
+                        switch( rt.getRuleTargetType() ) {
+                            case CIDR:
+                                //noinspection ConstantConditions
+                                matches = target.getCidr().equals(rt.getCidr());
+                                break;
+                            case GLOBAL:
+                                //noinspection ConstantConditions
+                                matches = target.getProviderFirewallId().equals(rt.getProviderFirewallId());
+                                break;
+                            case VLAN:
+                                //noinspection ConstantConditions
+                                matches = target.getProviderVlanId().equals(rt.getProviderVlanId());
+                                break;
+                            case VM:
+                                //noinspection ConstantConditions
+                                matches = target.getProviderVirtualMachineId().equals(rt.getProviderVirtualMachineId());
+                                break;
+                        }
+                        if( matches && rule.getProtocol().equals(protocol) && rule.getPermission().equals(permission) && rule.getDirection().equals(direction) ) {
+                            if( rule.getStartPort() == beginPort && rule.getEndPort() == endPort ) {
+                                targetRule = rule;
+                                break;
+                            }
                         }
                     }
+                }
+                else if( t.getRuleTargetType().equals(RuleTargetType.GLOBAL) && source.equals(t.getProviderFirewallId()) ) {
+                    RuleTarget rt = rule.getDestinationEndpoint();
 
+                    if( target.getRuleTargetType().equals(rt.getRuleTargetType()) ) {
+                        boolean matches = false;
+
+                        switch( rt.getRuleTargetType() ) {
+                            case CIDR:
+                                //noinspection ConstantConditions
+                                matches = target.getCidr().equals(rt.getCidr());
+                                break;
+                            case GLOBAL:
+                                //noinspection ConstantConditions
+                                matches = target.getProviderFirewallId().equals(rt.getProviderFirewallId());
+                                break;
+                            case VLAN:
+                                //noinspection ConstantConditions
+                                matches = target.getProviderVlanId().equals(rt.getProviderVlanId());
+                                break;
+                            case VM:
+                                //noinspection ConstantConditions
+                                matches = target.getProviderVirtualMachineId().equals(rt.getProviderVirtualMachineId());
+                                break;
+                        }
+                        if( matches && rule.getProtocol().equals(protocol) && rule.getPermission().equals(permission) && rule.getDirection().equals(direction) ) {
+                            if( rule.getStartPort() == beginPort && rule.getEndPort() == endPort ) {
+                                targetRule = rule;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
+            if( targetRule == null ) {
+                throw new CloudException("No such firewall rule");
+            }
+            revoke(targetRule.getProviderRuleId());
         }
-        if( targetRule == null ) {
-            throw new CloudException("No such firewall rule");
+        finally {
+            APITrace.end();
         }
-        revoke(targetRule.getProviderRuleId());
     }
 
     @Override
@@ -762,36 +642,41 @@ public class NovaSecurityGroup implements FirewallSupport {
         return true;
     }
 
-    private @Nullable Firewall toFirewall(@Nonnull ProviderContext ctx, @Nonnull JSONObject json) throws JSONException {
-        Firewall fw = new Firewall();
-        String id = null, name = null;
-        
-        fw.setActive(true);
-        fw.setAvailable(true);
-        fw.setProviderVlanId(null);
-        String regionId = ctx.getRegionId();
-        fw.setRegionId(regionId == null ? "" : regionId);
-        if( json.has("id") && !json.isNull("id") ) {
-            id = json.getString("id");
+    private @Nullable Firewall toFirewall(@Nonnull JSONObject json) throws CloudException, InternalException {
+        try {
+            Firewall fw = new Firewall();
+            String id = null, name = null;
+
+            fw.setActive(true);
+            fw.setAvailable(true);
+            fw.setProviderVlanId(null);
+            String regionId = getContext().getRegionId();
+            fw.setRegionId(regionId == null ? "" : regionId);
+            if( json.has("id") ) {
+                id = json.getString("id");
+            }
+            if( json.has("name") ) {
+                name = json.getString("name");
+            }
+            if( json.has("description") ) {
+                fw.setDescription(json.getString("description"));
+            }
+            if( id == null ) {
+                return null;
+            }
+            fw.setProviderFirewallId(id);
+            if( name == null ) {
+                name = id;
+            }
+            fw.setName(name);
+            if( fw.getDescription() == null ) {
+                fw.setDescription(name);
+            }
+            return fw;
         }
-        if( json.has("name") && !json.isNull("name") ) {
-            name = json.getString("name");
+        catch( JSONException e ) {
+            throw new InternalException(e);
         }
-        if( json.has("description") ) {
-            fw.setDescription(json.getString("description"));
-        }
-        if( id == null ) {
-            return null;
-        }
-        fw.setProviderFirewallId(id);
-        if( name == null ) {
-            name = id;
-        }
-        fw.setName(name);
-        if( fw.getDescription() == null ) {
-            fw.setDescription(name);
-        }
-        return fw;
     }
 
     private @Nullable ResourceStatus toStatus(@Nonnull JSONObject json) throws JSONException {

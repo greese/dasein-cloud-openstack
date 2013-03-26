@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * Copyright (C) 2009-2012 Enstratius, Inc.
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,6 +32,7 @@ import org.dasein.cloud.network.DNSZone;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.APITrace;
 import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -41,7 +42,6 @@ import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -56,8 +56,10 @@ import java.util.Map;
  * @version 2013.02 updated to 2013.02 model
  */
 public class RackspaceCloudDNS implements DNSSupport {
+    static private final Logger logger = NovaOpenStack.getLogger(RackspaceCloudDNS.class, "std");
+
     static private final String RESOURCE = "/domains";
-    static private final String SERVICE = "dnsextension:dns";
+    static private final String SERVICE = "rax:dns";
     
     private NovaOpenStack provider;
     
@@ -65,11 +67,7 @@ public class RackspaceCloudDNS implements DNSSupport {
     
     @Override
     public @Nonnull DNSRecord addDnsRecord(@Nonnull String providerDnsZoneId, @Nonnull DNSRecordType recordType, @Nonnull String name, @Nonnegative int ttl, @Nonnull String... values) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(RackspaceCloudDNS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + RackspaceCloudDNS.class.getName() + ".addDnsRecord()");
-        }
+        APITrace.begin(provider, "DNS.addDnsRecord");
         try {
             DNSZone zone = getDnsZone(providerDnsZoneId);
             
@@ -87,7 +85,7 @@ public class RackspaceCloudDNS implements DNSSupport {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             DNSRecord lastRecord = null;
@@ -129,37 +127,31 @@ public class RackspaceCloudDNS implements DNSSupport {
                         }
                     }
                     catch( JSONException e ) {
-                        std.error("createDnsZone(): JSON error parsing response: " + e.getMessage());
+                        logger.error("createDnsZone(): JSON error parsing response: " + e.getMessage());
                         e.printStackTrace();
                         throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "JSON error parsing " + response);
                     }
                 }
             }
             if( lastRecord == null ) {
-                std.error("addDnsRecord(): No record was created, but no error specified");
+                logger.error("addDnsRecord(): No record was created, but no error specified");
                 throw new CloudException("No record was created, but no error specified");
             }
             return lastRecord;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + RackspaceCloudDNS.class.getName() + ".addDnsRecord()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public @Nonnull String createDnsZone(@Nonnull String domainName, @Nonnull String name, @Nonnull String description) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(RackspaceCloudDNS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + RackspaceCloudDNS.class.getName() + ".createDnsZone()");
-        }
+        APITrace.begin(provider, "DNS.createDnsZone");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -196,31 +188,25 @@ public class RackspaceCloudDNS implements DNSSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("createDnsZone(): JSON error parsing response: " + e.getMessage());
+                logger.error("createDnsZone(): JSON error parsing response: " + e.getMessage());
                 e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "JSON error parsing " + response);
             }
-            std.error("createDnsZone(): No zone was created, but no error specified");
+            logger.error("createDnsZone(): No zone was created, but no error specified");
             throw new CloudException("No zone was created, but no error specified");
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + RackspaceCloudDNS.class.getName() + ".createDnsZone()");
-            }
+            APITrace.end();
         }
     }
 
     private @Nonnull List<String> lookupRecord(DNSRecord record) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(RackspaceCloudDNS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + RackspaceCloudDNS.class.getName() + ".lookupRecord()");
-        }
+        APITrace.begin(provider, "DNS.lookupRecord");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -253,26 +239,20 @@ public class RackspaceCloudDNS implements DNSSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("lookupRecord(): JSON error parsing response: " + e.getMessage());
+                logger.error("lookupRecord(): JSON error parsing response: " + e.getMessage());
                 e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "JSON error parsing " + response);
             }
             return ids;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + RackspaceCloudDNS.class.getName() + ".lookupRecord()");
-            }
+            APITrace.end();
         }
     }
     
     @Override
     public void deleteDnsRecords(@Nonnull DNSRecord... dnsRecords) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(RackspaceCloudDNS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + RackspaceCloudDNS.class.getName() + ".deleteDnsRecords("+ Arrays.toString(dnsRecords) + ")");
-        }
+        APITrace.begin(provider, "DNS.deleteDnsRecords");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -291,19 +271,13 @@ public class RackspaceCloudDNS implements DNSSupport {
             }
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + RackspaceCloudDNS.class.getName() + ".deleteDnsRecords()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public void deleteDnsZone(@Nonnull String providerDnsZoneId) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(RackspaceCloudDNS.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + RackspaceCloudDNS.class.getName() + ".deleteDnsZone("+ providerDnsZoneId + ")");
-        }
+        APITrace.begin(provider, "DNS.deleteDnsZone");
         try {
             ProviderContext ctx = provider.getContext();
 
@@ -316,28 +290,20 @@ public class RackspaceCloudDNS implements DNSSupport {
             method.deleteResource(SERVICE, RESOURCE, providerDnsZoneId, null);
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + RackspaceCloudDNS.class.getName() + ".removeDnsZone()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public DNSZone getDnsZone(@Nonnull String providerDnsZoneId) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(RackspaceCloudDNS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + RackspaceCloudDNS.class.getName() + ".getDnsZone()");
-        }
+        APITrace.begin(provider, "DNS.getDnsZone");
         try {
             CompleteDNS dns = getCompleteDNS(providerDnsZoneId, false);
 
             return (dns == null ? null : dns.domain);
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + RackspaceCloudDNS.class.getName() + ".getDnsZone()");
-            }
+            APITrace.end();
         }
     }
 
@@ -433,11 +399,7 @@ public class RackspaceCloudDNS implements DNSSupport {
 
     @Override
     public @Nonnull Iterable<DNSRecord> listDnsRecords(@Nonnull String providerDnsZoneId, @Nullable DNSRecordType forType, @Nullable String name) throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(RackspaceCloudDNS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + RackspaceCloudDNS.class.getName() + ".listDnsRecords()");
-        }
+        APITrace.begin(provider, "DNS.listDnsRecords");
         try {
             DNSZone zone = getDnsZone(providerDnsZoneId);
             
@@ -447,7 +409,7 @@ public class RackspaceCloudDNS implements DNSSupport {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -490,80 +452,80 @@ public class RackspaceCloudDNS implements DNSSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("listDnsRecords(): JSON error parsing response: " + e.getMessage());
+                logger.error("listDnsRecords(): JSON error parsing response: " + e.getMessage());
                 e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "JSON error parsing " + response);
             }
             return records;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + RackspaceCloudDNS.class.getName() + ".listDnsRecords()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listDnsZoneStatus() throws CloudException, InternalException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        NovaMethod method = new NovaMethod(provider);
-        JSONObject response = method.getResource(SERVICE, RESOURCE, null, false);
-
-        if( response == null ) {
-            return Collections.emptyList();
-        }
-        ArrayList<ResourceStatus> zones = new ArrayList<ResourceStatus>();
-
-        try {
-            int count = 0, total = 0;
-
-            if( response.has("totalEntries") ) {
-                total = response.getInt("totalEntries");
-            }
-            while( response != null ) {
-                int current = 0;
-
-                if( response.has("domains") ) {
-                    JSONArray list = response.getJSONArray("domains");
-
-                    current = list.length();
-                    count += current;
-                    for( int i=0; i<list.length(); i++ ) {
-                        JSONObject item = list.getJSONObject(i);
-
-                        if( item != null && item.has("id") ) {
-                            zones.add(new ResourceStatus(item.getString("id"), true));
-                        }
-                    }
-                }
-                response = null;
-                if( current > 0 && count < total ) {
-                    response = method.getResource(SERVICE, RESOURCE, "?offset=" + count, false);
-                }
-            }
-        }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "JSON error parsing " + response);
-        }
-        return zones;
-    }
-
-    @Override
-    public @Nonnull Iterable<DNSZone> listDnsZones() throws CloudException, InternalException {
-        Logger std = NovaOpenStack.getLogger(RackspaceCloudDNS.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + RackspaceCloudDNS.class.getName() + ".listDnsZones()");
-        }
+        APITrace.begin(provider, "DNS.listDnsZoneStatus");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                throw new InternalException("No context exists for this request");
+            }
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject response = method.getResource(SERVICE, RESOURCE, null, false);
+
+            if( response == null ) {
+                return Collections.emptyList();
+            }
+            ArrayList<ResourceStatus> zones = new ArrayList<ResourceStatus>();
+
+            try {
+                int count = 0, total = 0;
+
+                if( response.has("totalEntries") ) {
+                    total = response.getInt("totalEntries");
+                }
+                while( response != null ) {
+                    int current = 0;
+
+                    if( response.has("domains") ) {
+                        JSONArray list = response.getJSONArray("domains");
+
+                        current = list.length();
+                        count += current;
+                        for( int i=0; i<list.length(); i++ ) {
+                            JSONObject item = list.getJSONObject(i);
+
+                            if( item != null && item.has("id") ) {
+                                zones.add(new ResourceStatus(item.getString("id"), true));
+                            }
+                        }
+                    }
+                    response = null;
+                    if( current > 0 && count < total ) {
+                        response = method.getResource(SERVICE, RESOURCE, "?offset=" + count, false);
+                    }
+                }
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "JSON error parsing " + response);
+            }
+            return zones;
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    @Override
+    public @Nonnull Iterable<DNSZone> listDnsZones() throws CloudException, InternalException {
+        APITrace.begin(provider, "DNS.listDnsZones");
+        try {
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -608,22 +570,26 @@ public class RackspaceCloudDNS implements DNSSupport {
                 }
             }
             catch( JSONException e ) {
-                std.error("listDnsZones(): JSON error parsing response: " + e.getMessage());
+                logger.error("listDnsZones(): JSON error parsing response: " + e.getMessage());
                 e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "JSON error parsing " + response);
             }
             return zones;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + RackspaceCloudDNS.class.getName() + ".listDnsZones()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        return (provider.getCloudName().contains("Rackspace") && provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        APITrace.begin(provider, "DNS.isSubscribed");
+        try {
+            return (provider.getCloudName().contains("Rackspace") && provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        }
+        finally {
+            APITrace.end();
+        }
 
     }
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * Copyright (C) 2009-2012 Enstratius, Inc.
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,45 +32,41 @@ import org.dasein.cloud.AsynchronousTask;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.OperationNotSupportedException;
-import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
-import org.dasein.cloud.Tag;
+import org.dasein.cloud.compute.AbstractImageSupport;
 import org.dasein.cloud.compute.Architecture;
+import org.dasein.cloud.compute.ComputeServices;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.ImageCreateOptions;
+import org.dasein.cloud.compute.ImageFilterOptions;
 import org.dasein.cloud.compute.MachineImage;
-import org.dasein.cloud.compute.MachineImageFormat;
 import org.dasein.cloud.compute.MachineImageState;
-import org.dasein.cloud.compute.MachineImageSupport;
 import org.dasein.cloud.compute.MachineImageType;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.VirtualMachine;
+import org.dasein.cloud.compute.VirtualMachineSupport;
 import org.dasein.cloud.compute.VmState;
-import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.APITrace;
 import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-
-public class NovaImage implements MachineImageSupport {
+public class NovaImage extends AbstractImageSupport {
     static private final Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
 
-    private NovaOpenStack provider;
-    
-    NovaImage(NovaOpenStack provider) { this.provider = provider; }
+    NovaImage(NovaOpenStack provider) {
+        super(provider);
+    }
 
     public @Nullable String getImageRef(@Nonnull String machineImageId) throws CloudException, InternalException {
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaImage.class.getName() + ".getImageRef(" + machineImageId + ")");
-        }
+        APITrace.begin(getProvider(), "Image.getImageRef");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/images", machineImageId, true);
 
             if( ob == null ) {
@@ -102,115 +98,84 @@ public class NovaImage implements MachineImageSupport {
             }
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaImage.class.getName() + ".getImageRef()");
+            APITrace.end();
+        }
+    }
+
+    @Override
+    protected MachineImage capture(@Nonnull ImageCreateOptions options, @Nullable AsynchronousTask<MachineImage> task) throws CloudException, InternalException {
+        APITrace.begin(getProvider(), "Image.capture");
+        try {
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            HashMap<String,Object> action = new HashMap<String,Object>();
+
+            action.put("name", options.getName());
+            if( task != null ) {
+                task.setStartTime(System.currentTimeMillis());
             }
-        }
-    }
+            String vmId = options.getVirtualMachineId();
+            Platform platform = null;
 
-    @Override
-    public void addImageShare(@Nonnull String providerImageId, @Nonnull String accountNumber) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image sharing is not currently supported");
-    }
-
-    @Override
-    public void addPublicShare(@Nonnull String providerImageId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image sharing is not currently supported");
-    }
-
-    @Override
-    public @Nonnull String bundleVirtualMachine(@Nonnull String virtualMachineId, @Nonnull MachineImageFormat format, @Nonnull String bucket, @Nonnull String name) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("This operation is not currently supported");
-    }
-
-    @Override
-    public void bundleVirtualMachineAsync(@Nonnull String virtualMachineId, @Nonnull MachineImageFormat format, @Nonnull String bucket, @Nonnull String name, @Nonnull AsynchronousTask<String> trackingTask) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("This operation is not currently supported");
-    }
-
-    @Override
-    public @Nonnull MachineImage captureImage(@Nonnull ImageCreateOptions options) throws CloudException, InternalException {
-        return captureImage(options, null);
-    }
-
-    private MachineImage captureImage(@Nonnull ImageCreateOptions options, @Nullable AsynchronousTask<MachineImage> task) throws CloudException, InternalException {
-        NovaMethod method = new NovaMethod(provider);
-        HashMap<String,Object> action = new HashMap<String,Object>();
-
-        action.put("name", options.getName());
-        if( task != null ) {
-            task.setStartTime(System.currentTimeMillis());
-        }
-        String vmId = options.getVirtualMachineId();
-
-        if( vmId != null ) {
-            long timeout = (System.currentTimeMillis() + CalendarWrapper.MINUTE*10L);
-
-            while( timeout > System.currentTimeMillis() ) {
-                try {
-                    VirtualMachine vm = provider.getComputeServices().getVirtualMachineSupport().getVirtualMachine(vmId);
-
-                    if( vm == null ) {
-                        throw new CloudException("No such virtual machine: " + vmId);
-                    }
-                    if( !VmState.PENDING.equals(vm.getCurrentState()) ) {
-                        break;
-                    }
-                }
-                catch( Throwable ignore ) {
-                    // ignore
-                }
-                try { Thread.sleep(15000L); }
-                catch( InterruptedException ignore ) { }
-            }
-        }
-        JSONObject result;
-
-        if( provider.isPostCactus() ) {
-            HashMap<String,Object> json = new HashMap<String,Object>();
-            HashMap<String,String> metaData = new HashMap<String,String>();
-
-            metaData.put("dsnDescription", options.getDescription());
-            action.put("metadata", metaData);
-            json.put("createImage", action);
-
-            result = method.postServers("/servers", vmId, new JSONObject(json), true);
-        }
-        else {
-            HashMap<String,Object> json = new HashMap<String,Object>();
-
-            action.put("serverId", String.valueOf(vmId));
-            json.put("image", action);
-            result = method.postServers("/images", null, new JSONObject(json), true);
-        }
-        if( result != null && result.has("image") ) {
-            try {
-                JSONObject img = result.getJSONObject("image");
-                MachineImage image = toImage(img);
-
-                if( image != null ) {
-                    if( task != null ) {
-                        task.completeWithResult(image);
-                    }
-                    return image;
-                }
-            }
-            catch( JSONException e ) {
-                throw new CloudException(e);
-            }
-        }
-        else if( result != null && result.has("location") ) {
-            try {
-                long timeout = System.currentTimeMillis() + CalendarWrapper.MINUTE * 20L;
-                String location = result.getString("location");
-                int idx = location.lastIndexOf('/');
-
-                if( idx > 0 ) {
-                    location = location.substring(idx+1);
-                }
+            if( vmId != null ) {
+                long timeout = (System.currentTimeMillis() + CalendarWrapper.MINUTE*10L);
 
                 while( timeout > System.currentTimeMillis() ) {
-                    MachineImage image = getImage(location);
+                    try {
+                        ComputeServices services = getProvider().getComputeServices();
+                        VirtualMachine vm = null;
+
+                        if( services != null ) {
+                            VirtualMachineSupport support = services.getVirtualMachineSupport();
+
+                            if( support != null ) {
+                                vm = support.getVirtualMachine(vmId);
+                            }
+                        }
+                        if( vm == null ) {
+                            throw new CloudException("No such virtual machine: " + vmId);
+                        }
+                        platform = vm.getPlatform();
+                        if( !VmState.PENDING.equals(vm.getCurrentState()) ) {
+                            String tag = (String)vm.getTag("OS-EXT-STS:task_state");
+
+                            if( tag == null || !tag.equalsIgnoreCase("image_snapshot") ) {
+                                break;
+                            }
+                        }
+                    }
+                    catch( Throwable ignore ) {
+                        // ignore
+                    }
+                    try { Thread.sleep(15000L); }
+                    catch( InterruptedException ignore ) { }
+                }
+            }
+            JSONObject result;
+
+            if( ((NovaOpenStack)getProvider()).isPostCactus() ) {
+                HashMap<String,Object> json = new HashMap<String,Object>();
+                HashMap<String,String> metaData = new HashMap<String,String>();
+
+                metaData.put("org.dasein.description", options.getDescription());
+                if( platform != null ) {
+                    metaData.put("org.dasein.platform", platform.name());
+                }
+                action.put("metadata", metaData);
+                json.put("createImage", action);
+
+                result = method.postServers("/servers", vmId, new JSONObject(json), true);
+            }
+            else {
+                HashMap<String,Object> json = new HashMap<String,Object>();
+
+                action.put("serverId", String.valueOf(vmId));
+                json.put("image", action);
+                result = method.postServers("/images", null, new JSONObject(json), true);
+            }
+            if( result != null && result.has("image") ) {
+                try {
+                    JSONObject img = result.getJSONObject("image");
+                    MachineImage image = toImage(img);
 
                     if( image != null ) {
                         if( task != null ) {
@@ -218,76 +183,51 @@ public class NovaImage implements MachineImageSupport {
                         }
                         return image;
                     }
-                    try { Thread.sleep(15000L); }
-                    catch( InterruptedException ignore ) { }
+                }
+                catch( JSONException e ) {
+                    throw new CloudException(e);
                 }
             }
-            catch( JSONException e ) {
-                throw new CloudException(e);
-            }
-        }
-        logger.error("No image was created by the imaging attempt, and no error was returned");
-        throw new CloudException("No image was created");
-    }
-
-    @Override
-    public void captureImageAsync(final @Nonnull ImageCreateOptions options, final @Nonnull AsynchronousTask<MachineImage> taskTracker) throws CloudException, InternalException {
-        VirtualMachine vm = null;
-
-        long timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 30L);
-
-        while( timeout > System.currentTimeMillis() ) {
-            try {
-                //noinspection ConstantConditions
-                vm = provider.getComputeServices().getVirtualMachineSupport().getVirtualMachine(options.getVirtualMachineId());
-                if( vm == null ) {
-                    break;
-                }
-                if( !vm.isPersistent() ) {
-                    throw new OperationNotSupportedException("You cannot capture instance-backed virtual machines");
-                }
-                if( VmState.RUNNING.equals(vm.getCurrentState()) || VmState.STOPPED.equals(vm.getCurrentState()) ) {
-                    break;
-                }
-            }
-            catch( Throwable ignore ) {
-                // ignore
-            }
-            try { Thread.sleep(15000L); }
-            catch( InterruptedException ignore ) { }
-        }
-        if( vm == null ) {
-            throw new CloudException("No such virtual machine: " + options.getVirtualMachineId());
-        }
-        Thread t = new Thread() {
-            public void run() {
+            else if( result != null && result.has("location") ) {
                 try {
-                    taskTracker.completeWithResult(captureImage(options, taskTracker));
+                    long timeout = System.currentTimeMillis() + CalendarWrapper.MINUTE * 20L;
+                    String location = result.getString("location");
+                    int idx = location.lastIndexOf('/');
+
+                    if( idx > 0 ) {
+                        location = location.substring(idx+1);
+                    }
+
+                    while( timeout > System.currentTimeMillis() ) {
+                        MachineImage image = getImage(location);
+
+                        if( image != null ) {
+                            if( task != null ) {
+                                task.completeWithResult(image);
+                            }
+                            return image;
+                        }
+                        try { Thread.sleep(15000L); }
+                        catch( InterruptedException ignore ) { }
+                    }
                 }
-                catch( Throwable t ) {
-                    taskTracker.complete(t);
-                }
-                finally {
-                    provider.release();
+                catch( JSONException e ) {
+                    throw new CloudException(e);
                 }
             }
-        };
-
-        provider.hold();
-        t.setName("Imaging " + options.getVirtualMachineId() + " as " + options.getName());
-        t.setDaemon(true);
-        t.start();
+            logger.error("No image was created by the imaging attempt, and no error was returned");
+            throw new CloudException("No image was created");
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public MachineImage getImage(@Nonnull String providerImageId) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaImage.class.getName() + ".getMachineImage(" + providerImageId + ")");
-        }
+        APITrace.begin(getProvider(), "Image.getImage");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/images", providerImageId, true);
 
             if( ob == null ) {
@@ -310,21 +250,8 @@ public class NovaImage implements MachineImageSupport {
             return null;
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaImage.class.getName() + ".getMachineImage()");
-            }
+            APITrace.begin(getProvider(), "Image.getImage");
         }
-    }
-
-    @Override
-    @Deprecated
-    public @Nullable MachineImage getMachineImage(@Nonnull String machineImageId) throws CloudException, InternalException {
-        return getImage(machineImageId);
-    }
-
-    @Override
-    public @Nonnull String getProviderTermForImage(@Nonnull Locale locale) {
-        return "image";
     }
 
     @Override
@@ -338,13 +265,8 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    public @Nonnull String getProviderTermForCustomImage(@Nonnull Locale locale, @Nonnull ImageClass cls) {
-        return getProviderTermForImage(locale, cls);
-    }
-
-    @Override
     public boolean hasPublicLibrary() {
-        return false;
+        return true;
     }
 
     @Override
@@ -353,69 +275,38 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    public @Nonnull AsynchronousTask<String> imageVirtualMachine(@Nonnull String vmId, @Nonnull String name, @Nonnull String description) throws CloudException, InternalException {
-        @SuppressWarnings("ConstantConditions") VirtualMachine vm = provider.getComputeServices().getVirtualMachineSupport().getVirtualMachine(vmId);
-
-        if( vm == null ) {
-            throw new CloudException("No such virtual machine: " + vmId);
-        }
-        final AsynchronousTask<MachineImage> task = new AsynchronousTask<MachineImage>();
-        final AsynchronousTask<String> oldTask = new AsynchronousTask<String>();
-
-        captureImageAsync(ImageCreateOptions.getInstance(vm,  name, description), task);
-
-        final long timeout = System.currentTimeMillis() + (CalendarWrapper.HOUR * 2);
-
-        Thread t = new Thread() {
-            public void run() {
-                while( timeout > System.currentTimeMillis() ) {
-                    try { Thread.sleep(15000L); }
-                    catch( InterruptedException ignore ) { }
-                    oldTask.setPercentComplete(task.getPercentComplete());
-
-                    Throwable error = task.getTaskError();
-                    MachineImage img = task.getResult();
-
-                    if( error != null ) {
-                        oldTask.complete(error);
-                        return;
-                    }
-                    else if( img != null ) {
-                        oldTask.completeWithResult(img.getProviderMachineImageId());
-                        return;
-                    }
-                    else if( task.isComplete() ) {
-                        oldTask.complete(new CloudException("Task completed without info"));
-                        return;
-                    }
-                }
-                oldTask.complete(new CloudException("Image creation task timed out"));
-            }
-        };
-
-        t.setDaemon(true);
-        t.start();
-
-        return oldTask;
-    }
-
-    @Override
     public boolean isImageSharedWithPublic(@Nonnull String machineImageId) throws CloudException, InternalException {
-        return false;
+        APITrace.begin(getProvider(), "Image.isImageSharedWithPublic");
+        try {
+            MachineImage img = getImage(machineImageId);
+            String ownerId = (img != null ? img.getProviderOwnerId() : null);
+
+            return (ownerId != null && !ownerId.equals(getContext().getAccountNumber()));
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        return (provider.testContext() != null);
+        APITrace.begin(getProvider(), "Image.isSubscribed");
+        try {
+            return (getProvider().testContext() != null);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listImageStatus(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaImage.class.getName() + ".listImageStatus(" + cls + ")");
-        }
+        APITrace.begin(getProvider(), "Image.listImageStatus");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            if( !cls.equals(ImageClass.MACHINE) ) {
+                return Collections.emptyList();
+            }
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/images", null, true);
             ArrayList<ResourceStatus> images = new ArrayList<ResourceStatus>();
 
@@ -440,19 +331,25 @@ public class NovaImage implements MachineImageSupport {
             return images;
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaImage.class.getName() + ".listImageStatus()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
-    public @Nonnull Iterable<MachineImage> listImages(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaImage.class.getName() + ".listImages(" + cls + ")");
-        }
+    public @Nonnull Iterable<MachineImage> listImages(@Nullable ImageFilterOptions options) throws CloudException, InternalException {
+        APITrace.begin(getProvider(), "Image.listImages");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            String account = (options == null ? null : options.getAccountNumber());
+
+            if( account == null ) {
+                if( options == null ) {
+                    options = ImageFilterOptions.getInstance().withAccountNumber(getContext().getAccountNumber());
+                }
+                else {
+                    options.withAccountNumber(getContext().getAccountNumber());
+                }
+            }
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/images", null, true);
             ArrayList<MachineImage> images = new ArrayList<MachineImage>();
 
@@ -464,10 +361,9 @@ public class NovaImage implements MachineImageSupport {
                         JSONObject image = list.getJSONObject(i);
                         MachineImage img = toImage(image);
 
-                        if( img != null ) {
+                        if( img != null && options.matches(img) ) {
                             images.add(img);
                         }
-
                     }
                 }
             }
@@ -477,53 +373,8 @@ public class NovaImage implements MachineImageSupport {
             return images;
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaImage.class.getName() + ".listImages()");
-            }
+            APITrace.end();
         }
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImage> listImages(@Nonnull ImageClass cls, @Nonnull String ownedBy) throws CloudException, InternalException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new CloudException("No context was set for this request");
-        }
-        if( !ownedBy.equals(ctx.getAccountNumber()) ) {
-            return Collections.emptyList();
-        }
-        return listImages(cls);
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull Iterable<MachineImage> listMachineImages() throws CloudException, InternalException {
-        return listImages(ImageClass.MACHINE);
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull Iterable<MachineImage> listMachineImagesOwnedBy(@Nullable String accountId) throws CloudException, InternalException {
-        if( accountId == null ) {
-            return Collections.emptyList();
-        }
-        return listImages(ImageClass.MACHINE, accountId);
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImageFormat> listSupportedFormats() throws CloudException, InternalException {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImageFormat> listSupportedFormatsForBundling() throws CloudException, InternalException {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public @Nonnull Iterable<String> listShares(@Nonnull String forMachineImageId) throws CloudException, InternalException {
-        return Collections.emptyList();
     }
 
     @Override
@@ -540,29 +391,10 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    public @Nonnull MachineImage registerImageBundle(@Nonnull ImageCreateOptions options) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Glance integration not yet supported");
-    }
-
-    @Override
-    public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
-        return new String[0];
-    }
-
-    @Override
-    public void remove(@Nonnull String machineImageId) throws CloudException, InternalException {
-        remove(machineImageId, false);
-    }
-
-    @Override
     public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
-        Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
-
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaImage.class.getName() + ".remove(" + provider + "," + checkState + ")");
-        }
+        APITrace.begin(getProvider(), "Image.remove");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             long timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
 
             do {
@@ -580,111 +412,40 @@ public class NovaImage implements MachineImageSupport {
             } while( System.currentTimeMillis() < timeout );
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaImage.class.getName() + ".remove()");
-            }
+            APITrace.end();
         }
     }
 
-    @Override
-    public void removeAllImageShares(@Nonnull String providerImageId) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    @Override
-    public void removeImageShare(@Nonnull String providerImageId, @Nonnull String accountNumber) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image sharing is not supported");
-    }
-
-    @Override
-    public void removePublicShare(@Nonnull String providerImageId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Image sharing is not supported");
-    }
-
-    @Override
-    @Deprecated
-    public @Nonnull Iterable<MachineImage> searchMachineImages(@Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture) throws CloudException, InternalException {
-        return searchImages(null, keyword, platform, architecture, ImageClass.MACHINE);
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImage> searchImages(@Nullable String accountNumber, @Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass... imageClasses) throws CloudException, InternalException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new CloudException("No context was set for this request");
-        }
-        if( accountNumber != null && !accountNumber.equals(ctx.getAccountNumber()) ) {
-            return Collections.emptyList();
-        }
-
-        NovaMethod method = new NovaMethod(provider);
-        JSONObject ob = method.getServers("/images", null, true);
-        ArrayList<MachineImage> images = new ArrayList<MachineImage>();
-
+    public @Nonnull Iterable<MachineImage> searchPublicImages(@Nonnull ImageFilterOptions options) throws InternalException, CloudException {
+        APITrace.begin(getProvider(), "Image.searchPublicImages");
         try {
-            if( ob != null && ob.has("images") ) {
-                JSONArray list = ob.getJSONArray("images");
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            JSONObject ob = method.getServers("/images", null, true);
+            ArrayList<MachineImage> images = new ArrayList<MachineImage>();
+            String me = getContext().getAccountNumber();
 
-                for( int i=0; i<list.length(); i++ ) {
-                    JSONObject image = list.getJSONObject(i);
-                    MachineImage img = toImage(image);
+            try {
+                if( ob != null && ob.has("images") ) {
+                    JSONArray list = ob.getJSONArray("images");
 
-                    if( img != null ) {
-                        if( architecture != null ) {
-                            if( !architecture.equals(img.getArchitecture()) ) {
-                                continue;
-                            }
-                        }
-                        if( platform != null && !platform.equals(Platform.UNKNOWN) ) {
-                            Platform p = img.getPlatform();
+                    for( int i=0; i<list.length(); i++ ) {
+                        JSONObject image = list.getJSONObject(i);
+                        MachineImage img = toImage(image);
 
-                            if( p.equals(Platform.UNKNOWN) ) {
-                                continue;
-                            }
-                            else if( platform.isWindows() ) {
-                                if( !p.isWindows() ) {
-                                    continue;
-                                }
-                            }
-                            else if( platform.equals(Platform.UNIX) ) {
-                                if( !p.isUnix() ) {
-                                    continue;
-                                }
-                            }
-                            else if( !platform.equals(p) ) {
-                                continue;
-                            }
+                        if( img != null && !img.getProviderOwnerId().equals(me) && options.matches(img) ) {
+                            images.add(img);
                         }
-                        if( keyword != null ) {
-                            if( !img.getName().contains(keyword) ) {
-                                if( !img.getDescription().contains(keyword) ) {
-                                    if( !img.getProviderMachineImageId().contains(keyword) ) {
-                                        continue;
-                                    }
-                                }
-                            }
-                        }
-                        images.add(img);
                     }
-
                 }
             }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for images: " + e.getMessage());
+            }
+            return images;
         }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for images: " + e.getMessage());
+        finally {
+            APITrace.end();
         }
-        return images;
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImage> searchPublicImages(@Nullable String keyword, @Nullable Platform platform, @Nullable Architecture architecture, @Nullable ImageClass... imageClasses) throws CloudException, InternalException {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public void shareMachineImage(@Nonnull String machineImageId, @Nullable String withAccountId, boolean allow) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("OpenStack does not support image sharing");
     }
 
     @Override
@@ -703,26 +464,11 @@ public class NovaImage implements MachineImageSupport {
     }
 
     @Override
-    public boolean supportsImageSharing() {
-        return false;
-    }
-
-    @Override
-    public boolean supportsImageSharingWithPublic() {
-        return false;
-    }
-
-    @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        return false;
+        return true;
     }
 
-    @Override
-    public void updateTags(@Nonnull String imageId, @Nonnull Tag... tags) throws CloudException, InternalException {
-        // NO-OP
-    }
-
-    public @Nullable MachineImage toImage(@Nullable JSONObject json) throws JSONException {
+    public @Nullable MachineImage toImage(@Nullable JSONObject json) throws CloudException, InternalException {
         Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
         
         if( logger.isTraceEnabled() ) {
@@ -732,63 +478,134 @@ public class NovaImage implements MachineImageSupport {
             if( json == null ) {
                 return null;
             }
-            MachineImage image = new MachineImage();
 
-            image.setImageClass(ImageClass.MACHINE); // TODO: really?
-            image.setArchitecture(Architecture.I64);
-            image.setPlatform(Platform.UNKNOWN);
-            image.setProviderOwnerId(provider.getContext().getAccountNumber());
-            image.setProviderRegionId(provider.getContext().getRegionId());
-            image.setTags(new HashMap<String,String>());
-            image.setType(MachineImageType.VOLUME);
-            image.setSoftware("");
-            if( json.has("id") ) {
-                image.setProviderMachineImageId(json.getString("id"));
-            }
-            if( json.has("name") ) {
-                image.setName(json.getString("name"));
-            }
-            if( json.has("description") ) {
-                image.setDescription(json.getString("description"));
-            }
-            if( json.has("metadata") ) {
-                JSONObject md = json.getJSONObject("metadata");
-                
-                if( image.getDescription() == null && md.has("dsnDescription") ) {
-                    image.setDescription(md.getString("dsnDescription"));
+            try {
+                String imageId = (json.has("id") ? json.getString("id") : null);
+                String name = (json.has("name") ? json.getString("name") : null);
+                String description = (json.has("description") ? json.getString("description") : null);
+                JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
+                Architecture architecture = Architecture.I64;
+                Platform platform = Platform.UNKNOWN;
+                String owner = (getProvider().getProviderName().equals("Rackspace") ? getContext().getAccountNumber() : "--public--");
+
+                if( md != null ) {
+                    if( description == null && md.has("org.dasein.description") ) {
+                        description = md.getString("org.dasein.description");
+                    }
+                    if( md.has("org.dasein.platform") ) {
+                        try {
+                            platform = Platform.valueOf(md.getString("org.dasein.platform"));
+                        }
+                        catch( Throwable ignore ) {
+                            // ignore
+                        }
+                    }
+                    String[] akeys = { "arch", "architecture", "org.openstack__1__architecture", "com.hp__1__architecture" };
+                    String a = null;
+
+                    for( String key : akeys ) {
+                        if( md.has(key) && !md.isNull(key) ) {
+                            a = md.getString(key);
+                            if( a != null ) {
+                                break;
+                            }
+                        }
+                    }
+                    if( a != null ) {
+                        a = a.toLowerCase();
+                        if( a.contains("32") ) {
+                            architecture = Architecture.I32;
+                        }
+                        else if( a.contains("sparc") ) {
+                            architecture = Architecture.SPARC;
+                        }
+                        else if( a.contains("power") ) {
+                            architecture = Architecture.POWER;
+                        }
+                    }
+                    if( md.has("os_type") && !md.isNull("os_type") ) {
+                        Platform p = Platform.guess(md.getString("os_type"));
+
+                        if( !p.equals(Platform.UNKNOWN) ) {
+                            if( platform.equals(Platform.UNKNOWN) ) {
+                                platform = p;
+                            }
+                            else if( platform.equals(Platform.UNIX) && !p.equals(Platform.UNIX) ) {
+                                platform = p;
+                            }
+                        }
+                    }
+                    if( md.has("owner") && !md.isNull("owner")) {
+                        owner = md.getString("owner");
+                    }
+                    else if( md.has("image_type") && !md.isNull("image_type") && md.getString("image_type").equals("base") ) {
+                        owner = "--public--";
+                    }
                 }
-            }
-            if( json.has("status") ) {
-                String s = json.getString("status").toLowerCase();
-                
-                if( s.equals("saving") ) {
-                    image.setCurrentState(MachineImageState.PENDING);
+                long created = (json.has("created") ? ((NovaOpenStack)getProvider()).parseTimestamp(json.getString("created")) : -1L);
+
+                MachineImageState currentState = MachineImageState.PENDING;
+
+                if( json.has("status") ) {
+                    String s = json.getString("status").toLowerCase();
+
+                    if( s.equals("saving") ) {
+                        currentState = MachineImageState.PENDING;
+                    }
+                    else if( s.equals("active") || s.equals("queued") || s.equals("preparing") ) {
+                        currentState = MachineImageState.ACTIVE;
+                    }
+                    else if( s.equals("deleting") ) {
+                        currentState = MachineImageState.PENDING;
+                    }
+                    else if( s.equals("failed") ) {
+                        return null;
+                    }
+                    else {
+                        logger.warn("toImage(): Unknown image status: " + s);
+                        currentState = MachineImageState.PENDING;
+                    }
                 }
-                else if( s.equals("active") || s.equals("queued") || s.equals("preparing") ) {
-                    image.setCurrentState(MachineImageState.ACTIVE);
-                }
-                else if( s.equals("deleting") ) {
-                    image.setCurrentState(MachineImageState.PENDING);
-                }
-                else if( s.equals("failed") ) {
+
+                if( imageId == null ) {
                     return null;
                 }
-                else {
-                    logger.warn("toImage(): Unknown image status: " + s);
-                    image.setCurrentState(MachineImageState.PENDING);
+                if( name == null ) {
+                    name = imageId;
                 }
+                if( description == null ) {
+                    description = name;
+                }
+                if( platform.equals(Platform.UNKNOWN) ) {
+                    platform = Platform.guess(name + " " + description);
+                }
+                else if( platform.equals(Platform.UNIX) ) {
+                    Platform p = Platform.guess(name + " " + description);
+
+                    if( !p.equals(Platform.UNKNOWN) ) {
+                        platform = p;
+                    }
+                }
+                MachineImage image = MachineImage.getMachineImageInstance(owner, getContext().getRegionId(), imageId, currentState, name, description, architecture, platform).createdAt(created);
+
+                if( md != null ) {
+                    String[] names = JSONObject.getNames(md);
+
+                    if( names != null && names.length > 0 ) {
+                        for( String key : names ) {
+                            String value = md.getString(key);
+
+                            if( value != null ) {
+                                image.setTag(key, value);
+                            }
+                        }
+                    }
+                }
+                return image;
             }
-            if( image.getProviderMachineImageId() == null ) {
-                return null;
+            catch( JSONException e ) {
+                throw new CloudException(e);
             }
-            if( image.getName() == null ) {
-                image.setName(image.getProviderMachineImageId());
-            }
-            if( image.getDescription() == null ) {
-                image.setDescription(image.getName());
-            }
-            image.setPlatform(Platform.guess(image.getName() + " " + image.getDescription()));
-            return image;
         }
         finally {
             if( logger.isTraceEnabled() ) {
@@ -797,38 +614,55 @@ public class NovaImage implements MachineImageSupport {
         }
     }
 
-    public @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws JSONException {
+    public @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws CloudException, InternalException {
 
         if( json == null ) {
             return null;
         }
+        String owner = (getProvider().getProviderName().equals("Rackspace") ? getContext().getAccountNumber() : "--public--");
         MachineImageState state = MachineImageState.PENDING;
         String id = null;
 
-        if( json.has("id") ) {
-            id = json.getString("id");
-        }
-        if( id == null ) {
-            return null;
-        }
-        if( json.has("status") ) {
-            String s = json.getString("status").toLowerCase();
-
-            if( s.equals("saving") ) {
-                state = MachineImageState.PENDING;
+        try {
+            if( json.has("id") ) {
+                id = json.getString("id");
             }
-            else if( s.equals("active") || s.equals("queued") || s.equals("preparing") ) {
-                state = MachineImageState.ACTIVE;
-            }
-            else if( s.equals("deleting") ) {
-                state = MachineImageState.PENDING;
-            }
-            else if( s.equals("failed") ) {
+            if( id == null ) {
                 return null;
             }
-            else {
-                state = MachineImageState.PENDING;
+            JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
+
+            if( md != null && md.has("owner") && !md.isNull("owner")) {
+                owner = md.getString("owner");
             }
+            else if( md != null && md.has("image_type") && !md.isNull("image_type") && md.getString("image_type").equals("base") ) {
+                owner = "--public--";
+            }
+            if( json.has("status") ) {
+                String s = json.getString("status").toLowerCase();
+
+                if( s.equals("saving") ) {
+                    state = MachineImageState.PENDING;
+                }
+                else if( s.equals("active") || s.equals("queued") || s.equals("preparing") ) {
+                    state = MachineImageState.ACTIVE;
+                }
+                else if( s.equals("deleting") ) {
+                    state = MachineImageState.PENDING;
+                }
+                else if( s.equals("failed") ) {
+                    return null;
+                }
+                else {
+                    state = MachineImageState.PENDING;
+                }
+            }
+        }
+        catch( JSONException e ) {
+            throw new InternalException(e);
+        }
+        if( !owner.equals(getContext().getAccountNumber()) ) {
+            return null;
         }
         return new ResourceStatus(id, state);
     }

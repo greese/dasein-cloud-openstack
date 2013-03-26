@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * Copyright (C) 2009-2012 Enstratius, Inc.
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,8 @@ package org.dasein.cloud.openstack.nova.os;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
+import java.util.Properties;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
@@ -40,8 +42,15 @@ import org.dasein.cloud.openstack.nova.os.network.NovaNetworkServices;
 import org.dasein.cloud.openstack.nova.os.storage.SwiftStorageServices;
 import org.dasein.cloud.platform.PlatformServices;
 import org.dasein.cloud.storage.StorageServices;
+import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.Cache;
+import org.dasein.cloud.util.CacheLevel;
+import org.dasein.util.uom.time.Minute;
+import org.dasein.util.uom.time.TimePeriod;
 
 public class NovaOpenStack extends AbstractCloud {
+    static private final Logger logger = getLogger(NovaOpenStack.class, "std");
+
     static private @Nonnull String getLastItem(@Nonnull String name) {
         int idx = name.lastIndexOf('.');
         
@@ -83,26 +92,43 @@ public class NovaOpenStack extends AbstractCloud {
         return (major <= 2 && minor < 10);
     }
     
-    private AuthenticationContext authenticationContext;
-    
     public NovaOpenStack() { }
     
     public synchronized @Nonnull AuthenticationContext getAuthenticationContext() throws CloudException, InternalException {
-        if( authenticationContext == null ) {
-            NovaMethod method = new NovaMethod(this);
-            
-            authenticationContext = method.authenticate();
-            if( authenticationContext == null ) {
-                NovaException.ExceptionItems items = new NovaException.ExceptionItems();
-                
-                items.code = HttpServletResponse.SC_UNAUTHORIZED;
-                items.type = CloudErrorType.AUTHENTICATION;
-                items.message = "unauthorized";
-                items.details = "The API keys failed to authentication with the specified endpoint.";
-                throw new NovaException(items);
+        APITrace.begin(this, "Cloud.getAuthenticationContext");
+        try {
+            Cache<AuthenticationContext> cache = Cache.getInstance(this, "authenticationContext", AuthenticationContext.class, CacheLevel.CLOUD_ACCOUNT, new TimePeriod<Minute>(25, TimePeriod.MINUTE));
+            ProviderContext ctx = getContext();
+
+            if( ctx == null ) {
+                throw new CloudException("No context was set for this request");
             }
+            Iterable<AuthenticationContext> current = cache.get(ctx);
+            AuthenticationContext authenticationContext;
+
+            if( current != null ) {
+                authenticationContext = current.iterator().next();
+            }
+            else {
+                NovaMethod method = new NovaMethod(this);
+
+                authenticationContext = method.authenticate();
+                if( authenticationContext == null ) {
+                    NovaException.ExceptionItems items = new NovaException.ExceptionItems();
+
+                    items.code = HttpServletResponse.SC_UNAUTHORIZED;
+                    items.type = CloudErrorType.AUTHENTICATION;
+                    items.message = "unauthorized";
+                    items.details = "The API keys failed to authentication with the specified endpoint.";
+                    throw new NovaException(items);
+                }
+                cache.put(ctx, Collections.singletonList(authenticationContext));
+            }
+            return authenticationContext;
         }
-        return authenticationContext;
+        finally {
+            APITrace.end();
+        }
     }
     
     @Override
@@ -129,7 +155,7 @@ public class NovaOpenStack extends AbstractCloud {
     }
     
     @Override
-    public @Nonnull PlatformServices getPlatformServices() {
+    public @Nullable PlatformServices getPlatformServices() {
         if( getProviderName().equals("HP") ) {
             return new HPPlatformServices(this);
         }
@@ -265,6 +291,29 @@ public class NovaOpenStack extends AbstractCloud {
         return getProviderName().equalsIgnoreCase("hp");
     }
 
+    public boolean isInsecure() {
+        ProviderContext ctx = getContext();
+        String value;
+
+        if( ctx == null ) {
+            value = null;
+        }
+        else {
+            Properties p = ctx.getCustomProperties();
+
+            if( p == null ) {
+                value = null;
+            }
+            else {
+                value = p.getProperty("insecure");
+            }
+        }
+        if( value == null ) {
+            value = System.getProperty("insecure");
+        }
+        return (value != null && value.equalsIgnoreCase("true"));
+    }
+
     public boolean isRackspace() {
         return getProviderName().equalsIgnoreCase("rackspace");
     }
@@ -317,11 +366,7 @@ public class NovaOpenStack extends AbstractCloud {
     
     @Override
     public @Nullable String testContext() {
-        Logger logger = getLogger(NovaOpenStack.class, "std");
-        
-        if( logger.isTraceEnabled() ) {
-            logger.trace("enter - " + NovaOpenStack.class.getName() + ".textContext()");
-        }
+        APITrace.begin(this, "Cloud.testContext");
         try {
             try {
                 NovaMethod method = new NovaMethod(this);
@@ -331,16 +376,11 @@ public class NovaOpenStack extends AbstractCloud {
             }
             catch( Throwable t ) {
                 logger.warn("Failed to test OpenStack connection context: " + t.getMessage());
-                if( logger.isTraceEnabled() ) {
-                    t.printStackTrace();
-                }
                 return null;
             }
         }
         finally {
-            if( logger.isTraceEnabled() ) {
-                logger.trace("exit - " + NovaOpenStack.class.getName() + ".testContext()");
-            }
+            APITrace.end();
         }
     }
 }

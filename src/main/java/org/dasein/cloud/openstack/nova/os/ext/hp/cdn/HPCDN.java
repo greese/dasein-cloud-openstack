@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * Copyright (C) 2009-2012 Enstratius, Inc.
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,6 +29,7 @@ import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.platform.CDNSupport;
 import org.dasein.cloud.platform.Distribution;
+import org.dasein.cloud.util.APITrace;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nonnull;
@@ -52,6 +53,8 @@ import java.util.Map;
  * @version 2013.02 updated for 2013.02 model
  */
 public class HPCDN implements CDNSupport {
+    static private final Logger logger = NovaOpenStack.getLogger(HPCDN.class, "std");
+
     static public final String SERVICE  = "hpext:cdn";
     static public final String RESOURCE = null;
 
@@ -63,16 +66,12 @@ public class HPCDN implements CDNSupport {
 
     @Override
     public @Nonnull String create(@Nonnull String origin, @Nonnull String name, boolean active, @CheckForNull String... aliases) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(HPCDN.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + HPCDN.class.getName() + ".create()");
-        }
+        APITrace.begin(provider, "CDN.create");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -81,24 +80,18 @@ public class HPCDN implements CDNSupport {
             return origin;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPCDN.class.getName() + ".create()");
-            }
+            APITrace.end();
         }        
     }
 
     @Override
     public void delete(@Nonnull String distributionId) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(HPCDN.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + HPCDN.class.getName() + ".delete()");
-        }
+        APITrace.begin(provider, "CDN.delete");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -106,20 +99,24 @@ public class HPCDN implements CDNSupport {
             method.deleteHPCDN(distributionId);
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPCDN.class.getName() + ".delete()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public @Nullable Distribution getDistribution(@Nonnull String distributionId) throws InternalException, CloudException {
-        ProviderContext ctx = provider.getContext();
+        APITrace.begin(provider, "CDN.getDistribution");
+        try {
+            ProviderContext ctx = provider.getContext();
 
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
+            if( ctx == null ) {
+                throw new InternalException("No context exists for this request");
+            }
+            return toDistribution(ctx, distributionId);
         }
-        return toDistribution(ctx, distributionId);
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
@@ -129,21 +126,23 @@ public class HPCDN implements CDNSupport {
 
     @Override
     public boolean isSubscribed() throws InternalException, CloudException {
-        return (provider.getProviderName().equals("HP") && provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        APITrace.begin(provider, "CDN.isSubscribed");
+        try {
+            return (provider.getProviderName().equals("HP") && provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     @Override
     public @Nonnull Collection<Distribution> list() throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(HPCDN.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + HPCDN.class.getName() + ".list()");
-        }
+        APITrace.begin(provider, "CDN.list");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             NovaMethod method = new NovaMethod(provider);
@@ -165,63 +164,58 @@ public class HPCDN implements CDNSupport {
                 }
             }
             catch( IOException e ) {
-                std.error("list(): I/O error parsing response: " + e.getMessage());
+                logger.error("list(): I/O error parsing response: " + e.getMessage());
                 e.printStackTrace();
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "I/O error parsing " + response);
             }
             return distributions;
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPCDN.class.getName() + ".list()");
-            }
+            APITrace.end();
         }
     }
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listDistributionStatus() throws InternalException, CloudException {
-        ProviderContext ctx = provider.getContext();
-
-        if( ctx == null ) {
-            throw new InternalException("No context exists for this request");
-        }
-        NovaMethod method = new NovaMethod(provider);
-        String response = method.getHPCDN(null);
-        ArrayList<ResourceStatus> distributions = new ArrayList<ResourceStatus>();
-
+        APITrace.begin(provider, "CDN.listDistributionStatus");
         try {
-            if( response != null ) {
-                BufferedReader reader = new BufferedReader(new StringReader(response));
-                String container;
+            NovaMethod method = new NovaMethod(provider);
+            String response = method.getHPCDN(null);
+            ArrayList<ResourceStatus> distributions = new ArrayList<ResourceStatus>();
 
-                while( (container = reader.readLine()) != null ) {
-                    ResourceStatus d = toStatus(container);
+            try {
+                if( response != null ) {
+                    BufferedReader reader = new BufferedReader(new StringReader(response));
+                    String container;
 
-                    if( d != null ) {
-                        distributions.add(d);
+                    while( (container = reader.readLine()) != null ) {
+                        ResourceStatus d = toStatus(container);
+
+                        if( d != null ) {
+                            distributions.add(d);
+                        }
                     }
                 }
             }
+            catch( IOException e ) {
+                e.printStackTrace();
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "I/O error parsing " + response);
+            }
+            return distributions;
         }
-        catch( IOException e ) {
-            e.printStackTrace();
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidResponse", "I/O error parsing " + response);
+        finally {
+            APITrace.end();
         }
-        return distributions;
     }
 
     @Override
     public void update(@Nonnull String distributionId, @Nonnull String name, boolean active, @CheckForNull String... aliases) throws InternalException, CloudException {
-        Logger std = NovaOpenStack.getLogger(HPCDN.class, "std");
-
-        if( std.isTraceEnabled() ) {
-            std.trace("ENTER: " + HPCDN.class.getName() + ".update()");
-        }
+        APITrace.begin(provider, "CDN.update");
         try {
             ProviderContext ctx = provider.getContext();
 
             if( ctx == null ) {
-                std.error("No context exists for this request");
+                logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             HashMap<String,String> headers = new HashMap<String, String>();
@@ -231,9 +225,7 @@ public class HPCDN implements CDNSupport {
             method.postHPCDN(distributionId, headers);
         }
         finally {
-            if( std.isTraceEnabled() ) {
-                std.trace("exit - " + HPCDN.class.getName() + ".update()");
-            }
+            APITrace.end();
         }
     }
 
@@ -288,7 +280,7 @@ public class HPCDN implements CDNSupport {
 
 
         distribution.setName(container);
-        distribution.setActive(true);
+        distribution.setActive(enabled != null && enabled.equalsIgnoreCase("true"));
         distribution.setAliases(new String[0]);
         distribution.setDeployed(enabled != null && enabled.equalsIgnoreCase("true"));
         distribution.setDnsName(dns);

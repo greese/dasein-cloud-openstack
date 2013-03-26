@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * Copyright (C) 2009-2012 Enstratius, Inc.
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -80,6 +80,20 @@ public class NovaMethod extends AbstractMethod {
         catch( JSONException e ) {
             throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
         }
+    }
+
+    public @Nullable String postServersForString(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
+        AuthenticationContext context = provider.getAuthenticationContext();
+
+        if( resourceId != null ) {
+            resource = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
+        }
+        String computeEndpoint = context.getComputeUrl();
+
+        if( computeEndpoint == null ) {
+            throw new CloudException("No compute endpoint exists");
+        }
+        return postString(context.getAuthToken(), computeEndpoint, resource, body.toString());
     }
 
     public @Nullable JSONObject postServers(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
