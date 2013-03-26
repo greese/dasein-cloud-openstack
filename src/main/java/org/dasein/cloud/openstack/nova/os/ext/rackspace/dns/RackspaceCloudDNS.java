@@ -57,7 +57,7 @@ import java.util.Map;
  */
 public class RackspaceCloudDNS implements DNSSupport {
     static private final String RESOURCE = "/domains";
-    static private final String SERVICE = "dnsextension:dns";
+    static private final String SERVICE = "rax:dns";
     
     private NovaOpenStack provider;
     
