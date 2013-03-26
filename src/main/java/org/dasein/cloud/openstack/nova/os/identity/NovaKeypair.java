@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2012 enStratus Networks Inc
+ * Copyright (C) 2009-2012 Enstratius, Inc.
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,7 +47,7 @@ import java.util.Locale;
 
 /**
  * OpenStack Nova SSH keypairs
- * @author George Reese (george.reese@enstratus.com)
+ * @author George Reese (george.reese@enstratius.com)
  * @since 2011.10
  * @version 2011.10
  * @version 2012.04.1 Added some intelligence around features Rackspace does not support
