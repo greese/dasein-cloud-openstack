@@ -426,6 +426,11 @@ public class NovaImage implements MachineImageSupport {
             logger.trace("enter - " + NovaImage.class.getName() + ".listImageStatus(" + cls + ")");
         }
         try {
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                throw new CloudException("No context was set for this request");
+            }
             NovaMethod method = new NovaMethod(provider);
             JSONObject ob = method.getServers("/images", null, true);
             ArrayList<ResourceStatus> images = new ArrayList<ResourceStatus>();
@@ -436,7 +441,7 @@ public class NovaImage implements MachineImageSupport {
 
                     for( int i=0; i<list.length(); i++ ) {
                         JSONObject image = list.getJSONObject(i);
-                        ResourceStatus img = toStatus(image);
+                        ResourceStatus img = toStatus(ctx, image);
 
                         if( img != null ) {
                             images.add(img);
@@ -862,38 +867,55 @@ public class NovaImage implements MachineImageSupport {
         }
     }
 
-    public @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws JSONException {
+    public @Nullable ResourceStatus toStatus(@Nonnull ProviderContext ctx, @Nullable JSONObject json) throws CloudException, InternalException {
 
         if( json == null ) {
             return null;
         }
+        String owner = (provider.getProviderName().equals("Rackspace") ? ctx.getAccountNumber() : "--public--");
         MachineImageState state = MachineImageState.PENDING;
         String id = null;
 
-        if( json.has("id") ) {
-            id = json.getString("id");
-        }
-        if( id == null ) {
-            return null;
-        }
-        if( json.has("status") ) {
-            String s = json.getString("status").toLowerCase();
-
-            if( s.equals("saving") ) {
-                state = MachineImageState.PENDING;
+        try {
+            if( json.has("id") ) {
+                id = json.getString("id");
             }
-            else if( s.equals("active") || s.equals("queued") || s.equals("preparing") ) {
-                state = MachineImageState.ACTIVE;
-            }
-            else if( s.equals("deleting") ) {
-                state = MachineImageState.PENDING;
-            }
-            else if( s.equals("failed") ) {
+            if( id == null ) {
                 return null;
             }
-            else {
-                state = MachineImageState.PENDING;
+            JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
+
+            if( md != null && md.has("owner") && !md.isNull("owner")) {
+                owner = md.getString("owner");
             }
+            else if( md != null && md.has("image_type") && !md.isNull("image_type") && md.getString("image_type").equals("base") ) {
+                owner = "--public--";
+            }
+            if( json.has("status") ) {
+                String s = json.getString("status").toLowerCase();
+
+                if( s.equals("saving") ) {
+                    state = MachineImageState.PENDING;
+                }
+                else if( s.equals("active") || s.equals("queued") || s.equals("preparing") ) {
+                    state = MachineImageState.ACTIVE;
+                }
+                else if( s.equals("deleting") ) {
+                    state = MachineImageState.PENDING;
+                }
+                else if( s.equals("failed") ) {
+                    return null;
+                }
+                else {
+                    state = MachineImageState.PENDING;
+                }
+            }
+        }
+        catch( JSONException e ) {
+            throw new InternalException(e);
+        }
+        if( !owner.equals(ctx.getAccountNumber()) ) {
+            return null;
         }
         return new ResourceStatus(id, state);
     }
