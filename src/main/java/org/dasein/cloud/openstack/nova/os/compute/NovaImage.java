@@ -619,7 +619,7 @@ public class NovaImage extends AbstractImageSupport {
         if( json == null ) {
             return null;
         }
-        String owner = getContext().getAccountNumber();
+        String owner = (getProvider().getProviderName().equals("Rackspace") ? getContext().getAccountNumber() : "--public--");
         MachineImageState state = MachineImageState.PENDING;
         String id = null;
 
