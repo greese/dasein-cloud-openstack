@@ -77,6 +77,10 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         this.provider = provider;
     }
 
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return getProvider().getAuthenticationContext().getTenantId();
+    }
+
     public void addIPEndpoints(@Nonnull String toLoadBalancerId, @Nonnull String ... ipAddresses) throws CloudException, InternalException {
         APITrace.begin(provider, "LB.addIPEndpoints");
         try {
@@ -1154,158 +1158,163 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         return false;
     }
 
-    private @Nullable LoadBalancer toLoadBalancer(@Nullable JSONObject json, @Nullable Iterable<VirtualMachine> possibleNodes) throws JSONException, CloudException {
+    private @Nullable LoadBalancer toLoadBalancer(@Nullable JSONObject json, @Nullable Iterable<VirtualMachine> possibleNodes) throws InternalException, CloudException {
         if( json == null ) {
             return null;
         }
-        String[] dataCenterIds = new String[] { getContext().getRegionId() + "-a" };
-        String owner = getContext().getAccountNumber();
-        String regionId = getContext().getRegionId();
-        String id = (json.has("id") && !json.isNull("id")) ? json.getString("id") : null;
-        String name = (json.has("name") && !json.isNull("name")) ? json.getString("name") : null;
-        long created = 0L;
+        try {
+            String[] dataCenterIds = new String[] { getContext().getRegionId() + "-a" };
+            String owner = getTenantId();
+            String regionId = getContext().getRegionId();
+            String id = (json.has("id") && !json.isNull("id")) ? json.getString("id") : null;
+            String name = (json.has("name") && !json.isNull("name")) ? json.getString("name") : null;
+            long created = 0L;
 
-        if( id == null ) {
-            return null;
-        }
-        if( regionId == null ) {
-            throw new CloudException("No region was set for this request");
-        }
-        if( name == null ) {
-            name = id;
-        }
-        if( json.has("created") && !json.isNull("created") ) {
-            JSONObject ob = json.getJSONObject("created");
-            
-            if( ob.has("time") && !ob.isNull("time") ) {
-                created = provider.parseTimestamp(ob.getString("time"));
+            if( id == null ) {
+                return null;
             }
-        }
-        LoadBalancerState state = LoadBalancerState.PENDING;
+            if( regionId == null ) {
+                throw new CloudException("No region was set for this request");
+            }
+            if( name == null ) {
+                name = id;
+            }
+            if( json.has("created") && !json.isNull("created") ) {
+                JSONObject ob = json.getJSONObject("created");
 
-        if( json.has("status") && !json.isNull("status")) {
-            String s = json.getString("status").toLowerCase();
-            
-            if( s.equalsIgnoreCase("active") ) {
-                state = LoadBalancerState.ACTIVE;
+                if( ob.has("time") && !ob.isNull("time") ) {
+                    created = provider.parseTimestamp(ob.getString("time"));
+                }
             }
-            else if( s.equalsIgnoreCase("pending_delete") || s.equalsIgnoreCase("deleted") ) {
-                state = LoadBalancerState.TERMINATED;
-            }
-            else {
-                state = LoadBalancerState.PENDING;
-            }
-        }
-        String address = null;
+            LoadBalancerState state = LoadBalancerState.PENDING;
 
-        if( json.has("virtualIps") ) {
-            JSONArray arr = json.getJSONArray("virtualIps");
-            
-            for( int i=0; i<arr.length(); i++ ) {
-                JSONObject ob = arr.getJSONObject(i);
-                
-                if( ob.has("ipVersion") && ob.getString("ipVersion").equalsIgnoreCase("ipv4") ) {
-                    if( ob.has("address") ) {
-                        address = ob.getString("address");
-                        break;
+            if( json.has("status") && !json.isNull("status")) {
+                String s = json.getString("status").toLowerCase();
+
+                if( s.equalsIgnoreCase("active") ) {
+                    state = LoadBalancerState.ACTIVE;
+                }
+                else if( s.equalsIgnoreCase("pending_delete") || s.equalsIgnoreCase("deleted") ) {
+                    state = LoadBalancerState.TERMINATED;
+                }
+                else {
+                    state = LoadBalancerState.PENDING;
+                }
+            }
+            String address = null;
+
+            if( json.has("virtualIps") ) {
+                JSONArray arr = json.getJSONArray("virtualIps");
+
+                for( int i=0; i<arr.length(); i++ ) {
+                    JSONObject ob = arr.getJSONObject(i);
+
+                    if( ob.has("ipVersion") && ob.getString("ipVersion").equalsIgnoreCase("ipv4") ) {
+                        if( ob.has("address") ) {
+                            address = ob.getString("address");
+                            break;
+                        }
                     }
                 }
             }
-        }
-        if( address == null ) {
-            return null;
-        }
-        ArrayList<String> nodes = new ArrayList<String>();
-        int privatePort = -1;
-        
-        if( json.has("nodes") ) {
-            JSONArray arr = json.getJSONArray("nodes");
-            
-            for( int i=0; i<arr.length(); i++ ) {
-                JSONObject ob = arr.getJSONObject(i);
-                
-                if( ob.has("address") ) {
-                    String addr = ob.getString("address");
-                    VirtualMachine node = null;
+            if( address == null ) {
+                return null;
+            }
+            ArrayList<String> nodes = new ArrayList<String>();
+            int privatePort = -1;
 
-                    if( possibleNodes != null ) {
-                        for( VirtualMachine vm : possibleNodes ) {
-                            RawAddress[] addrs = vm.getPublicAddresses();
+            if( json.has("nodes") ) {
+                JSONArray arr = json.getJSONArray("nodes");
 
-                            for( RawAddress a : addrs ){
-                                if( addr.equals(a.getIpAddress()) ) {
-                                    node = vm;
-                                    break;
-                                }
-                            }
-                            if( node == null ) {
-                                addrs = vm.getPrivateAddresses();
+                for( int i=0; i<arr.length(); i++ ) {
+                    JSONObject ob = arr.getJSONObject(i);
+
+                    if( ob.has("address") ) {
+                        String addr = ob.getString("address");
+                        VirtualMachine node = null;
+
+                        if( possibleNodes != null ) {
+                            for( VirtualMachine vm : possibleNodes ) {
+                                RawAddress[] addrs = vm.getPublicAddresses();
+
                                 for( RawAddress a : addrs ){
                                     if( addr.equals(a.getIpAddress()) ) {
                                         node = vm;
                                         break;
                                     }
                                 }
+                                if( node == null ) {
+                                    addrs = vm.getPrivateAddresses();
+                                    for( RawAddress a : addrs ){
+                                        if( addr.equals(a.getIpAddress()) ) {
+                                            node = vm;
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                         }
+                        if( node != null ) {
+                            nodes.add(node.getProviderVirtualMachineId());
+                        }
                     }
-                    if( node != null ) {
-                        nodes.add(node.getProviderVirtualMachineId());
+                    else if( ob.has("port") ) {
+                        privatePort = ob.getInt("port");
                     }
                 }
-                else if( ob.has("port") ) {
-                    privatePort = ob.getInt("port");
+            }
+            int port = -1;
+
+            if( json.has("port") ) {
+                port = json.getInt("port");
+                if( privatePort == -1 ) {
+                    privatePort = port;
                 }
             }
-        }
-        int port = -1;
-        
-        if( json.has("port") ) {
-            port = json.getInt("port");
-            if( privatePort == -1 ) {
-                privatePort = port;
-            }
-        }
-        int[] ports = new int[] { port };
+            int[] ports = new int[] { port };
 
-        LbProtocol protocol = LbProtocol.RAW_TCP;
-        
-        if( json.has("protocol") ) {
-            String p = json.getString("protocol");
-            
-            if( p.equals("HTTP") ) {
-                protocol = LbProtocol.HTTP;
-            }
-            else if( p.equals("HTTPS") ) {
-                protocol = LbProtocol.HTTPS;
-            }
-            else if( p.equals("AJP") ) {
-                protocol = LbProtocol.AJP;
-            }
-        }
-        
-        LbAlgorithm algorithm = LbAlgorithm.ROUND_ROBIN;
-        
-        if( json.has("algorithm") ) {
-            String a = json.getString("algorithm").toLowerCase();
-            
-            if( a.equals("round_robin") ) {
-                algorithm = LbAlgorithm.ROUND_ROBIN;
-            }
-            else if( a.equals("least_connections") ) {
-                algorithm = LbAlgorithm.LEAST_CONN;
-            }
-        }
-        LoadBalancer lb = LoadBalancer.getInstance(owner, regionId, id, state, name, name + " [" + address + "]", LoadBalancerAddressType.IP, address,  ports).createdAt(created);
+            LbProtocol protocol = LbProtocol.RAW_TCP;
 
-        lb.operatingIn(dataCenterIds);
-        lb.supportingTraffic(IPVersion.IPV4);
-        lb.withListeners(LbListener.getInstance(algorithm, LbPersistence.NONE, protocol, port, privatePort));
-        if( !nodes.isEmpty() ) {
-            //noinspection deprecation
-            lb.setProviderServerIds(nodes.toArray(new String[nodes.size()]));
+            if( json.has("protocol") ) {
+                String p = json.getString("protocol");
+
+                if( p.equals("HTTP") ) {
+                    protocol = LbProtocol.HTTP;
+                }
+                else if( p.equals("HTTPS") ) {
+                    protocol = LbProtocol.HTTPS;
+                }
+                else if( p.equals("AJP") ) {
+                    protocol = LbProtocol.AJP;
+                }
+            }
+
+            LbAlgorithm algorithm = LbAlgorithm.ROUND_ROBIN;
+
+            if( json.has("algorithm") ) {
+                String a = json.getString("algorithm").toLowerCase();
+
+                if( a.equals("round_robin") ) {
+                    algorithm = LbAlgorithm.ROUND_ROBIN;
+                }
+                else if( a.equals("least_connections") ) {
+                    algorithm = LbAlgorithm.LEAST_CONN;
+                }
+            }
+            LoadBalancer lb = LoadBalancer.getInstance(owner, regionId, id, state, name, name + " [" + address + "]", LoadBalancerAddressType.IP, address,  ports).createdAt(created);
+
+            lb.operatingIn(dataCenterIds);
+            lb.supportingTraffic(IPVersion.IPV4);
+            lb.withListeners(LbListener.getInstance(algorithm, LbPersistence.NONE, protocol, port, privatePort));
+            if( !nodes.isEmpty() ) {
+                //noinspection deprecation
+                lb.setProviderServerIds(nodes.toArray(new String[nodes.size()]));
+            }
+            return lb;
         }
-        return lb;
+        catch( JSONException e ) {
+            throw new CloudException(e);
+        }
     }
 
     private @Nullable ResourceStatus toStatus(@Nullable JSONObject json) throws JSONException, CloudException {

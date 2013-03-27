@@ -156,10 +156,10 @@ public class NovaOpenStack extends AbstractCloud {
     
     @Override
     public @Nullable PlatformServices getPlatformServices() {
-        if( getProviderName().equals("HP") ) {
+        if( getCloudProvider().equals(OpenStackProvider.HP) ) {
             return new HPPlatformServices(this);
         }
-        else if( getProviderName().equals("Rackspace") ) {
+        else if( getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
             return new RackspacePlatformServices(this);
         }
         return super.getPlatformServices();
@@ -315,7 +315,16 @@ public class NovaOpenStack extends AbstractCloud {
     }
 
     public boolean isRackspace() {
-        return getProviderName().equalsIgnoreCase("rackspace");
+        return getCloudProvider().equals(OpenStackProvider.RACKSPACE);
+    }
+
+    static private OpenStackProvider provider;
+
+    public @Nonnull OpenStackProvider getCloudProvider() {
+        if( provider == null ) {
+            provider = OpenStackProvider.getProvider(getProviderName());
+        }
+        return provider;
     }
 
     public boolean isPostCactus() throws CloudException, InternalException {

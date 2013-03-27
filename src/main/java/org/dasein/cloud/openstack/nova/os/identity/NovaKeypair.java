@@ -59,6 +59,10 @@ public class NovaKeypair implements ShellKeySupport {
 
     NovaKeypair(@Nonnull NovaOpenStack cloud) { provider = cloud; }
 
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return provider.getAuthenticationContext().getTenantId();
+    }
+
     @Override
     public @Nonnull SSHKeypair createKeypair(@Nonnull String name) throws InternalException, CloudException {
         APITrace.begin(provider, "Keypair.createKeypair");
@@ -339,7 +343,7 @@ public class NovaKeypair implements ShellKeySupport {
         return new String[0];
     }
     
-    private @Nullable SSHKeypair toKeypair(@Nonnull ProviderContext ctx, @Nullable JSONObject json) throws InternalException {
+    private @Nullable SSHKeypair toKeypair(@Nonnull ProviderContext ctx, @Nullable JSONObject json) throws InternalException, CloudException {
         if( json == null ) {
             return null;
         }
@@ -364,7 +368,7 @@ public class NovaKeypair implements ShellKeySupport {
             }
             kp.setName(name);
             kp.setProviderKeypairId(name);
-            kp.setProviderOwnerId(ctx.getAccountNumber());
+            kp.setProviderOwnerId(getTenantId());
             String regionId = ctx.getRegionId();
             kp.setProviderRegionId(regionId == null ? "" : regionId);
             return kp;

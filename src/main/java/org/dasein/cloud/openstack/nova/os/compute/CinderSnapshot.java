@@ -63,6 +63,10 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
         super(provider);
     }
 
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+    }
+
     private @Nonnull String getResource() {
         return (((NovaOpenStack)getProvider()).isHP() ? "/os-snapshots" : "/snapshots");
     }
@@ -388,7 +392,7 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
             snapshot.setCurrentState(currentState);
             snapshot.setDescription(description);
             snapshot.setName(name);
-            snapshot.setOwner(getContext().getAccountNumber());
+            snapshot.setOwner(getTenantId());
             snapshot.setProviderSnapshotId(snapshotId);
             snapshot.setRegionId(regionId);
             snapshot.setSizeInGb(size);
