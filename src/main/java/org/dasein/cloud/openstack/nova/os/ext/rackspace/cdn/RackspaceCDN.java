@@ -51,7 +51,11 @@ public class RackspaceCDN implements CDNSupport {
     private NovaOpenStack provider;
     
     public RackspaceCDN(NovaOpenStack provider) { this.provider = provider; }
-    
+
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return provider.getAuthenticationContext().getTenantId();
+    }
+
     @Override
     public @Nonnull String create(@Nonnull String origin, @Nonnull String name, boolean active, @Nullable String... aliases) throws InternalException, CloudException {
         APITrace.begin(provider, "CDN.create");
@@ -149,7 +153,7 @@ public class RackspaceCDN implements CDNSupport {
             distribution.setLogName(null);
             distribution.setName(distributionId);
             distribution.setProviderDistributionId(distributionId);
-            distribution.setProviderOwnerId(ctx.getAccountNumber());
+            distribution.setProviderOwnerId(getTenantId());
             return distribution;
         }
         finally {
@@ -311,7 +315,7 @@ public class RackspaceCDN implements CDNSupport {
         distribution.setLocation(uriString);
         distribution.setLogDirectory(null);
         distribution.setProviderDistributionId(container);
-        distribution.setProviderOwnerId(ctx.getAccountNumber());
+        distribution.setProviderOwnerId(getTenantId());
         return distribution;
     }
 

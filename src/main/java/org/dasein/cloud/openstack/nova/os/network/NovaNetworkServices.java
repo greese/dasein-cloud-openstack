@@ -22,6 +22,7 @@ import org.dasein.cloud.network.AbstractNetworkServices;
 import org.dasein.cloud.network.DNSSupport;
 import org.dasein.cloud.network.LoadBalancerSupport;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.openstack.nova.os.OpenStackProvider;
 import org.dasein.cloud.openstack.nova.os.ext.rackspace.dns.RackspaceCloudDNS;
 import org.dasein.cloud.openstack.nova.os.ext.rackspace.lb.RackspaceLoadBalancers;
 
@@ -44,7 +45,7 @@ public class NovaNetworkServices extends AbstractNetworkServices {
 
     @Override
     public @Nullable DNSSupport getDnsSupport() {
-        if( provider.getProviderName().equals("Rackspace") ) {
+        if( provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
             return new RackspaceCloudDNS(provider);
         }
         return null;
@@ -52,7 +53,7 @@ public class NovaNetworkServices extends AbstractNetworkServices {
 
     @Override
     public @Nullable NovaSecurityGroup getFirewallSupport() {
-        if( provider.getProviderName().equals("Rackspace") ) {
+        if( provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
             return null;
         }
         return new NovaSecurityGroup(provider);
@@ -60,7 +61,7 @@ public class NovaNetworkServices extends AbstractNetworkServices {
 
     @Override
     public @Nullable NovaFloatingIP getIpAddressSupport() {
-        if( provider.getProviderName().equals("Rackspace") ) {
+        if( provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
             return null;
         }
         return new NovaFloatingIP(provider);
@@ -68,7 +69,7 @@ public class NovaNetworkServices extends AbstractNetworkServices {
 
     @Override
     public @Nullable LoadBalancerSupport getLoadBalancerSupport() {
-        if( provider.getProviderName().equals("Rackspace") ) {
+        if( provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
             return new RackspaceLoadBalancers(provider);
         }
         return null;

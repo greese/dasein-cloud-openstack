@@ -66,6 +66,10 @@ public class Quantum extends AbstractVLANSupport {
         super(provider);
     }
 
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+    }
+
     @Override
     public boolean allowsNewSubnetCreation() throws CloudException, InternalException {
         return !((NovaOpenStack)getProvider()).isRackspace();
@@ -692,7 +696,7 @@ public class Quantum extends AbstractVLANSupport {
         try {
             VLAN v = new VLAN();
 
-            v.setProviderOwnerId(getContext().getAccountNumber());
+            v.setProviderOwnerId(getTenantId());
             v.setCurrentState(VLANState.AVAILABLE);
             v.setProviderRegionId(getContext().getRegionId());
             if( network.has("id") ) {

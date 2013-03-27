@@ -63,6 +63,10 @@ public class NovaImage extends AbstractImageSupport {
         super(provider);
     }
 
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+    }
+
     public @Nullable String getImageRef(@Nonnull String machineImageId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "Image.getImageRef");
         try {
@@ -281,7 +285,7 @@ public class NovaImage extends AbstractImageSupport {
             MachineImage img = getImage(machineImageId);
             String ownerId = (img != null ? img.getProviderOwnerId() : null);
 
-            return (ownerId != null && !ownerId.equals(getContext().getAccountNumber()));
+            return (ownerId != null && !ownerId.equals(getTenantId()));
         }
         finally {
             APITrace.end();
@@ -343,10 +347,10 @@ public class NovaImage extends AbstractImageSupport {
 
             if( account == null ) {
                 if( options == null ) {
-                    options = ImageFilterOptions.getInstance().withAccountNumber(getContext().getAccountNumber());
+                    options = ImageFilterOptions.getInstance().withAccountNumber(getTenantId());
                 }
                 else {
-                    options.withAccountNumber(getContext().getAccountNumber());
+                    options.withAccountNumber(getTenantId());
                 }
             }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
@@ -422,7 +426,7 @@ public class NovaImage extends AbstractImageSupport {
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             JSONObject ob = method.getServers("/images", null, true);
             ArrayList<MachineImage> images = new ArrayList<MachineImage>();
-            String me = getContext().getAccountNumber();
+            String me = getTenantId();
 
             try {
                 if( ob != null && ob.has("images") ) {
@@ -486,7 +490,7 @@ public class NovaImage extends AbstractImageSupport {
                 JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
                 Architecture architecture = Architecture.I64;
                 Platform platform = Platform.UNKNOWN;
-                String owner = (getProvider().getProviderName().equals("Rackspace") ? getContext().getAccountNumber() : "--public--");
+                String owner = ((NovaOpenStack)getProvider()).getCloudProvider().getDefaultImageOwner(getTenantId());
 
                 if( md != null ) {
                     if( description == null && md.has("org.dasein.description") ) {
@@ -540,6 +544,9 @@ public class NovaImage extends AbstractImageSupport {
                     }
                     else if( md.has("image_type") && !md.isNull("image_type") && md.getString("image_type").equals("base") ) {
                         owner = "--public--";
+                    }
+                    else if( md.has("image_type") && !md.isNull("image_type") && md.getString("image_type").equals("snapshot") ) {
+                        owner = getTenantId();
                     }
                 }
                 long created = (json.has("created") ? ((NovaOpenStack)getProvider()).parseTimestamp(json.getString("created")) : -1L);
@@ -619,7 +626,7 @@ public class NovaImage extends AbstractImageSupport {
         if( json == null ) {
             return null;
         }
-        String owner = (getProvider().getProviderName().equals("Rackspace") ? getContext().getAccountNumber() : "--public--");
+        String owner = ((NovaOpenStack)getProvider()).getCloudProvider().getDefaultImageOwner(getTenantId());
         MachineImageState state = MachineImageState.PENDING;
         String id = null;
 
@@ -637,6 +644,9 @@ public class NovaImage extends AbstractImageSupport {
             }
             else if( md != null && md.has("image_type") && !md.isNull("image_type") && md.getString("image_type").equals("base") ) {
                 owner = "--public--";
+            }
+            else if( md != null && md.has("image_type") && !md.isNull("image_type") && md.getString("image_type").equals("snapshot") ) {
+                owner = getTenantId();
             }
             if( json.has("status") ) {
                 String s = json.getString("status").toLowerCase();
@@ -661,7 +671,7 @@ public class NovaImage extends AbstractImageSupport {
         catch( JSONException e ) {
             throw new InternalException(e);
         }
-        if( !owner.equals(getContext().getAccountNumber()) ) {
+        if( !owner.equals(getTenantId()) ) {
             return null;
         }
         return new ResourceStatus(id, state);

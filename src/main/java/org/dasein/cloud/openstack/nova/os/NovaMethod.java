@@ -43,19 +43,6 @@ public class NovaMethod extends AbstractMethod {
         delete(context.getAuthToken(), endpoint, resource + "/" + resourceId);
     }
     
-    /*
-    public String getFlavorRef(String flavorId) {
-        return provider.getEndpoint() + "/flavors/" + flavorId;
-    }
-    public String getImageRef(String imageId) {
-        return provider.getEndpoint() + "/images/" + imageId;
-    }
-    
-    public String getServerRef(String serverId) {
-        return provider.getEndpoint() + "/servers/" + serverId;
-    }
-    */
-    
     public @Nullable JSONObject getServers(@Nonnull String resource, @Nullable String resourceId, boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getComputeUrl();

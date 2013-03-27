@@ -70,7 +70,11 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     private NovaOpenStack provider;
 
     public RackspaceRDBMS(NovaOpenStack provider) { this.provider = provider; }
-    
+
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return provider.getAuthenticationContext().getTenantId();
+    }
+
     @Override
     public void addAccess(String providerDatabaseId, String sourceCidr) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Access management is not yet supported");
@@ -712,7 +716,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             database.setProductSize(flavor + ":" + size);
             database.setProviderDatabaseId(dbId);
             database.setProviderDataCenterId(regionId + "-a");
-            database.setProviderOwnerId(ctx.getAccountNumber());
+            database.setProviderOwnerId(getTenantId());
             database.setProviderRegionId(regionId);
             return database;
         }
