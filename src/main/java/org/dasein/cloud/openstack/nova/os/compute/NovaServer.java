@@ -1114,7 +1114,7 @@ public class NovaServer implements VirtualMachineSupport {
             vm.setPersistent(true);
             vm.setPlatform(Platform.UNKNOWN);
             vm.setRebootable(true);
-            vm.setProviderOwnerId(provider.getContext().getAccountNumber());
+            vm.setProviderOwnerId(provider.getTenantId());
             if( server.has("id") ) {
                 vm.setProviderVirtualMachineId(server.getString("id"));
             }

@@ -468,7 +468,7 @@ public class CinderSnapshot implements SnapshotSupport {
             snapshot.setCurrentState(currentState);
             snapshot.setDescription(description);
             snapshot.setName(name);
-            snapshot.setOwner(ctx.getAccountNumber());
+            snapshot.setOwner(provider.getTenantId());
             snapshot.setProviderSnapshotId(snapshotId);
             snapshot.setRegionId(regionId);
             snapshot.setSizeInGb(size);

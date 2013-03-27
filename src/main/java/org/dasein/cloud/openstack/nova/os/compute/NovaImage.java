@@ -419,7 +419,7 @@ public class NovaImage implements MachineImageSupport {
         MachineImage img = getImage(machineImageId);
         String ownerId = (img != null ? img.getProviderOwnerId() : null);
 
-        return (ownerId != null && !ownerId.equals(ctx.getAccountNumber()));
+        return (ownerId != null && !ownerId.equals(provider.getTenantId()));
     }
 
     @Override
@@ -492,7 +492,7 @@ public class NovaImage implements MachineImageSupport {
                         JSONObject image = list.getJSONObject(i);
                         MachineImage img = toImage(ctx, image);
 
-                        if( img != null && img.getProviderOwnerId().equals(ctx.getAccountNumber()) && img.getImageClass().equals(cls) ) {
+                        if( img != null && img.getProviderOwnerId().equals(provider.getTenantId()) && img.getImageClass().equals(cls) ) {
                             images.add(img);
                         }
 
@@ -518,7 +518,7 @@ public class NovaImage implements MachineImageSupport {
         if( ctx == null ) {
             throw new CloudException("No context was set for this request");
         }
-        if( !ownedBy.equals(ctx.getAccountNumber()) ) {
+        if( !ownedBy.equals(provider.getTenantId()) ) {
             return Collections.emptyList();
         }
         return listImages(cls);
@@ -737,7 +737,7 @@ public class NovaImage implements MachineImageSupport {
                     MachineImage img = toImage(ctx, image);
 
                     if( img != null ) {
-                        if( ctx.getAccountNumber().equals(img.getProviderOwnerId()) ) {
+                        if( provider.getTenantId().equals(img.getProviderOwnerId()) ) {
                             continue;
                         }
                         if( architecture != null ) {
@@ -839,7 +839,7 @@ public class NovaImage implements MachineImageSupport {
         // NO-OP
     }
 
-    public @Nullable MachineImage toImage(@Nonnull ProviderContext ctx, @Nullable JSONObject json) throws JSONException {
+    public @Nullable MachineImage toImage(@Nonnull ProviderContext ctx, @Nullable JSONObject json) throws CloudException, JSONException {
         Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
         
         if( logger.isTraceEnabled() ) {
@@ -866,7 +866,7 @@ public class NovaImage implements MachineImageSupport {
             JSONObject md = (json.has("metadata") ? json.getJSONObject("metadata") : null);
             Architecture architecture = Architecture.I64;
             Platform platform = Platform.UNKNOWN;
-            String owner = (provider.getProviderName().equals("Rackspace") ? ctx.getAccountNumber() : "--public--");
+            String owner = provider.getCloudProvider().getDefaultImageOwner(provider.getTenantId());
 
             if( md != null ) {
                 if( description == null && md.has("org.dasein.description") ) {
@@ -976,7 +976,7 @@ public class NovaImage implements MachineImageSupport {
         if( json == null ) {
             return null;
         }
-        String owner = (provider.getProviderName().equals("Rackspace") ? ctx.getAccountNumber() : "--public--");
+        String owner = provider.getCloudProvider().getDefaultImageOwner(provider.getTenantId());
         MachineImageState state = MachineImageState.PENDING;
         String id = null;
 
@@ -1021,7 +1021,7 @@ public class NovaImage implements MachineImageSupport {
         catch( JSONException e ) {
             throw new InternalException(e);
         }
-        if( !owner.equals(ctx.getAccountNumber()) ) {
+        if( !owner.equals(provider.getTenantId()) ) {
             return null;
         }
         return new ResourceStatus(id, state);

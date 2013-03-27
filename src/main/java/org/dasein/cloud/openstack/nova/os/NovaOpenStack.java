@@ -112,7 +112,16 @@ public class NovaOpenStack extends AbstractCloud {
 
         return (name != null ? name : "OpenStack");
     }
-    
+
+    private transient volatile OpenStackProvider cloudProvider;
+
+    public @Nonnull OpenStackProvider getCloudProvider() {
+        if( cloudProvider == null ) {
+            cloudProvider = OpenStackProvider.getProvider(getProviderName());
+        }
+        return cloudProvider;
+    }
+
     @Override
     public @Nonnull NovaComputeServices getComputeServices() {
         return new NovaComputeServices(this);
@@ -261,14 +270,32 @@ public class NovaOpenStack extends AbstractCloud {
         return new NovaNetworkServices(this);
     }
 
+    public @Nonnull String getTenantId() throws CloudException {
+        if( authenticationContext == null ) {
+            String id = testContext();
+
+            if( id != null ) {
+                return id;
+            }
+            if( authenticationContext != null ) {
+                return authenticationContext.getTenantId();
+            }
+            throw new CloudException("Configuration error for tenant ID");
+        }
+        return authenticationContext.getTenantId();
+    }
+
+    @Deprecated
     public boolean isHP() {
-        return getProviderName().equalsIgnoreCase("hp");
+        return getCloudProvider().equals(OpenStackProvider.HP);
     }
 
+    @Deprecated
     public boolean isRackspace() {
-        return getProviderName().equalsIgnoreCase("rackspace");
+        return getCloudProvider().equals(OpenStackProvider.RACKSPACE);
     }
 
+    @Deprecated
     public boolean isPostCactus() throws CloudException, InternalException {
         return (getMajorVersion() > 1 || getMinorVersion() > 0);
     }
