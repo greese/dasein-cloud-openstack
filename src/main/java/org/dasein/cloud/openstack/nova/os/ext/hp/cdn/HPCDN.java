@@ -64,6 +64,10 @@ public class HPCDN implements CDNSupport {
         provider = cloud;
     }
 
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return provider.getAuthenticationContext().getTenantId();
+    }
+
     @Override
     public @Nonnull String create(@Nonnull String origin, @Nonnull String name, boolean active, @CheckForNull String... aliases) throws InternalException, CloudException {
         APITrace.begin(provider, "CDN.create");
@@ -287,7 +291,7 @@ public class HPCDN implements CDNSupport {
         distribution.setLocation(uriString);
         distribution.setLogDirectory(null);
         distribution.setProviderDistributionId(container);
-        distribution.setProviderOwnerId(ctx.getAccountNumber());
+        distribution.setProviderOwnerId(getTenantId());
         return distribution;
     }
 

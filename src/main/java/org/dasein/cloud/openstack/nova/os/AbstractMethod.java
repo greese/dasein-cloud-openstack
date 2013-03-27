@@ -199,12 +199,20 @@ public abstract class AbstractMethod {
             if( std.isDebugEnabled() ) {
                 std.debug("authenticateKeystone(): tenantId=" + provider.getContext().getAccountNumber());
             }
-            if( !provider.getProviderName().equals("Rackspace") ) {
-                if( provider.getProviderName().equals("HP") ) {
-                    json.put("tenantId", provider.getContext().getAccountNumber());
+            if( !provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
+                String acct = provider.getContext().getAccountNumber();
+
+                if( provider.getCloudProvider().equals(OpenStackProvider.HP) ) {
+                    json.put("tenantId", acct);
                 }
                 else {
-                    json.put("tenantName", provider.getContext().getAccountNumber());
+                    // a hack
+                    if( acct.length() == 32 ) {
+                        json.put("tenantId", acct);
+                    }
+                    else {
+                        json.put("tenantName", acct);
+                    }
                 }
             }
             HashMap<String,Object> jsonAuth = new HashMap<String,Object>();
@@ -330,7 +338,14 @@ public abstract class AbstractMethod {
                         token = auth.getJSONObject("token");
                         catalog = auth.getJSONArray("serviceCatalog");
                         id = (token.has("id") ? token.getString("id") : null);
-                        tenantId = (token.has("tenantId") ? token.getString("tenantId") : null);
+                        tenantId = ((token.has("tenantId") && !token.isNull("tenantId")) ? token.getString("tenantId") : null);
+                        if( tenantId == null && token.has("tenant") && !token.isNull("tenant") ) {
+                            JSONObject t = token.getJSONObject("tenant");
+
+                            if( t.has("id") && !t.isNull("id") ) {
+                                tenantId = t.getString("id");
+                            }
+                        }
                     }
                     catch( JSONException e ) {
                         std.error("authenticateKeystone(): Invalid response from server: " + e.getMessage());
@@ -675,12 +690,9 @@ public abstract class AbstractMethod {
             std.trace("enter - " + AbstractMethod.class.getName() + ".authenticate()");
         }
         String tenantId = provider.getContext().getAccountNumber();
-        String authToken = null, storageToken = null, myRegion = provider.getContext().getRegionId();
+        String authToken = null, storageToken = null;
         String thisRegion = toRegion(endpoint);
-        
-        if( myRegion == null ) {
-            myRegion = thisRegion;
-        }
+
         if( wire.isDebugEnabled() ) {
             wire.debug("--------------------------------------------------------> " + endpoint);
             wire.debug("");
@@ -875,7 +887,7 @@ public abstract class AbstractMethod {
             HttpResponse response;
 
             try {
-                APITrace.trace(provider, "DELETE " + resource);
+                APITrace.trace(provider, "DELETE " + toAPIResource(resource));
                 response = client.execute(delete);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(response.getStatusLine().toString());
@@ -1052,7 +1064,7 @@ public abstract class AbstractMethod {
             HttpResponse response;
 
             try {
-                APITrace.trace(provider, "GET " + resource);
+                APITrace.trace(provider, "GET " + toAPIResource(resource));
                 response = client.execute(get);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(response.getStatusLine().toString());
@@ -1209,7 +1221,7 @@ public abstract class AbstractMethod {
             HttpResponse response;
 
             try {
-                APITrace.trace(provider, "GET " + resource);
+                APITrace.trace(provider, "GET " + toAPIResource(resource));
                 response = client.execute(get);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(response.getStatusLine().toString());
@@ -1408,7 +1420,7 @@ public abstract class AbstractMethod {
             HttpResponse response;
 
             try {
-                APITrace.trace(provider, "HEAD " + resource);
+                APITrace.trace(provider, "HEAD " + toAPIResource(resource));
                 response = client.execute(head);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(response.getStatusLine().toString());
@@ -1524,7 +1536,7 @@ public abstract class AbstractMethod {
             HttpResponse response;
 
             try {
-                APITrace.trace(provider, "POST " + resource);
+                APITrace.trace(provider, "POST " + toAPIResource(resource));
                 response = client.execute(post);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(response.getStatusLine().toString());
@@ -1737,7 +1749,7 @@ public abstract class AbstractMethod {
             HttpResponse response;
 
             try {
-                APITrace.trace(provider, "POST " + resource);
+                APITrace.trace(provider, "POST " + toAPIResource(resource));
                 response = client.execute(post);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(response.getStatusLine().toString());
@@ -1906,7 +1918,7 @@ public abstract class AbstractMethod {
             HttpResponse response;
 
             try {
-                APITrace.trace(provider, "POST " + resource);
+                APITrace.trace(provider, "POST " + toAPIResource(resource));
                 response = client.execute(post);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(response.getStatusLine().toString());
@@ -2061,7 +2073,7 @@ public abstract class AbstractMethod {
             HttpResponse response;
 
             try {
-                APITrace.trace(provider, "PUT " + resource);
+                APITrace.trace(provider, "PUT " + toAPIResource(resource));
                 response = client.execute(put);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(response.getStatusLine().toString());
@@ -2191,7 +2203,7 @@ public abstract class AbstractMethod {
             HttpResponse response;
 
             try {
-                APITrace.trace(provider, "PUT " + resource);
+                APITrace.trace(provider, "PUT " + toAPIResource(resource));
                 response = client.execute(put);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(response.getStatusLine().toString());
@@ -2315,7 +2327,7 @@ public abstract class AbstractMethod {
             HttpResponse response;
 
             try {
-                APITrace.trace(provider, "PUT " + resource);
+                APITrace.trace(provider, "PUT " + toAPIResource(resource));
                 response = client.execute(put);
                 if( wire.isDebugEnabled() ) {
                     wire.debug(response.getStatusLine().toString());
@@ -2500,4 +2512,22 @@ public abstract class AbstractMethod {
 		
 		return result;
 	}
+
+    private @Nonnull String toAPIResource(@Nonnull String resource) {
+        if( resource.equals("/") || resource.length() < 2 ) {
+            return resource;
+        }
+        while( resource.startsWith("/") ) {
+            if( resource.equals("/") ) {
+                return "/";
+            }
+            resource = resource.substring(1);
+        }
+        int idx = resource.indexOf("/");
+
+        if( idx > 0 ) {
+            return resource.substring(0, idx);
+        }
+        return resource;
+    }
 }

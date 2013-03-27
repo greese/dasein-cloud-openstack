@@ -68,6 +68,10 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
         super(cloud);
     }
 
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+    }
+
     @Override
     public @Nonnull String authorize(@Nonnull String firewallId, @Nonnull Direction direction, @Nonnull Permission permission, @Nonnull RuleTarget sourceEndpoint, @Nonnull Protocol protocol, @Nonnull RuleTarget destinationEndpoint, int beginPort, int endPort, @Nonnegative int precedence) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "Firewall.authorize");
@@ -95,7 +99,7 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
                     if( targetGroup == null ) {
                         throw new CloudException("No such source endpoint firewall: " + sourceEndpoint.getProviderFirewallId());
                     }
-                    g.put("tenant_id", getContext().getAccountNumber());
+                    g.put("tenant_id", getTenantId());
                     g.put("name", targetGroup.getName());
                     json.put("group", g);
                     break;
@@ -282,7 +286,7 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
                             else {
                                 String o = (g.has("tenant_id") ? g.getString("tenant_id") : null);
 
-                                if( getContext().getAccountNumber().equals(o) ) {
+                                if( getTenantId().equals(o) ) {
                                     String n = (g.has("name") ? g.getString("name") : null);
 
                                     if( n != null ) {

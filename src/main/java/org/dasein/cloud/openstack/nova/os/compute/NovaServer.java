@@ -94,6 +94,10 @@ public class NovaServer extends AbstractVMSupport {
         super(provider);
     }
 
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+    }
+
     @Override
     public @Nonnull String getConsoleOutput(@Nonnull String vmId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.getConsoleOutput");
@@ -882,17 +886,17 @@ public class NovaServer extends AbstractVMSupport {
 
     @Override
     public boolean supportsPauseUnpause(@Nonnull VirtualMachine vm) {
-        return (!((NovaOpenStack)getProvider()).isHP() && (!((NovaOpenStack)getProvider()).isRackspace() || !getProvider().getCloudName().contains("Rackspace")));
+        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsPauseUnpause(vm);
     }
 
     @Override
     public boolean supportsStartStop(@Nonnull VirtualMachine vm) {
-        return (!((NovaOpenStack)getProvider()).isHP() && (!((NovaOpenStack)getProvider()).isRackspace() || !getProvider().getCloudName().contains("Rackspace")));
+        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsStartStop(vm);
     }
 
     @Override
     public boolean supportsSuspendResume(@Nonnull VirtualMachine vm) {
-        return (!((NovaOpenStack)getProvider()).isHP() && (!((NovaOpenStack)getProvider()).isRackspace() || !getProvider().getCloudName().contains("Rackspace")));
+        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsSuspendResume(vm);
     }
 
     @Override
@@ -1032,7 +1036,7 @@ public class NovaServer extends AbstractVMSupport {
         vm.setPersistent(true);
         vm.setPlatform(Platform.UNKNOWN);
         vm.setRebootable(true);
-        vm.setProviderOwnerId(getContext().getAccountNumber());
+        vm.setProviderOwnerId(getTenantId());
         if( server.has("id") ) {
             vm.setProviderVirtualMachineId(server.getString("id"));
         }

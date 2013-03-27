@@ -64,7 +64,11 @@ public class RackspaceCloudDNS implements DNSSupport {
     private NovaOpenStack provider;
     
     public RackspaceCloudDNS(NovaOpenStack provider) { this.provider = provider; }
-    
+
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return provider.getAuthenticationContext().getTenantId();
+    }
+
     @Override
     public @Nonnull DNSRecord addDnsRecord(@Nonnull String providerDnsZoneId, @Nonnull DNSRecordType recordType, @Nonnull String name, @Nonnegative int ttl, @Nonnull String... values) throws CloudException, InternalException {
         APITrace.begin(provider, "DNS.addDnsRecord");
@@ -670,7 +674,7 @@ public class RackspaceCloudDNS implements DNSSupport {
             zone.setDomainName(name);
             zone.setName(name);
             zone.setProviderDnsZoneId(zoneId);
-            zone.setProviderOwnerId(ctx.getAccountNumber());
+            zone.setProviderOwnerId(getTenantId());
             if( nameservers != null ) {
                 String[] ns = new String[nameservers.length()];
                 
