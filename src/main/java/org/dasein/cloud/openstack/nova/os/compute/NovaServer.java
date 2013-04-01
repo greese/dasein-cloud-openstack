@@ -1266,11 +1266,9 @@ public class NovaServer implements VirtualMachineSupport {
                             }
                             if( addr != null ) {
                                 if( isPublicIpAddress(addr) ) {
-                                    System.out.println("Check : IpAddress : " + addr.getIpAddress() + " is public.");
                                 	pub.add(addr);
                                 }
                                 else {
-                                    System.out.println("Check : IpAddress : " + addr.getIpAddress() + " is private.");
                                     priv.add(addr);
                                 }
                             }
