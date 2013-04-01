@@ -1199,37 +1199,37 @@ public class NovaServer implements VirtualMachineSupport {
             if( server.has("status") ) {
                 String s = server.getString("status").toLowerCase();
                 
-                if( s.equals("active") ) {
+                if( s.startsWith("active") ) {
                     vm.setCurrentState(VmState.RUNNING);
                 }
                 else if( s.startsWith("build") ) {
                     vm.setCurrentState(VmState.PENDING);
                 }
-                else if( s.equals("deleted") ) {
+                else if( s.startsWith("deleted") ) {
                     vm.setCurrentState(VmState.TERMINATED);
                 }
-                else if( s.equals("suspended") ) {
+                else if( s.startsWith("suspended") ) {
                     vm.setCurrentState(VmState.SUSPENDED);
                 }
-                else if( s.equalsIgnoreCase("paused") ) {
+                else if( s.startsWith("paused") ) {
                     vm.setCurrentState(VmState.PAUSED);
                 }
-                else if( s.equalsIgnoreCase("stopped") || s.equalsIgnoreCase("shutoff")) {
+                else if( s.startsWith("stopped") || s.startsWith("shutoff")) {
                     vm.setCurrentState(VmState.STOPPED);
                 }
-                else if( s.equalsIgnoreCase("stopping") ) {
+                else if( s.startsWith("stopping") ) {
                     vm.setCurrentState(VmState.STOPPING);
                 }
-                else if( s.equalsIgnoreCase("pausing") ) {
+                else if( s.startsWith("pausing") ) {
                     vm.setCurrentState(VmState.PAUSING);
                 }
-                else if( s.equalsIgnoreCase("suspending") ) {
+                else if( s.startsWith("suspending") ) {
                     vm.setCurrentState(VmState.SUSPENDING);
                 }
-                else if( s.equals("error") ) {
+                else if( s.startsWith("error") ) {
                     return null;
                 }
-                else if( s.equals("reboot") || s.equals("hard_reboot") ) {
+                else if( s.startsWith("reboot") || s.startsWith("hard_reboot") ) {
                     vm.setCurrentState(VmState.REBOOTING);
                 }
                 else {
@@ -1242,60 +1242,42 @@ public class NovaServer implements VirtualMachineSupport {
             }
             if( server.has("addresses") ) {
                 JSONObject addrs = server.getJSONObject("addresses");
-                
-                if( addrs.has("public") ) {
-                    JSONArray arr = addrs.getJSONArray("public");
-                    ArrayList<String> addresses = new ArrayList<String>();
-                    
-                    for( int i=0; i<arr.length(); i++ ) {
-                        if( provider.getMinorVersion() == 0 && provider.getMajorVersion() == 1 ) {
-                            addresses.add(arr.getString(i).trim());
-                        }
-                        else {
-                            JSONObject a = arr.getJSONObject(i);
-                        
-                            if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
-                                addresses.add(a.getString("addr"));
+                String[] names = JSONObject.getNames(addrs);
+
+                if( names != null && names.length > 0 ) {
+                    ArrayList<RawAddress> pub = new ArrayList<RawAddress>();
+                    ArrayList<RawAddress> priv = new ArrayList<RawAddress>();
+
+                    for( String name : names ) {
+                        JSONArray arr = addrs.getJSONArray(name);
+
+                        for( int i=0; i<arr.length(); i++ ) {
+                            RawAddress addr = null;
+
+                            if( (provider.getMinorVersion() == 0 && provider.getMajorVersion() == 1 ) ) {
+                                addr = new RawAddress(arr.getString(i).trim());
+                            }
+                            else {
+                                JSONObject a = arr.getJSONObject(i);
+
+                                if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
+                                    addr = new RawAddress(a.getString("addr"));
+                                }
+                            }
+                            if( addr != null ) {
+                                if( isPublicIpAddress(addr) ) {
+                                    System.out.println("Check : IpAddress : " + addr.getIpAddress() + " is public.");
+                                	pub.add(addr);
+                                }
+                                else {
+                                    System.out.println("Check : IpAddress : " + addr.getIpAddress() + " is private.");
+                                    priv.add(addr);
+                                }
                             }
                         }
                     }
-                    RawAddress[] raw = new RawAddress[addresses.size()];
-                    int i=0;
-
-                    for( String addr : addresses ) {
-                        raw[i++] = new RawAddress(addr);
-                    }
-                    vm.setPublicAddresses(raw);
-                }
-                if( addrs.has("private") || addrs.has("nova_fixed")) {
-                    JSONArray arr;
-                    
-                    if ( addrs.has("private"))
-                    	arr = addrs.getJSONArray("private");
-                    else 
-                    	arr = addrs.getJSONArray("nova_fixed");
-                    
-                    ArrayList<String> addresses = new ArrayList<String>();
-                    
-                    for( int i=0; i<arr.length(); i++ ) {
-                        if( provider.getMinorVersion() == 0 && provider.getMajorVersion() == 1 ) {
-                            addresses.add(arr.getString(i).trim());
-                        }
-                        else {
-                            JSONObject a = arr.getJSONObject(i);
-                        
-                            if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
-                                addresses.add(a.getString("addr"));
-                            }
-                        }
-                    }
-                    RawAddress[] raw = new RawAddress[addresses.size()];
-                    int i=0;
-
-                    for( String addr : addresses ) {
-                        raw[i++] = new RawAddress(addr);
-                    }
-                    vm.setPrivateAddresses(raw);
+                    vm.setPublicAddresses(pub.toArray(new RawAddress[pub.size()]));
+                    vm.setPrivateAddresses(priv.toArray(new RawAddress[priv.size()]));
                 }
                 RawAddress[] raw = vm.getPublicAddresses();
 
@@ -1405,5 +1387,31 @@ public class NovaServer implements VirtualMachineSupport {
             }
         }
     }
+
+	private boolean isPublicIpAddress(RawAddress addr) {
+		 if( addr.getVersion().equals(IPVersion.IPV4) ) {
+	            if( addr.getIpAddress().startsWith("10.") || addr.getIpAddress().startsWith("192.168") || addr.getIpAddress().startsWith("169.254") ) {
+	                return false;
+	            }
+	            else if( addr.getIpAddress().startsWith("172.") ) {
+	                String[] parts = addr.getIpAddress().split("\\.");
+
+	                if( parts.length != 4 ) {
+	                    return true;
+	                }
+	                int x = Integer.parseInt(parts[1]);
+
+	                if( x >= 16 && x <= 31 ) {
+	                    return false;
+	                }
+	            }
+	      }
+	      else {
+	          if( addr.getIpAddress().startsWith("fd") || addr.getIpAddress().startsWith("fc00:")) {
+	              return false;
+	          }
+	      }
+	      return true;
+	}
 
 }
