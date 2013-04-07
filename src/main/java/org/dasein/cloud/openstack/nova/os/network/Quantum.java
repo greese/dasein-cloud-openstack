@@ -115,25 +115,26 @@ public class Quantum implements VLANSupport {
             }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             try {
-                JSONObject ob = method.getServers("networks", null, false);
+                JSONObject ob = method.getServers("/networks", null, false);
 
                 if( ob != null && ob.has("networks") ) {
                     cache.put(getContext(), Collections.singletonList(QuantumType.QUANTUM));
                     return QuantumType.QUANTUM;
                 }
             }
-            catch( Throwable t ) {
-                try {
-                    JSONObject ob = method.getServers("os-networks", null, false);
+            catch( Throwable ignore ) {
+                // ignore
+            }
+            try {
+                JSONObject ob = method.getServers("/os-networks", null, false);
 
-                    if( ob != null && ob.has("networks") ) {
-                        cache.put(getContext(), Collections.singletonList(QuantumType.NOVA));
-                        return QuantumType.NOVA;
-                    }
+                if( ob != null && ob.has("networks") ) {
+                    cache.put(getContext(), Collections.singletonList(QuantumType.NOVA));
+                    return QuantumType.NOVA;
                 }
-                catch( Throwable another ) {
-                    return QuantumType.NONE;
-                }
+            }
+            catch( Throwable ignore ) {
+                // ignore
             }
             return QuantumType.NONE;
         }
