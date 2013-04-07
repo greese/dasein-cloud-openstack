@@ -44,6 +44,8 @@ import org.dasein.cloud.network.VLANSupport;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.Cache;
+import org.dasein.cloud.util.CacheLevel;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -54,6 +56,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 
@@ -71,6 +74,72 @@ public class Quantum implements VLANSupport {
 
     public Quantum(@Nonnull NovaOpenStack provider) {
         this.provider = provider;
+    }
+
+    private enum QuantumType {
+        NONE, RACKSPACE, NOVA, QUANTUM;
+
+        public String getNetworkResource() {
+            switch( this ) {
+                case QUANTUM: return "/networks";
+                case RACKSPACE: return "/os-networksv2";
+                case NOVA: return "/os-networks";
+            }
+            return "/networks";
+        }
+
+        public String getSubnetResource() {
+            switch( this ) {
+                case QUANTUM: return "/subnets";
+            }
+            return "/subnets";
+        }
+    }
+
+    private QuantumType getNetworkType() throws CloudException, InternalException {
+        Cache<QuantumType> cache = Cache.getInstance(getProvider(), "quantumness", QuantumType.class, CacheLevel.CLOUD);
+
+        Iterable<QuantumType> it = cache.get(getContext());
+
+        if( it != null ) {
+            Iterator<QuantumType> b = it.iterator();
+
+            if( b.hasNext() ) {
+                return b.next();
+            }
+        }
+        try {
+            if( getProvider().isRackspace() ) {
+                cache.put(getContext(), Collections.singletonList(QuantumType.RACKSPACE));
+                return QuantumType.RACKSPACE;
+            }
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            try {
+                JSONObject ob = method.getServers("networks", null, false);
+
+                if( ob != null && ob.has("networks") ) {
+                    cache.put(getContext(), Collections.singletonList(QuantumType.QUANTUM));
+                    return QuantumType.QUANTUM;
+                }
+            }
+            catch( Throwable t ) {
+                try {
+                    JSONObject ob = method.getServers("os-networks", null, false);
+
+                    if( ob != null && ob.has("networks") ) {
+                        cache.put(getContext(), Collections.singletonList(QuantumType.NOVA));
+                        return QuantumType.NOVA;
+                    }
+                }
+                catch( Throwable another ) {
+                    return QuantumType.NONE;
+                }
+            }
+            return QuantumType.NONE;
+        }
+        finally {
+            APITrace.end();
+        }
     }
 
     private @Nonnull ProviderContext getContext() throws CloudException {
@@ -92,7 +161,7 @@ public class Quantum implements VLANSupport {
 
     @Override
     public boolean allowsNewSubnetCreation() throws CloudException, InternalException {
-        return !((NovaOpenStack)getProvider()).isRackspace();
+        return getNetworkType().equals(QuantumType.QUANTUM);
     }
 
     @Override
@@ -130,25 +199,21 @@ public class Quantum implements VLANSupport {
     @Override
     public void addRouteToAddress(@Nonnull String toRoutingTableId, @Nonnull IPVersion version, @Nullable String destinationCidr, @Nonnull String address) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Not supported");
-        //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
     public void addRouteToGateway(@Nonnull String toRoutingTableId, @Nonnull IPVersion version, @Nullable String destinationCidr, @Nonnull String gatewayId) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Not supported");
-        //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
     public void addRouteToNetworkInterface(@Nonnull String toRoutingTableId, @Nonnull IPVersion version, @Nullable String destinationCidr, @Nonnull String nicId) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Not supported");
-        //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
     public void addRouteToVirtualMachine(@Nonnull String toRoutingTableId, @Nonnull IPVersion version, @Nullable String destinationCidr, @Nonnull String vmId) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Not supported");
-        //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
@@ -186,7 +251,7 @@ public class Quantum implements VLANSupport {
 
             wrapper.put("port", json);
 
-            JSONObject result = method.postServers("/networks/" + subnet.getProviderVlanId() + "/ports", null, new JSONObject(wrapper), false);
+            JSONObject result = method.postServers(getNetworkResource() + "/" + subnet.getProviderVlanId() + "/ports", null, new JSONObject(wrapper), false);
 
             if( result != null && result.has("port") ) {
                 try {
@@ -249,7 +314,7 @@ public class Quantum implements VLANSupport {
 
             wrapper.put("subnet", json);
 
-            JSONObject result = method.postServers("/subnets", null, new JSONObject(wrapper), false);
+            JSONObject result = method.postServers(getSubnetResource(), null, new JSONObject(wrapper), false);
 
             if( result != null && result.has("subnet") ) {
                 try {
@@ -329,7 +394,6 @@ public class Quantum implements VLANSupport {
     @Override
     public void detachNetworkInterface(@Nonnull String nicId) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Not supported");
-        //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
@@ -342,13 +406,12 @@ public class Quantum implements VLANSupport {
         return -2;
     }
 
-    private @Nonnull String getNetworkResource() {
-        if( ((NovaOpenStack)getProvider()).isRackspace() ) {
-            return "/os-networksv2";
-        }
-        else {
-            return "/networks";
-        }
+    private @Nonnull String getNetworkResource() throws CloudException, InternalException {
+        return getNetworkType().getNetworkResource();
+    }
+
+    private @Nonnull String getSubnetResource() throws CloudException, InternalException {
+        return getNetworkType().getSubnetResource();
     }
 
     @Override
@@ -391,8 +454,11 @@ public class Quantum implements VLANSupport {
     public Subnet getSubnet(@Nonnull String subnetId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.getSubnet");
         try {
+            if( !getNetworkType().equals(QuantumType.QUANTUM) ) {
+                return null;
+            }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
-            JSONObject ob = method.getServers("/subnets", subnetId, false);
+            JSONObject ob = method.getServers(getSubnetResource(), subnetId, false);
 
             try {
                 if( ob != null && ob.has("subnet") ) {
@@ -416,8 +482,8 @@ public class Quantum implements VLANSupport {
     }
 
     @Override
-    public @Nonnull Requirement getSubnetSupport() {
-        return (((NovaOpenStack)getProvider()).isRackspace() ? Requirement.NONE : Requirement.REQUIRED);
+    public @Nonnull Requirement getSubnetSupport() throws CloudException, InternalException {
+        return (getNetworkType().equals(QuantumType.QUANTUM) ? Requirement.REQUIRED : Requirement.NONE);
     }
 
     @Override
@@ -550,8 +616,11 @@ public class Quantum implements VLANSupport {
     public @Nonnull Iterable<Subnet> listSubnets(@Nonnull String inVlanId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.listSubnets");
         try {
+            if( !getNetworkType().equals(QuantumType.QUANTUM) ) {
+                return Collections.emptyList();
+            }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
-            JSONObject ob = method.getServers("/subnets", null, false);
+            JSONObject ob = method.getServers(getSubnetResource(), null, false);
             ArrayList<Subnet> subnets = new ArrayList<Subnet>();
 
             try {
@@ -686,9 +755,12 @@ public class Quantum implements VLANSupport {
     public void removeSubnet(String subnetId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.removeSubnet");
         try {
+            if( !getNetworkType().equals(QuantumType.QUANTUM) ) {
+                throw new OperationNotSupportedException("Not supported");
+            }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
-            method.deleteServers("/subnets", subnetId);
+            method.deleteServers(getSubnetResource(), subnetId);
         }
         finally {
             APITrace.end();
