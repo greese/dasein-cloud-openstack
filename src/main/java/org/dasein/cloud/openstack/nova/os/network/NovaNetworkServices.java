@@ -21,6 +21,7 @@ package org.dasein.cloud.openstack.nova.os.network;
 import org.dasein.cloud.network.AbstractNetworkServices;
 import org.dasein.cloud.network.DNSSupport;
 import org.dasein.cloud.network.LoadBalancerSupport;
+import org.dasein.cloud.network.VLANSupport;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.openstack.nova.os.ext.rackspace.dns.RackspaceCloudDNS;
 import org.dasein.cloud.openstack.nova.os.ext.rackspace.lb.RackspaceLoadBalancers;
@@ -72,5 +73,10 @@ public class NovaNetworkServices extends AbstractNetworkServices {
             return new RackspaceLoadBalancers(provider);
         }
         return null;
+    }
+
+    @Override
+    public @Nullable VLANSupport getVlanSupport() {
+        return new Quantum(provider);
     }
 }
