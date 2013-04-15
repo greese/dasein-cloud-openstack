@@ -161,7 +161,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public boolean isAssigned(@Nonnull AddressType type) {
-        return type.equals(AddressType.PUBLIC);
+        return true;
     }
 
     @Override
@@ -186,7 +186,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public boolean isRequestable(@Nonnull AddressType type) {
-        return type.equals(AddressType.PUBLIC);
+        return true;
     }
 
     @Override
@@ -223,12 +223,36 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public @Nonnull Iterable<IpAddress> listPrivateIpPool(boolean unassignedOnly) throws InternalException, CloudException {
-        return Collections.emptyList();
+        ArrayList<IpAddress> addresses = new ArrayList<IpAddress>();
+
+        for( IpAddress address : listIpPool(IPVersion.IPV4, unassignedOnly) ) {
+            if( address.getAddressType().equals(AddressType.PRIVATE) ) {
+                addresses.add(address);
+            }
+        }
+        for( IpAddress address : listIpPool(IPVersion.IPV6, unassignedOnly) ) {
+            if( address.getAddressType().equals(AddressType.PRIVATE) ) {
+                addresses.add(address);
+            }
+        }
+        return addresses;
     }
 
     @Override
     public @Nonnull Iterable<IpAddress> listPublicIpPool(boolean unassignedOnly) throws InternalException, CloudException {
-        return listIpPool(IPVersion.IPV4, unassignedOnly);
+        ArrayList<IpAddress> addresses = new ArrayList<IpAddress>();
+
+        for( IpAddress address : listIpPool(IPVersion.IPV4, unassignedOnly) ) {
+            if( address.getAddressType().equals(AddressType.PUBLIC) ) {
+                addresses.add(address);
+            }
+        }
+        for( IpAddress address : listIpPool(IPVersion.IPV6, unassignedOnly) ) {
+            if( address.getAddressType().equals(AddressType.PUBLIC) ) {
+                addresses.add(address);
+            }
+        }
+        return addresses;
     }
 
     @Override
@@ -263,7 +287,7 @@ public class NovaFloatingIP implements IpAddressSupport {
                             IpAddress addr = toIP(ctx, json);
 
                             if( addr != null ) {
-                                if( !unassignedOnly || addr.getServerId() == null ) {
+                                if( addr.getVersion().equals(version) && (!unassignedOnly || addr.getServerId() == null) ) {
                                     addresses.add(addr);
                                 }
                             }
@@ -311,7 +335,7 @@ public class NovaFloatingIP implements IpAddressSupport {
                     JSONObject json = list.getJSONObject(i);
 
                     try {
-                        ResourceStatus addr = toStatus(json);
+                        ResourceStatus addr = toStatus(ctx, json, version);
 
                         if( addr != null ) {
                             addresses.add(addr);
@@ -566,7 +590,69 @@ public class NovaFloatingIP implements IpAddressSupport {
         return false;
     }
 
+    public boolean isPublicIpAddress(@Nonnull String ipAddress, @Nonnull IPVersion version) {
+        if( version.equals(IPVersion.IPV4) ) {
+            if( ipAddress.startsWith("10.") || ipAddress.startsWith("192.168") || ipAddress.startsWith("169.254") ) {
+                return false;
+            }
+            else if( ipAddress.startsWith("172.") ) {
+                String[] parts = ipAddress.split("\\.");
+
+                if( parts.length != 4 ) {
+                    return true;
+                }
+                int x = Integer.parseInt(parts[1]);
+
+                if( x >= 16 && x <= 31 ) {
+                    return false;
+                }
+            }
+        }
+        else {
+            if( ipAddress.startsWith("fd") || ipAddress.startsWith("fc00:")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private IpAddress toIP(ProviderContext ctx, JSONObject json) throws JSONException {
+        if(json == null ) {
+            return null;
+        }
+        String regionId = ctx.getRegionId();
+
+        IpAddress address = new IpAddress();
+
+        if( regionId != null ) {
+            address.setRegionId(regionId);
+        }
+        address.setServerId(null);
+        address.setProviderLoadBalancerId(null);
+
+        String id = ((json.has("id") && !json.isNull("id")) ? json.getString("id") : null);
+        String ip = ((json.has("ip") && !json.isNull("ip")) ? json.getString("ip") : null);
+        String server = ((json.has("instance_id") && !json.isNull("instance_id")) ? json.getString("instance_id") : null);
+        if( id != null ) {
+            address.setIpAddressId(id);
+        }
+        if( server != null ) {
+            address.setServerId(server);
+        }
+        if( ip != null ) {
+            address.setAddress(ip);
+        }
+        if( id == null || ip == null ) {
+            return null;
+        }
+        IPVersion version = address.getRawAddress().getVersion();
+
+        address.setAddressType(isPublicIpAddress(ip, version) ? AddressType.PUBLIC : AddressType.PRIVATE);
+        address.setVersion(version);
+        return address;
+    }
+
+    private ResourceStatus toStatus(ProviderContext ctx, JSONObject json, @Nonnull IPVersion version) throws JSONException {
         if(json == null ) {
             return null;
         }
@@ -596,26 +682,9 @@ public class NovaFloatingIP implements IpAddressSupport {
         if( id == null || ip == null ) {
             return null;
         }
-        address.setVersion(IPVersion.IPV4);
-        return address;
-    }
-
-    private ResourceStatus toStatus(JSONObject json) throws JSONException {
-        if( json == null ) {
-            return null;
+        if( version.equals(address.getRawAddress().getVersion()) ) {
+            return new ResourceStatus(id, !address.isAssigned());
         }
-        Boolean available = null;
-        String id;
-
-        id = (json.has("id") ? json.getString("id") : null);
-        if( json.has("instance_id") ) {
-            String instance = json.getString("instance_id");
-
-            available = !(instance != null && instance.length() > 0);
-        }
-        if( id == null ) {
-            return null;
-        }
-        return new ResourceStatus(id, available == null ? true : available);
+        return null;
     }
 }

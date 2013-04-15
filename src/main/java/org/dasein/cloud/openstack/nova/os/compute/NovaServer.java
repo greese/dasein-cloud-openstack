@@ -24,7 +24,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 
+import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletResponse;
@@ -62,6 +66,7 @@ import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.APITrace;
 import org.dasein.util.CalendarWrapper;
 import org.dasein.util.uom.storage.Gigabyte;
 import org.dasein.util.uom.storage.Megabyte;
@@ -202,14 +207,190 @@ public class NovaServer implements VirtualMachineSupport {
     }
 
     @Override
-    public @Nullable VmStatistics getVMStatistics(@Nonnull String vmId, long from, long to) throws InternalException, CloudException {
+    public @Nonnull VmStatistics getVMStatistics(@Nonnull String instanceId, @Nonnegative long startTimestamp, @Nonnegative long endTimestamp) throws InternalException, CloudException {
         return null;
     }
 
     @Override
-    public @Nonnull Iterable<VmStatistics> getVMStatisticsForPeriod(@Nonnull String vmId, long from, long to) throws InternalException, CloudException {
+    public @Nonnull Iterable<VmStatistics> getVMStatisticsForPeriod(@Nonnull String instanceId, long startTimestamp, long endTimestamp) throws InternalException, CloudException {
         return Collections.emptyList();
     }
+
+    /*
+            APITrace.begin(provider, "getVMStatistics");
+            try {
+                VmStatistics statistics = new VmStatistics();
+
+                if( endTimestamp < 1L ) {
+                    endTimestamp = System.currentTimeMillis() + 1000L;
+                }
+                if( startTimestamp > (endTimestamp - (2L * CalendarWrapper.MINUTE)) ) {
+                    startTimestamp = endTimestamp - (2L * CalendarWrapper.MINUTE);
+                }
+                else if( startTimestamp < (System.currentTimeMillis() - (2L * CalendarWrapper.DAY)) ) {
+                    startTimestamp = System.currentTimeMillis() - (2L * CalendarWrapper.DAY);
+                }
+
+                calculateCpuUtilization(statistics, instanceId, startTimestamp, endTimestamp);
+                calculateDiskReadBytes(statistics, instanceId, startTimestamp, endTimestamp);
+                calculateDiskReadOps(statistics, instanceId, startTimestamp, endTimestamp);
+                calculateDiskWriteBytes(statistics, instanceId, startTimestamp, endTimestamp);
+                calculateDiskWriteOps(statistics, instanceId, startTimestamp, endTimestamp);
+                calculateNetworkIn(statistics, instanceId, startTimestamp, endTimestamp);
+                calculateNetworkOut(statistics, instanceId, startTimestamp, endTimestamp);
+                return statistics;
+            }
+            finally {
+                APITrace.end();
+            }
+        }
+
+        @Override
+        public @Nonnull Iterable<VmStatistics> getVMStatisticsForPeriod(@Nonnull String instanceId, long startTimestamp, long endTimestamp) throws InternalException, CloudException {
+            APITrace.begin(provider, "getVMStatisticsForPeriod");
+            try {
+                if( endTimestamp < 1L ) {
+                    endTimestamp = System.currentTimeMillis() + 1000L;
+                }
+                if( startTimestamp > (endTimestamp - (2L * CalendarWrapper.MINUTE)) ) {
+                    startTimestamp = endTimestamp - (2L * CalendarWrapper.MINUTE);
+                }
+                else if( startTimestamp < (System.currentTimeMillis() - CalendarWrapper.DAY) ) {
+                    startTimestamp = System.currentTimeMillis() - CalendarWrapper.DAY;
+                }
+                TreeMap<Integer,VmStatistics> statMap = new TreeMap<Integer,VmStatistics>();
+                int minutes = (int)((endTimestamp-startTimestamp)/CalendarWrapper.MINUTE);
+
+                for( int i =1; i<=minutes; i++ ) {
+                    statMap.put(i, new VmStatistics());
+                }
+                Set<Metric> metrics = calculate("CPUUtilization", "Percent", instanceId, startTimestamp, endTimestamp);
+                for( Metric m : metrics ) {
+                    int minute = 1 + (int)((m.timestamp - startTimestamp)/CalendarWrapper.MINUTE);
+                    VmStatistics stats = statMap.get(minute);
+
+                    if( stats == null ) {
+                        stats = new VmStatistics();
+                        statMap.put(minute, stats);
+                    }
+                    stats.setAverageCpuUtilization(m.average);
+                    stats.setMaximumCpuUtilization(m.maximum);
+                    stats.setMinimumCpuUtilization(m.minimum);
+                    stats.setStartTimestamp(m.timestamp);
+                    stats.setEndTimestamp(m.timestamp);
+                    stats.setSamples(m.samples);
+                }
+                metrics = calculate("DiskReadBytes", "Bytes", instanceId, startTimestamp, endTimestamp);
+                for( Metric m : metrics ) {
+                    int minute = 1 + (int)((m.timestamp - startTimestamp)/CalendarWrapper.MINUTE);
+                    VmStatistics stats = statMap.get(minute);
+
+                    if( stats == null ) {
+                        stats = new VmStatistics();
+                        statMap.put(minute, stats);
+                    }
+                    stats.setAverageDiskReadBytes(m.average);
+                    stats.setMinimumDiskReadBytes(m.minimum);
+                    stats.setMaximumDiskReadBytes(m.maximum);
+                    if( stats.getSamples() < 1 ) {
+                        stats.setSamples(m.samples);
+                    }
+                }
+                metrics = calculate("DiskReadOps", "Count", instanceId, startTimestamp, endTimestamp);
+                for( Metric m : metrics ) {
+                    int minute = 1 + (int)((m.timestamp - startTimestamp)/CalendarWrapper.MINUTE);
+                    VmStatistics stats = statMap.get(minute);
+
+                    if( stats == null ) {
+                        stats = new VmStatistics();
+                        statMap.put(minute, stats);
+                    }
+                    stats.setAverageDiskReadOperations(m.average);
+                    stats.setMinimumDiskReadOperations(m.minimum);
+                    stats.setMaximumDiskReadOperations(m.maximum);
+                    if( stats.getSamples() < 1 ) {
+                        stats.setSamples(m.samples);
+                    }
+                }
+                metrics = calculate("DiskWriteBytes", "Bytes", instanceId, startTimestamp, endTimestamp);
+                for( Metric m : metrics ) {
+                    int minute = 1 + (int)((m.timestamp - startTimestamp)/CalendarWrapper.MINUTE);
+                    VmStatistics stats = statMap.get(minute);
+
+                    if( stats == null ) {
+                        stats = new VmStatistics();
+                        statMap.put(minute, stats);
+                    }
+                    stats.setAverageDiskWriteBytes(m.average);
+                    stats.setMinimumDiskWriteBytes(m.minimum);
+                    stats.setMaximumDiskWriteBytes(m.maximum);
+                    if( stats.getSamples() < 1 ) {
+                        stats.setSamples(m.samples);
+                    }
+                }
+                metrics = calculate("DiskWriteOps", "Count", instanceId, startTimestamp, endTimestamp);
+                for( Metric m : metrics ) {
+                    int minute = 1 + (int)((m.timestamp - startTimestamp)/CalendarWrapper.MINUTE);
+                    VmStatistics stats = statMap.get(minute);
+
+                    if( stats == null ) {
+                        stats = new VmStatistics();
+                        statMap.put(minute, stats);
+                    }
+                    stats.setAverageDiskWriteOperations(m.average);
+                    stats.setMinimumDiskWriteOperations(m.minimum);
+                    stats.setMaximumDiskWriteOperations(m.maximum);
+                    if( stats.getSamples() < 1 ) {
+                        stats.setSamples(m.samples);
+                    }
+                }
+                metrics = calculate("NetworkIn", "Bytes", instanceId, startTimestamp, endTimestamp);
+                for( Metric m : metrics ) {
+                    int minute = 1 + (int)((m.timestamp - startTimestamp)/CalendarWrapper.MINUTE);
+                    VmStatistics stats = statMap.get(minute);
+
+                    if( stats == null ) {
+                        stats = new VmStatistics();
+                        statMap.put(minute, stats);
+                    }
+                    stats.setAverageNetworkIn(m.average);
+                    stats.setMinimumNetworkIn(m.minimum);
+                    stats.setMaximumNetworkIn(m.maximum);
+                    if( stats.getSamples() < 1 ) {
+                        stats.setSamples(m.samples);
+                    }
+                }
+                metrics = calculate("NetworkOut", "Bytes", instanceId, startTimestamp, endTimestamp);
+                for( Metric m : metrics ) {
+                    int minute = 1 + (int)((m.timestamp - startTimestamp)/CalendarWrapper.MINUTE);
+                    VmStatistics stats = statMap.get(minute);
+
+                    if( stats == null ) {
+                        stats = new VmStatistics();
+                        statMap.put(minute, stats);
+                    }
+                    stats.setAverageNetworkOut(m.average);
+                    stats.setMinimumNetworkOut(m.minimum);
+                    stats.setMaximumNetworkOut(m.maximum);
+                    if( stats.getSamples() < 1 ) {
+                        stats.setSamples(m.samples);
+                    }
+                }
+                ArrayList<VmStatistics> list = new ArrayList<VmStatistics>();
+                for( Map.Entry<Integer,VmStatistics> entry : statMap.entrySet() ) {
+                    VmStatistics stats = entry.getValue();
+
+                    if( stats != null && stats.getSamples() > 0 ) {
+                        list.add(stats);
+                    }
+                }
+                return list;
+            }
+            finally {
+                APITrace.end();
+            }
+        }
+        */
 
     @Override
     public @Nonnull Requirement identifyImageRequirement(@Nonnull ImageClass cls) throws CloudException, InternalException {
