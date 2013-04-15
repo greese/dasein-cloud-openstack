@@ -77,7 +77,7 @@ public class NovaFloatingIP implements IpAddressSupport {
             HashMap<String,Object> json = new HashMap<String,Object>();
             HashMap<String,Object> action = new HashMap<String,Object>();
             IpAddress addr = getIpAddress(addressId);
-            
+
             if( addr == null ) {
                 throw new CloudException("No such IP address: " + addressId);
             }
@@ -87,6 +87,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
             NovaMethod method = new NovaMethod(provider);
 
+            logger.info("Posting");
             method.postServers("/servers", serverId, new JSONObject(json), true);
         }
         finally {
@@ -645,6 +646,12 @@ public class NovaFloatingIP implements IpAddressSupport {
         if( id == null || ip == null ) {
             return null;
         }
+        if( ip.contains(":") ) {
+            address.setVersion(IPVersion.IPV6);
+        }
+        else {
+            address.setVersion(IPVersion.IPV4);
+        }
         IPVersion version = address.getRawAddress().getVersion();
 
         address.setAddressType(isPublicIpAddress(ip, version) ? AddressType.PUBLIC : AddressType.PRIVATE);
@@ -656,6 +663,7 @@ public class NovaFloatingIP implements IpAddressSupport {
         if(json == null ) {
             return null;
         }
+
         String regionId = ctx.getRegionId();
 
         IpAddress address = new IpAddress();
@@ -681,6 +689,12 @@ public class NovaFloatingIP implements IpAddressSupport {
         }
         if( id == null || ip == null ) {
             return null;
+        }
+        if( ip.contains(":") ) {
+            address.setVersion(IPVersion.IPV6);
+        }
+        else {
+            address.setVersion(IPVersion.IPV4);
         }
         if( version.equals(address.getRawAddress().getVersion()) ) {
             return new ResourceStatus(id, !address.isAssigned());
