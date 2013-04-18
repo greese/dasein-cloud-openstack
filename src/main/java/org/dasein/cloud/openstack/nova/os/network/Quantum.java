@@ -110,7 +110,7 @@ public class Quantum extends AbstractVLANSupport {
             }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             try {
-                JSONObject ob = method.getServers(getNetworkResource(), null, false);
+                JSONObject ob = method.getServers("/networks", null, false);
 
                 if( ob != null && ob.has("networks") ) {
                     cache.put(getContext(), Collections.singletonList(QuantumType.QUANTUM));
