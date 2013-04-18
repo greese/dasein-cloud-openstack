@@ -43,6 +43,7 @@ import org.dasein.cloud.network.VLANState;
 import org.dasein.cloud.network.VLANSupport;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.openstack.nova.os.OpenStackProvider;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
@@ -109,7 +110,7 @@ public class Quantum implements VLANSupport {
             }
         }
         try {
-            if( getProvider().isRackspace() ) {
+            if( getProvider().getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
                 cache.put(getContext(), Collections.singletonList(QuantumType.RACKSPACE));
                 return QuantumType.RACKSPACE;
             }

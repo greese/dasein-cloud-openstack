@@ -108,6 +108,10 @@ public class NovaImage implements MachineImageSupport {
         }
     }
 
+    private @Nonnull String getTenantId() throws CloudException, InternalException {
+        return provider.getAuthenticationContext().getTenantId();
+    }
+
     @Override
     public void addImageShare(@Nonnull String providerImageId, @Nonnull String accountNumber) throws CloudException, InternalException {
         throw new OperationNotSupportedException("Image sharing is not currently supported");
@@ -737,7 +741,7 @@ public class NovaImage implements MachineImageSupport {
                     MachineImage img = toImage(ctx, image);
 
                     if( img != null ) {
-                        if( provider.getTenantId().equals(img.getProviderOwnerId()) ) {
+                        if( getTenantId().equals(img.getProviderOwnerId()) ) {
                             continue;
                         }
                         if( architecture != null ) {
@@ -831,7 +835,7 @@ public class NovaImage implements MachineImageSupport {
 
     @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        return false;
+        return ImageClass.MACHINE.equals(cls);
     }
 
     @Override
