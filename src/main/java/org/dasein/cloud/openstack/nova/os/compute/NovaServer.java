@@ -1544,20 +1544,26 @@ public class NovaServer implements VirtualMachineSupport {
                 }
                 vm.setPlatform(p);
             }
-            Iterable<String> fwIds = listFirewalls(vm.getProviderVirtualMachineId(), server);
-            int count = 0;
-
-            //noinspection UnusedDeclaration
-            for( String id : fwIds ) {
-                count++;
+            if (provider.getProviderName().equalsIgnoreCase("RACKSPACE")){
+	            //Rackspace does not support the concept for firewalls in servers
+            	vm.setProviderFirewallIds(null);
             }
-            String[] ids = new String[count];
-            int i = 0;
-
-            for( String id : fwIds ) {
-                ids[i++] = id;
+            else{
+	            Iterable<String> fwIds = listFirewalls(vm.getProviderVirtualMachineId(), server);
+	            int count = 0;
+	
+	            //noinspection UnusedDeclaration
+	            for( String id : fwIds ) {
+	                count++;
+	            }
+	            String[] ids = new String[count];
+	            int i = 0;
+	
+	            for( String id : fwIds ) {
+	                ids[i++] = id;
+	            }
+	            vm.setProviderFirewallIds(ids);
             }
-            vm.setProviderFirewallIds(ids);
             return vm;
         }
         finally {
