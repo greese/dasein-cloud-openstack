@@ -1304,7 +1304,7 @@ public class NovaServer extends AbstractVMSupport {
             }
             vm.setPlatform(p);
         }
-        if (provider.getProviderName().equalsIgnoreCase("RACKSPACE")){
+        if (getProvider().getProviderName().equalsIgnoreCase("RACKSPACE")){
             //Rackspace does not support the concept for firewalls in servers
         	vm.setProviderFirewallIds(null);
         }
