@@ -1372,7 +1372,7 @@ public class NovaServer implements VirtualMachineSupport {
                 vm.setProductId(server.getString("flavorId"));
             }
             if( server.has("adminPass") ) {
-                vm.setRootPassword("adminPass");
+                vm.setRootPassword(server.getString("adminPass"));
             }
             if( server.has("key_name") ) {
                 vm.setProviderShellKeyIds(server.getString("key_name"));
