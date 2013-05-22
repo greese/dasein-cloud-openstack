@@ -1,5 +1,6 @@
 /**
- * Copyright (C) 2009-2012 Enstratius, Inc.
+ * Copyright (C) 2009-2013 Dell, Inc.
+ * See annotations for authorship information
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -110,7 +111,7 @@ public class Quantum extends AbstractVLANSupport {
             }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             try {
-                JSONObject ob = method.getServers(getNetworkResource(), null, false);
+                JSONObject ob = method.getServers("/networks", null, false);
 
                 if( ob != null && ob.has("networks") ) {
                     cache.put(getContext(), Collections.singletonList(QuantumType.QUANTUM));

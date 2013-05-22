@@ -1,5 +1,6 @@
 /**
- * Copyright (C) 2009-2012 Enstratius, Inc.
+ * Copyright (C) 2009-2013 Dell, Inc.
+ * See annotations for authorship information
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,9 +29,9 @@ import java.util.Map;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.http.HttpStatus;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
@@ -912,7 +913,7 @@ public class NovaServer extends AbstractVMSupport {
                     return;
                 }
                 catch( NovaException e ) {
-                    if( e.getHttpCode() != HttpServletResponse.SC_CONFLICT ) {
+                    if( e.getHttpCode() != HttpStatus.SC_CONFLICT ) {
                         throw e;
                     }
                 }
@@ -1121,7 +1122,7 @@ public class NovaServer extends AbstractVMSupport {
             vm.setProductId(server.getString("flavorId"));
         }
         if( server.has("adminPass") ) {
-            vm.setRootPassword("adminPass");
+            vm.setRootPassword(server.getString("adminPass"));
         }
         if( server.has("key_name") ) {
             vm.setProviderShellKeyIds(server.getString("key_name"));
@@ -1304,20 +1305,26 @@ public class NovaServer extends AbstractVMSupport {
             }
             vm.setPlatform(p);
         }
-        Iterable<String> fwIds = listFirewalls(vm.getProviderVirtualMachineId(), server);
-        int count = 0;
-
-        //noinspection UnusedDeclaration
-        for( String id : fwIds ) {
-            count++;
+        if (getProvider().getProviderName().equalsIgnoreCase("RACKSPACE")){
+            //Rackspace does not support the concept for firewalls in servers
+        	vm.setProviderFirewallIds(null);
         }
-        String[] ids = new String[count];
-        int i = 0;
+        else{
+            Iterable<String> fwIds = listFirewalls(vm.getProviderVirtualMachineId(), server);
+            int count = 0;
 
-        for( String id : fwIds ) {
-            ids[i++] = id;
+            //noinspection UnusedDeclaration
+            for( String id : fwIds ) {
+                count++;
+            }
+            String[] ids = new String[count];
+            int i = 0;
+
+            for( String id : fwIds ) {
+                ids[i++] = id;
+            }
+            vm.setProviderFirewallIds(ids);
         }
-        vm.setProviderFirewallIds(ids);
         return vm;
     }
 
