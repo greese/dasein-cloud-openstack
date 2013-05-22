@@ -20,8 +20,8 @@
   </licenses>
   
   <organization>
-    <name>Enstratius, Inc.</name>
-    <url>http://www.enstratius.com</url>
+    <name>Dell, Inc.</name>
+    <url>http://software.dell.com</url>
   </organization>
 
     <scm>
@@ -141,8 +141,8 @@
                     <exclude>**/LICENSE-APACHE.txt</exclude>
                 </excludes>
                 <properties>
-                    <year>2009-2012</year>
-                    <copyrightHolder>Enstratius, Inc.</copyrightHolder>
+                    <year>2009-2013</year>
+                    <copyrightHolder>Dell, Inc.</copyrightHolder>
                 </properties>
             </configuration>
         </plugin>
@@ -261,8 +261,8 @@
     <developer>
         <name>George Reese</name>
         <id>georgereese</id>
-        <email>george.reese -at- enstratius -dot- com</email>
-        <organization>Enstratius</organization>
+        <email>george_reese -at- dell -dot- com</email>
+        <organization>Dell</organization>
         <roles>
           <role>Java Developer</role>
           <role>PMC</role>
