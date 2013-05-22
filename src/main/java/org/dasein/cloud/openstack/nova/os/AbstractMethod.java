@@ -33,10 +33,10 @@ import java.util.regex.Pattern;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.httpclient.Header;
 import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.httpclient.cookie.CookiePolicy;
 import org.apache.commons.httpclient.methods.DeleteMethod;
 import org.apache.commons.httpclient.methods.GetMethod;
@@ -58,6 +58,7 @@ import org.json.JSONObject;
 public abstract class AbstractMethod {
     protected NovaOpenStack provider;
 
+    
     public AbstractMethod(NovaOpenStack provider) { this.provider = provider; }
 
     public synchronized @Nullable AuthenticationContext authenticate() throws CloudException, InternalException {
@@ -253,7 +254,7 @@ public abstract class AbstractMethod {
                 }
                 wire.debug("");
             }
-            if( code != HttpServletResponse.SC_OK ) {
+            if( code != HttpStatus.SC_OK ) {
                 if( code == 401 ) {
                     std.warn("authenticateKeystone(): Authentication failed");
                     return null;
@@ -368,8 +369,9 @@ public abstract class AbstractMethod {
                                             Matcher m = p.matcher(url);
                                             if (m.find()) {
                                                 version = m.group(1);
-                                                if (version == null)
+                                                if( version == null ) {
                                                     version = m.group(2);
+                                                }
                                             } else {
                                                 version = "1.0";
                                             }
@@ -543,8 +545,8 @@ public abstract class AbstractMethod {
                             }
                         }
                     }
-                    if( code != HttpServletResponse.SC_NO_CONTENT ) {
-                        if( code == HttpServletResponse.SC_FORBIDDEN || code == HttpServletResponse.SC_UNAUTHORIZED ) {
+                    if( code != HttpStatus.SC_NO_CONTENT ) {
+                        if( code == HttpStatus.SC_FORBIDDEN || code == HttpStatus.SC_UNAUTHORIZED ) {
                             return null;
                         }
                         std.error("authenticateStandard(): Expected NO CONTENT for an authentication request, got " + code);
@@ -560,7 +562,7 @@ public abstract class AbstractMethod {
                             }
                             throw new CloudException(e);                    
                         }
-                        if( code == HttpServletResponse.SC_INTERNAL_SERVER_ERROR && response.contains("<faultstring>") ) {
+                        if( code == HttpStatus.SC_INTERNAL_SERVER_ERROR && response.contains("<faultstring>") ) {
                             return null;
                         }
                         if( wire.isDebugEnabled() ) {
@@ -741,8 +743,8 @@ public abstract class AbstractMethod {
                     }
                 }
             }
-            if( code != HttpServletResponse.SC_NO_CONTENT && code != HttpServletResponse.SC_OK ) {
-                if( code == HttpServletResponse.SC_FORBIDDEN || code == HttpServletResponse.SC_UNAUTHORIZED ) {
+            if( code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_OK ) {
+                if( code == HttpStatus.SC_FORBIDDEN || code == HttpStatus.SC_UNAUTHORIZED ) {
                     return null;
                 }
                 std.error("authenticate(): Expected NO CONTENT for an authentication request, got " + code);
@@ -896,7 +898,7 @@ public abstract class AbstractMethod {
                 }
                 wire.debug("");                                
             }
-            if( code != HttpServletResponse.SC_NO_CONTENT && code != HttpServletResponse.SC_ACCEPTED ) {
+            if( code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_ACCEPTED ) {
                 std.error("delete(): Expected NO CONTENT for DELETE request, got " + code);
                 String response;
                 
@@ -1077,10 +1079,10 @@ public abstract class AbstractMethod {
                 }
                 wire.debug("");                
             }
-            if( code == HttpServletResponse.SC_NOT_FOUND ) {
+            if( code == HttpStatus.SC_NOT_FOUND ) {
                 return null;
             }
-            if( code == HttpServletResponse.SC_BAD_REQUEST ) {
+            if( code == HttpStatus.SC_BAD_REQUEST ) {
                 String response;
 
                 try {
@@ -1117,7 +1119,7 @@ public abstract class AbstractMethod {
                 std.error("getString(): [" +  code + " : " + items.message + "] " + items.details);
                 throw new NovaException(items);
             }
-            if( code != HttpServletResponse.SC_NO_CONTENT && code != HttpServletResponse.SC_OK && code != HttpServletResponse.SC_NON_AUTHORITATIVE_INFORMATION ) {
+            if( code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_OK && code != HttpStatus.SC_NON_AUTHORITATIVE_INFORMATION ) {
                 std.error("getString(): Expected OK for GET request, got " + code);
                 String response;
 
@@ -1231,10 +1233,10 @@ public abstract class AbstractMethod {
                 }
                 wire.debug("");                
             }
-            if( code == HttpServletResponse.SC_NOT_FOUND ) {
+            if( code == HttpStatus.SC_NOT_FOUND ) {
                 return null;
             }
-            if( code != HttpServletResponse.SC_OK && code != HttpServletResponse.SC_NON_AUTHORITATIVE_INFORMATION ) {
+            if( code != HttpStatus.SC_OK && code != HttpStatus.SC_NON_AUTHORITATIVE_INFORMATION ) {
                 std.error("getStream(): Expected OK for GET request, got " + code);
                 String response;
                 
@@ -1387,8 +1389,8 @@ public abstract class AbstractMethod {
                 }
                 wire.debug("");                                
             }
-            if( code != HttpServletResponse.SC_NO_CONTENT && code != HttpServletResponse.SC_OK ) {
-                if( code == HttpServletResponse.SC_NOT_FOUND ) {
+            if( code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_OK ) {
+                if( code == HttpStatus.SC_NOT_FOUND ) {
                     return null;
                 }
                 std.error("head(): Expected NO CONTENT or OK for HEAD request, got " + code);
@@ -1510,7 +1512,7 @@ public abstract class AbstractMethod {
                 }
                 wire.debug("");
             }
-            if( code != HttpServletResponse.SC_ACCEPTED && code != HttpServletResponse.SC_NO_CONTENT ) {
+            if( code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT ) {
                 std.error("postString(): Expected ACCEPTED for POST request, got " + code);
                 String response;
                 
@@ -1541,7 +1543,7 @@ public abstract class AbstractMethod {
                 throw new NovaException(items);
             }
             else {
-                if( code == HttpServletResponse.SC_ACCEPTED ) {
+                if( code == HttpStatus.SC_ACCEPTED ) {
                     String response;
                     
                     try {
@@ -1693,7 +1695,7 @@ public abstract class AbstractMethod {
                 }
                 wire.debug("");
             }
-            if( code != HttpServletResponse.SC_OK && code != HttpServletResponse.SC_ACCEPTED && code != HttpServletResponse.SC_NO_CONTENT && code != HttpServletResponse.SC_CREATED ) {
+            if( code != HttpStatus.SC_OK && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_CREATED ) {
                 std.error("postString(): Expected OK, ACCEPTED, or NO CONTENT for POST request, got " + code);
                 String response;
                 
@@ -1724,7 +1726,7 @@ public abstract class AbstractMethod {
                 throw new NovaException(items);
             }
             else {
-                if( code != HttpServletResponse.SC_NO_CONTENT ) {
+                if( code != HttpStatus.SC_NO_CONTENT ) {
                     String response;
                     
                     try {
@@ -1744,7 +1746,7 @@ public abstract class AbstractMethod {
                         wire.debug("");
                         return response;
                     }
-                    else if( code == HttpServletResponse.SC_ACCEPTED ) {
+                    else if( code == HttpStatus.SC_ACCEPTED ) {
                         return "{\"location\" : \"" + location + "\"}";
                     }
                 }
@@ -1831,7 +1833,7 @@ public abstract class AbstractMethod {
             if( responseHash != null && md5Hash != null && !responseHash.equals(md5Hash) ) {
                 throw new CloudException("MD5 hash values do not match, probably data corruption");
             }
-            if( code != HttpServletResponse.SC_ACCEPTED && code != HttpServletResponse.SC_NO_CONTENT ) {
+            if( code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT ) {
                 std.error("postStream(): Expected ACCEPTED or NO CONTENT for POST request, got " + code);
                 String response;
                 
@@ -1863,7 +1865,7 @@ public abstract class AbstractMethod {
             }
             else {
                 wire.debug("");
-                if( code == HttpServletResponse.SC_ACCEPTED ) {
+                if( code == HttpStatus.SC_ACCEPTED ) {
                     String response;
                     
                     try {
@@ -1979,7 +1981,7 @@ public abstract class AbstractMethod {
                 }
                 wire.debug("");
             }
-            if( code != HttpServletResponse.SC_CREATED && code != HttpServletResponse.SC_ACCEPTED && code != HttpServletResponse.SC_NO_CONTENT ) {
+            if( code != HttpStatus.SC_CREATED && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT ) {
                 std.error("putString(): Expected CREATED, ACCEPTED, or NO CONTENT for put request, got " + code);
                 String response;
                 
@@ -2010,7 +2012,7 @@ public abstract class AbstractMethod {
                 throw new NovaException(items);
             }
             else {
-                if( code == HttpServletResponse.SC_ACCEPTED || code == HttpServletResponse.SC_CREATED ) {
+                if( code == HttpStatus.SC_ACCEPTED || code == HttpStatus.SC_CREATED ) {
                     String response;
                     
                     try {
@@ -2113,7 +2115,7 @@ public abstract class AbstractMethod {
                 }
                 wire.debug("");
             }
-            if( code != HttpServletResponse.SC_CREATED && code != HttpServletResponse.SC_ACCEPTED && code != HttpServletResponse.SC_NO_CONTENT ) {
+            if( code != HttpStatus.SC_CREATED && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT ) {
                 std.error("putString(): Expected CREATED, ACCEPTED, or NO CONTENT for put request, got " + code);
                 String response;
                 
@@ -2144,7 +2146,7 @@ public abstract class AbstractMethod {
                 throw new NovaException(items);
             }
             else {
-                if( code == HttpServletResponse.SC_ACCEPTED || code == HttpServletResponse.SC_CREATED ) {
+                if( code == HttpStatus.SC_ACCEPTED || code == HttpStatus.SC_CREATED ) {
                     String response;
                     
                     try {
@@ -2250,7 +2252,7 @@ public abstract class AbstractMethod {
             if( responseHash != null && md5Hash != null && !responseHash.equals(md5Hash) ) {
                 throw new CloudException("MD5 hash values do not match, probably data corruption");
             }
-            if( code != HttpServletResponse.SC_CREATED && code != HttpServletResponse.SC_ACCEPTED && code != HttpServletResponse.SC_NO_CONTENT ) {
+            if( code != HttpStatus.SC_CREATED && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT ) {
                 std.error("putStream(): Expected CREATED, ACCEPTED, or NO CONTENT for PUT request, got " + code);
                 String response;
                 
@@ -2281,7 +2283,7 @@ public abstract class AbstractMethod {
                 throw new NovaException(items);
             }
             else {
-                if( code == HttpServletResponse.SC_ACCEPTED ) {
+                if( code == HttpStatus.SC_ACCEPTED ) {
                     String response;
                     
                     try {
@@ -2388,8 +2390,9 @@ public abstract class AbstractMethod {
             int major2 = Integer.parseInt(majorStr2);
             int minor2 = Integer.parseInt(minorStr2);
             result = major1 - major2;
-            if (result==0)
+            if( result == 0 ) {
                 result = minor1 - minor2;
+            }
 		} catch (Exception e) {
 			// Something really stupid showed up in the version string...
             throw new InternalException(e);
