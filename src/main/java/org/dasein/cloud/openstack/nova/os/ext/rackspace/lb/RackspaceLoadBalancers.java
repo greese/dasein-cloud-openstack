@@ -1,5 +1,6 @@
 /**
- * Copyright (C) 2009-2012 Enstratius, Inc.
+ * Copyright (C) 2009-2013 Dell, Inc.
+ * See annotations for authorship information
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +19,7 @@
 
 package org.dasein.cloud.openstack.nova.os.ext.rackspace.lb;
 
+import org.apache.http.HttpStatus;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
@@ -54,7 +56,6 @@ import org.json.JSONObject;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -926,7 +927,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
                     return;
                 }
                 catch( NovaException e ) {
-                    if( e.getHttpCode() != HttpServletResponse.SC_CONFLICT || e.getHttpCode() == 422 ) {
+                    if( e.getHttpCode() != HttpStatus.SC_CONFLICT || e.getHttpCode() == 422 ) {
                         throw e;
                     }
                 }

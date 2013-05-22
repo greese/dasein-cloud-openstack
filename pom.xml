@@ -4,9 +4,9 @@
   <artifactId>dasein-cloud-openstack</artifactId>
   <version>2013.07-SNAPSHOT</version>
   <name>Dasein Cloud Nova</name>
-  <description>Dasein Cloud implementation for the Nova APIs</description>
+  <description>Dasein Cloud implementation for the OpenStack APIs</description>
   
-  <url>http://dasein-cloud.sf.net</url>
+  <url>http://github.com/greese/dasein-cloud-openstack</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -20,8 +20,8 @@
   </licenses>
   
   <organization>
-    <name>Enstratius, Inc.</name>
-    <url>http://www.enstratius.com</url>
+    <name>Dell, Inc.</name>
+    <url>http://software.dell.com</url>
   </organization>
 
     <scm>
@@ -69,14 +69,6 @@
           <artifactId>json</artifactId>
           <version>20090211</version>
           <scope>compile</scope>
-      </dependency>
-
-      <!-- Provided -->
-      <dependency>
-          <groupId>javax.servlet</groupId>
-          <artifactId>servlet-api</artifactId>
-          <version>2.5</version>
-          <scope>provided</scope>
       </dependency>
 
       <!-- Test -->
@@ -149,8 +141,8 @@
                     <exclude>**/LICENSE-APACHE.txt</exclude>
                 </excludes>
                 <properties>
-                    <year>2009-2012</year>
-                    <copyrightHolder>Enstratius, Inc.</copyrightHolder>
+                    <year>2009-2013</year>
+                    <copyrightHolder>Dell, Inc.</copyrightHolder>
                 </properties>
             </configuration>
         </plugin>
@@ -214,22 +206,6 @@
                     <name>regionId</name>
                     <value>${regionId}</value>
                 </property>
-                <property>
-                    <name>test.region</name>
-                    <value>${regionId}</value>
-                </property>
-                <property>
-                    <name>test.dataCenter</name>
-                    <value>${test.dataCenter}</value>
-                </property>
-                <property>
-                    <name>test.machineImage</name>
-                    <value>${test.machineImage}</value>
-                </property>
-                <property>
-                    <name>test.product</name>
-                    <value>${test.product}</value>
-                </property>
             </systemProperties>
           <includes>
               <include>**/TestSuite.java</include>
@@ -269,7 +245,7 @@
     <developer>
         <name>George Reese</name>
         <id>georgereese</id>
-        <email>george.reese -at- enstratius -dot- com</email>
+        <email>george_reese -at- dell -dot- com</email>
         <organization>Enstratius</organization>
         <roles>
           <role>Java Developer</role>
@@ -282,7 +258,7 @@
         <name>Morgan Catlin</name>
         <id>sylistron</id>
         <email>morgan.catlin -at- valtira -dot- com</email>
-        <organization>Enstratius</organization>
+        <organization>Valtira</organization>
         <roles>
           <role>Java Developer</role>
         </roles>

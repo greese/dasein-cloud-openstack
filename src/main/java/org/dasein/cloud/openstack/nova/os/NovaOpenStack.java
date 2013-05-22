@@ -1,5 +1,6 @@
 /**
- * Copyright (C) 2009-2012 Enstratius, Inc.
+ * Copyright (C) 2009-2013 Dell, Inc.
+ * See annotations for authorship information
  *
  * ====================================================================
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,8 +27,8 @@ import java.util.Properties;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.servlet.http.HttpServletResponse;
 
+import org.apache.http.HttpStatus;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.AbstractCloud;
 import org.dasein.cloud.CloudErrorType;
@@ -116,7 +117,7 @@ public class NovaOpenStack extends AbstractCloud {
                 if( authenticationContext == null ) {
                     NovaException.ExceptionItems items = new NovaException.ExceptionItems();
 
-                    items.code = HttpServletResponse.SC_UNAUTHORIZED;
+                    items.code = HttpStatus.SC_UNAUTHORIZED;
                     items.type = CloudErrorType.AUTHENTICATION;
                     items.message = "unauthorized";
                     items.details = "The API keys failed to authentication with the specified endpoint.";
