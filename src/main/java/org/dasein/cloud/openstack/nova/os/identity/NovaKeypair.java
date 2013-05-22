@@ -19,6 +19,7 @@
 
 package org.dasein.cloud.openstack.nova.os.identity;
 
+import org.apache.commons.httpclient.HttpStatus;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
@@ -38,7 +39,6 @@ import org.json.JSONObject;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.servlet.http.HttpServletResponse;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -132,7 +132,7 @@ public class NovaKeypair implements ShellKeySupport {
                     return;
                 }
                 catch( NovaException e ) {
-                    if( e.getHttpCode() != HttpServletResponse.SC_CONFLICT ) {
+                    if( e.getHttpCode() != HttpStatus.SC_CONFLICT ) {
                         throw e;
                     }
                 }
