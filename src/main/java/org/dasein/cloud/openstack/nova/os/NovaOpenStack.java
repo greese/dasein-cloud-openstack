@@ -26,8 +26,8 @@ import java.util.Properties;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.servlet.http.HttpServletResponse;
 
+import org.apache.http.HttpStatus;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.AbstractCloud;
 import org.dasein.cloud.CloudErrorType;
@@ -60,7 +60,7 @@ public class NovaOpenStack extends AbstractCloud {
         else if( idx == (name.length()-1) ) {
             return "";
         }
-        return name.substring(idx+1);
+        return name.substring(idx + 1);
     }
     
     static public @Nonnull Logger getLogger(@Nonnull Class<?> cls, @Nonnull String type) {
@@ -116,7 +116,7 @@ public class NovaOpenStack extends AbstractCloud {
                 if( authenticationContext == null ) {
                     NovaException.ExceptionItems items = new NovaException.ExceptionItems();
 
-                    items.code = HttpServletResponse.SC_UNAUTHORIZED;
+                    items.code = HttpStatus.SC_UNAUTHORIZED;
                     items.type = CloudErrorType.AUTHENTICATION;
                     items.message = "unauthorized";
                     items.details = "The API keys failed to authentication with the specified endpoint.";

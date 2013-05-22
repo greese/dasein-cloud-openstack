@@ -28,9 +28,9 @@ import java.util.Map;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.http.HttpStatus;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
@@ -912,7 +912,7 @@ public class NovaServer extends AbstractVMSupport {
                     return;
                 }
                 catch( NovaException e ) {
-                    if( e.getHttpCode() != HttpServletResponse.SC_CONFLICT ) {
+                    if( e.getHttpCode() != HttpStatus.SC_CONFLICT ) {
                         throw e;
                     }
                 }
