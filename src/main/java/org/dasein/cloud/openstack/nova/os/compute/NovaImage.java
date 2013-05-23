@@ -359,7 +359,15 @@ public class NovaImage implements MachineImageSupport {
 
     @Override
     public boolean hasPublicLibrary() {
-        return supportsPublicLibrary(ImageClass.MACHINE);
+        try {
+            return supportsPublicLibrary(ImageClass.MACHINE);
+        }
+        catch( CloudException e ) {
+            throw new RuntimeException(e);
+        }
+        catch( InternalException e ) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
