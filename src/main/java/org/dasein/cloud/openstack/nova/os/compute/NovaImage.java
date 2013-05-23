@@ -358,7 +358,7 @@ public class NovaImage implements MachineImageSupport {
 
     @Override
     public boolean hasPublicLibrary() {
-        return false;
+        return supportsPublicLibrary(ImageClass.MACHINE);
     }
 
     @Override
