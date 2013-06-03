@@ -901,7 +901,7 @@ public class NovaServer extends AbstractVMSupport {
     }
 
     @Override
-    public void terminate(@Nonnull String vmId) throws InternalException, CloudException {
+    public void terminate(@Nonnull String vmId, @Nullable String explanation) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.terminate");
         try {
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
