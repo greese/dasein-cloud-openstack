@@ -86,7 +86,7 @@ import org.json.JSONObject;
  * @version 2013.02 added support for fetching shell keys (issue #4)
  * @since unknown
  */
-public class NovaServer extends AbstractVMSupport {
+public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     static private final Logger logger = NovaOpenStack.getLogger(NovaServer.class, "std");
 
     static public final String SERVICE = "compute";
