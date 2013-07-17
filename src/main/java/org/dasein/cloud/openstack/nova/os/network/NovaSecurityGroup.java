@@ -327,7 +327,15 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
                             endPort = s;
                         }
                         if( rule.has("ip_protocol") ) {
-                            protocol = Protocol.valueOf(rule.getString("ip_protocol").toUpperCase());
+                        	/*
+                        	 * Note: the nova api returns null for 'Any' 
+                        	 */
+                        	String testAny = rule.getString("ip_protocol");
+                        	if (testAny == null || testAny.equalsIgnoreCase("null")) {
+                        		protocol = Protocol.ANY;
+                        	} else {
+                        		protocol = Protocol.valueOf(rule.getString("ip_protocol").toUpperCase());
+                        	}
                         }
                         if( protocol == null ) {
                             protocol = Protocol.TCP;
