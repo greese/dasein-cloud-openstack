@@ -86,7 +86,10 @@ public class NovaOpenStack extends AbstractCloud {
         }
         else {
             String[] parts = version.split("\\.");
-            
+
+            while( parts[0].startsWith("v") && !parts[0].equals("v") ) {
+                parts[0] = parts[0].substring(1);
+            }
             major = Integer.parseInt(parts[0]);
             minor = Integer.parseInt(parts[1]);
         }

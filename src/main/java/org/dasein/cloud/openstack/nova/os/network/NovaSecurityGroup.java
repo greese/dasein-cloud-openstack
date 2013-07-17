@@ -94,15 +94,16 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
                 case VLAN: throw new OperationNotSupportedException("Cannot target VLANs with firewall rules");
                 case VM: throw new OperationNotSupportedException("Cannot target virtual machines with firewall rules");
                 case GLOBAL:
-                    HashMap<String,Object> g = new HashMap<String, Object>();
+                    //HashMap<String,Object> g = new HashMap<String, Object>();
                     Firewall targetGroup = getFirewall(sourceEndpoint.getProviderFirewallId());
 
                     if( targetGroup == null ) {
                         throw new CloudException("No such source endpoint firewall: " + sourceEndpoint.getProviderFirewallId());
                     }
-                    g.put("tenant_id", getTenantId());
-                    g.put("name", targetGroup.getName());
-                    json.put("group", g);
+                    //g.put("tenant_id", getTenantId());
+                    //g.put("name", targetGroup.getName());
+                    //json.put("group", g);
+                    json.put("group_id", targetGroup.getProviderFirewallId());
                     break;
             }
 
@@ -328,7 +329,18 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
                             endPort = s;
                         }
                         if( rule.has("ip_protocol") ) {
-                            protocol = Protocol.valueOf(rule.getString("ip_protocol").toUpperCase());
+                            String p = null;
+
+                            if( !rule.isNull("ip_protocol") ) {
+                                rule.getString("ip_protocol");
+                            }
+
+                            if( p == null || p.equalsIgnoreCase("null") ) {
+                                protocol = Protocol.ANY;
+                            }
+                            else {
+                                protocol = Protocol.valueOf(p.toUpperCase());
+                            }
                         }
                         if( protocol == null ) {
                             protocol = Protocol.TCP;
