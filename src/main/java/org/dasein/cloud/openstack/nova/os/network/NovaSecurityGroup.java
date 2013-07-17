@@ -330,7 +330,7 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
                             String p = null;
 
                             if( !rule.isNull("ip_protocol") ) {
-                                rule.getString("ip_protocol");
+                                p = rule.getString("ip_protocol");
                             }
 
                             if( p == null || p.equalsIgnoreCase("null") ) {
