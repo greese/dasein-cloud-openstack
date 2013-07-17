@@ -467,7 +467,18 @@ public class NovaSecurityGroup implements FirewallSupport {
                             endPort = s;
                         }
                         if( rule.has("ip_protocol") ) {
-                            protocol = Protocol.valueOf(rule.getString("ip_protocol").toUpperCase());
+                            String p = null;
+
+                            if( !rule.isNull("ip_protocol") ) {
+                                rule.getString("ip_protocol");
+                            }
+
+                            if( p == null || p.equalsIgnoreCase("null") ) {
+                                protocol = Protocol.ANY;
+                            }
+                            else {
+                                protocol = Protocol.valueOf(p.toUpperCase());
+                            }
                         }
                         if( protocol == null ) {
                             protocol = Protocol.TCP;
