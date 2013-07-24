@@ -1289,7 +1289,7 @@ public class NovaServer implements VirtualMachineSupport {
             vm.setLastBootTimestamp(-1L);
             vm.setLastPauseTimestamp(-1L);
             vm.setPausable(false);
-            vm.setPersistent(true);
+            vm.setPersistent(false);
             vm.setPlatform(Platform.UNKNOWN);
             vm.setRebootable(true);
             vm.setProviderOwnerId(provider.getTenantId());
