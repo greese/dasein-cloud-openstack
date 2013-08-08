@@ -1556,7 +1556,7 @@ public abstract class AbstractMethod {
 
             std.debug("HTTP STATUS: " + code);
 
-            if( code == HttpStatus.SC_REQUEST_URI_TOO_LONG || code == HttpStatus.SC_REQUEST_TOO_LONG ) {
+            if( code == HttpStatus.SC_REQUEST_TOO_LONG || code == HttpStatus.SC_REQUEST_URI_TOO_LONG ) {
                 String data = null;
 
                 try {

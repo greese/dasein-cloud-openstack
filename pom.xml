@@ -2,11 +2,11 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-openstack</artifactId>
-  <version>2013.04.5-SNAPSHOT</version>
+  <version>2013.07</version>
   <name>Dasein Cloud Nova</name>
-  <description>Dasein Cloud implementation for the Nova APIs</description>
+  <description>Dasein Cloud implementation for the OpenStack APIs</description>
   
-  <url>http://dasein-cloud.sf.net</url>
+  <url>http://github.com/greese/dasein-cloud-openstack</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -41,7 +41,7 @@
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2013.04.1</version>
+        <version>2013.07.0</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>
@@ -81,7 +81,7 @@
       <dependency>
           <groupId>org.dasein</groupId>
           <artifactId>dasein-cloud-test</artifactId>
-          <version>2013.04.6</version>
+          <version>2013.07.1</version>
           <scope>test</scope>
           <optional>false</optional>
       </dependency>
@@ -206,26 +206,10 @@
                     <name>regionId</name>
                     <value>${regionId}</value>
                 </property>
-                <property>
-                    <name>test.region</name>
-                    <value>${regionId}</value>
-                </property>
-                <property>
-                    <name>test.dataCenter</name>
-                    <value>${test.dataCenter}</value>
-                </property>
-                <property>
-                    <name>test.machineImage</name>
-                    <value>${test.machineImage}</value>
-                </property>
-                <property>
-                    <name>test.product</name>
-                    <value>${test.product}</value>
-                </property>
             </systemProperties>
-          <excludes>
-              <exclude>**/TestSuite.java</exclude>
-          </excludes>
+          <includes>
+              <include>**/TestSuite.java</include>
+          </includes>
         </configuration>
       </plugin>     
       <plugin>
@@ -262,7 +246,7 @@
         <name>George Reese</name>
         <id>georgereese</id>
         <email>george_reese -at- dell -dot- com</email>
-        <organization>Dell</organization>
+        <organization>Enstratius</organization>
         <roles>
           <role>Java Developer</role>
           <role>PMC</role>
@@ -274,7 +258,7 @@
         <name>Morgan Catlin</name>
         <id>sylistron</id>
         <email>morgan.catlin -at- valtira -dot- com</email>
-        <organization>Enstratius</organization>
+        <organization>Valtira</organization>
         <roles>
           <role>Java Developer</role>
         </roles>
