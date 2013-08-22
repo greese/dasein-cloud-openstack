@@ -32,7 +32,7 @@ import javax.annotation.Nonnull;
  * @since 2013.04.1
  */
 public enum OpenStackProvider {
-    DELL, DREAMHOST, GRIZZLY, HP, IBM, METACLOUD, RACKSPACE, OTHER;
+    DELL, DREAMHOST, HP, IBM, METACLOUD, RACKSPACE, OTHER;
 
     static public OpenStackProvider getProvider(@Nonnull String name) {
         if( name.equalsIgnoreCase("dell") ) {
@@ -40,9 +40,6 @@ public enum OpenStackProvider {
         }
         else if( name.equalsIgnoreCase("dreamhost") ) {
             return DREAMHOST;
-        }
-        else if( name.equalsIgnoreCase("grizzly") ) {
-            return GRIZZLY;
         }
         else if( name.equalsIgnoreCase("hp") ) {
             return HP;
