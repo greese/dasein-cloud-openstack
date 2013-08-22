@@ -1161,7 +1161,7 @@ public abstract class AbstractMethod {
                 throw new NovaException(items);
             }
             else {
-                std.error("Expected OK for GET request, got " + code);
+                std.info("Expected OK for GET request, got " + code);
                 String data = null;
 
                 try {
@@ -2515,7 +2515,7 @@ public abstract class AbstractMethod {
 	}
 
     private @Nonnull String toAPIResource(@Nonnull String resource) {
-        if( resource.equals("/") || resource.length() < 2 ) {
+        if( resource == null || resource.equals("/") || resource.length() < 2 ) {
             return resource;
         }
         while( resource.startsWith("/") ) {
