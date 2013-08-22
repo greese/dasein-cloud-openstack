@@ -43,6 +43,16 @@ public class NovaMethod extends AbstractMethod {
         }
         delete(context.getAuthToken(), endpoint, resource + "/" + resourceId);
     }
+
+    public void deleteNetworks(@Nonnull String resource, @Nonnull String resourceId) throws CloudException, InternalException {
+        AuthenticationContext context = provider.getAuthenticationContext();
+        String endpoint = context.getServiceUrl("network");
+
+        if( endpoint == null ) {
+            throw new CloudException("No network endpoint exists");
+        }
+        delete(context.getAuthToken(), endpoint, resource + "/" + resourceId);
+    }
     
     public @Nullable JSONObject getServers(@Nonnull String resource, @Nullable String resourceId, boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
@@ -50,6 +60,32 @@ public class NovaMethod extends AbstractMethod {
         
         if( endpoint == null ) {
             throw new CloudException("No compute URL has been established in " + context.getMyRegion());
+        }
+        if( resourceId != null ) {
+            resource = resource + "/" + resourceId;
+        }
+        else if( suffix ) {
+            resource = resource + "/detail";
+        }
+        String response = getString(context.getAuthToken(), endpoint, resource);
+
+        if( response == null ) {
+            return null;
+        }
+        try {
+            return new JSONObject(response);
+        }
+        catch( JSONException e ) {
+            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        }
+    }
+
+    public @Nullable JSONObject getNetworks(@Nonnull String resource, @Nullable String resourceId, boolean suffix) throws CloudException, InternalException {
+        AuthenticationContext context = provider.getAuthenticationContext();
+        String endpoint = context.getServiceUrl("network");
+
+        if( endpoint == null ) {
+            throw new CloudException("No network URL has been established in " + context.getMyRegion());
         }
         if( resourceId != null ) {
             resource = resource + "/" + resourceId;
@@ -91,12 +127,36 @@ public class NovaMethod extends AbstractMethod {
             resource = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
         }
         String computeEndpoint = context.getComputeUrl();
-        
+
         if( computeEndpoint == null ) {
             throw new CloudException("No compute endpoint exists");
         }
         String response = postString(context.getAuthToken(), computeEndpoint, resource, body.toString());
-        
+
+        if( response == null ) {
+            return null;
+        }
+        try {
+            return new JSONObject(response);
+        }
+        catch( JSONException e ) {
+            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        }
+    }
+
+    public @Nullable JSONObject postNetworks(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
+        AuthenticationContext context = provider.getAuthenticationContext();
+
+        if( resourceId != null ) {
+            resource = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
+        }
+        String endpoint = context.getServiceUrl("network");
+
+        if( endpoint == null ) {
+            throw new CloudException("No network endpoint exists");
+        }
+        String response = postString(context.getAuthToken(), endpoint, resource, body.toString());
+
         if( response == null ) {
             return null;
         }
