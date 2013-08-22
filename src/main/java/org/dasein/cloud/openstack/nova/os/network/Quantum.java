@@ -272,8 +272,6 @@ public class Quantum extends AbstractVLANSupport {
                 result = method.postServers(getSubnetResource(), null, new JSONObject(wrapper), false);
             }
 
-           // JSONObject result = method.postServers(getSubnetResource(), null, new JSONObject(wrapper), false);
-
             if( result != null && result.has("subnet") ) {
                 try {
                     JSONObject ob = result.getJSONObject("subnet");
@@ -469,7 +467,6 @@ public class Quantum extends AbstractVLANSupport {
             else {
                 ob = method.getServers(getSubnetResource(), subnetId, false);
             }
-            //JSONObject ob = method.getServers(getSubnetResource(), subnetId, false);
 
             try {
                 if( ob != null && ob.has("subnet") ) {
@@ -602,7 +599,6 @@ public class Quantum extends AbstractVLANSupport {
             else {
                 ob = method.getServers(getSubnetResource(), null, false);
             }
-           // JSONObject ob = method.getServers(getSubnetResource(), null, false);
             ArrayList<Subnet> subnets = new ArrayList<Subnet>();
 
             try {
@@ -740,8 +736,6 @@ public class Quantum extends AbstractVLANSupport {
             else {
                 method.deleteServers(getSubnetResource(), subnetId);
             }
-
-           // method.deleteServers(getSubnetResource(), subnetId);
         }
         finally {
             APITrace.end();
