@@ -254,8 +254,10 @@ public class Quantum extends AbstractVLANSupport {
             else {
                 json.put("ip_version", "4");
             }
-            md.put("org.dasein.description", options.getDescription());
-            json.put("metadata", md);
+            if (!getNetworkType().equals(QuantumType.QUANTUM)) {
+                md.put("org.dasein.description", options.getDescription());
+                json.put("metadata", md);
+            }
 
             wrapper.put("subnet", json);
 
