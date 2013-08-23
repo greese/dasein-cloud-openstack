@@ -46,6 +46,11 @@
         <optional>false</optional>
     </dependency>
     <dependency>
+        <groupId>commons-net</groupId>
+        <artifactId>commons-net</artifactId>
+        <version>3.0.1</version>
+    </dependency>
+    <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-util</artifactId>
         <version>2013.02</version>
@@ -207,9 +212,10 @@
                     <value>${regionId}</value>
                 </property>
             </systemProperties>
-          <excludes>
-              <exclude>**/TestSuite.java</exclude>
-          </excludes>
+          <includes>
+              <include>**/TestSuite.java</include>
+          </includes>
+            <argLine>-Ddasein.inclusions=StatefulVLANTests.launchVM</argLine>
         </configuration>
       </plugin>     
       <plugin>
