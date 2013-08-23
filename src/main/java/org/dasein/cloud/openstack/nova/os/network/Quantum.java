@@ -92,6 +92,13 @@ public class Quantum extends AbstractVLANSupport {
             }
             return "/subnets";
         }
+
+        public String getPortResource() {
+            switch( this ) {
+                case QUANTUM: return "/ports";
+            }
+            return "/ports";
+        }
     }
 
     private QuantumType getNetworkType() throws CloudException, InternalException {
@@ -194,7 +201,7 @@ public class Quantum extends AbstractVLANSupport {
 
             JSONObject result = null;
             if (getNetworkType().equals(QuantumType.QUANTUM) ) {
-                result = method.postNetworks(getNetworkResource() + "/" + subnet.getProviderVlanId() + "/ports", null, new JSONObject(wrapper), false);
+                result = method.postNetworks(getPortResource(), null, new JSONObject(wrapper), false);
             }
             else {
                 result = method.postServers(getNetworkResource() + "/" + subnet.getProviderVlanId() + "/ports", null, new JSONObject(wrapper), false);
@@ -412,6 +419,15 @@ public class Quantum extends AbstractVLANSupport {
         }
         return type.getSubnetResource();
     }
+
+    private @Nonnull String getPortResource() throws CloudException, InternalException {
+        QuantumType type = getNetworkType();
+        if (type.equals(QuantumType.QUANTUM)) {
+            return getNetworkResourceVersion()+QuantumType.QUANTUM.getPortResource();
+        }
+        return type.getSubnetResource();
+    }
+
 
     @Override
     public @Nonnull String getProviderTermForNetworkInterface(@Nonnull Locale locale) {

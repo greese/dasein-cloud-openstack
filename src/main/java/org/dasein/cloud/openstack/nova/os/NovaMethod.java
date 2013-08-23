@@ -46,7 +46,7 @@ public class NovaMethod extends AbstractMethod {
 
     public void deleteNetworks(@Nonnull String resource, @Nonnull String resourceId) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
-        String endpoint = context.getServiceUrl("network");
+        String endpoint = context.getNetworkUrl();
 
         if( endpoint == null ) {
             throw new CloudException("No network endpoint exists");
@@ -82,7 +82,7 @@ public class NovaMethod extends AbstractMethod {
 
     public @Nullable JSONObject getNetworks(@Nonnull String resource, @Nullable String resourceId, boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
-        String endpoint = context.getServiceUrl("network");
+        String endpoint = context.getNetworkUrl();
 
         if( endpoint == null ) {
             throw new CloudException("No network URL has been established in " + context.getMyRegion());
@@ -150,7 +150,7 @@ public class NovaMethod extends AbstractMethod {
         if( resourceId != null ) {
             resource = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
         }
-        String endpoint = context.getServiceUrl("network");
+        String endpoint = context.getNetworkUrl();
 
         if( endpoint == null ) {
             throw new CloudException("No network endpoint exists");
