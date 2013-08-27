@@ -61,6 +61,14 @@ public class NovaException extends CloudException {
                         items.message = items.message.trim();
                     }
                 }
+                if (items.message.equals("unknown")) {
+                    String[] names = JSONObject.getNames(ob);
+                    for (String key : names) {
+                        if (key.contains("Error")) {
+                            items.message = ob.getString(key);
+                        }
+                    }
+                }
                 if( ob.has("details") ) {
                     items.details = ob.getString("details");
                 }
