@@ -57,6 +57,10 @@ public class AuthenticationContext {
         }
         return map.get(myRegion);
     }
+
+    public @Nullable String getNetworkUrl() {
+        return getServiceUrl("network");
+    }
     
     public String getStorageToken() {
         if( storageToken == null ) {

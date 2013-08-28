@@ -31,6 +31,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.net.util.SubnetUtils;
 import org.apache.http.HttpStatus;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
@@ -59,6 +60,7 @@ import org.dasein.cloud.network.NetworkServices;
 import org.dasein.cloud.network.RawAddress;
 import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.network.VLANSupport;
+import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -1185,6 +1187,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 for( String name : names ) {
                     JSONArray arr = addrs.getJSONArray(name);
 
+                    String subnet = null;
                     for( int i=0; i<arr.length(); i++ ) {
                         RawAddress addr = null;
 
@@ -1195,9 +1198,11 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                             JSONObject a = arr.getJSONObject(i);
 
                             if( a.has("version") && a.getInt("version") == 4 && a.has("addr") ) {
+                                subnet = a.getString("addr");
                                 addr = new RawAddress(a.getString("addr"), IPVersion.IPV4);
                             }
                             else if( a.has("version") && a.getInt("version") == 6 && a.has("addr") ) {
+                                subnet = a.getString("addr");
                                 addr = new RawAddress(a.getString("addr"), IPVersion.IPV6);
                             }
                         }
@@ -1214,6 +1219,18 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                         for( VLAN network : networks ) {
                             if( network.getName().equals(name) ) {
                                 vm.setProviderVlanId(network.getProviderVlanId());
+                                //get subnet
+                                NetworkServices services = getProvider().getNetworkServices();
+                                VLANSupport support = services.getVlanSupport();
+                                Iterable<Subnet> subnets = support.listSubnets(network.getProviderVlanId());
+                                for (Subnet sub : subnets) {
+                                    SubnetUtils utils = new SubnetUtils(sub.getCidr());
+
+                                    if (utils.getInfo().isInRange(subnet)) {
+                                        vm.setProviderSubnetId(sub.getProviderSubnetId());
+                                        break;
+                                    }
+                                }
                                 break;
                             }
                         }
