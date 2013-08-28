@@ -98,7 +98,7 @@ public class NovaOpenStack extends AbstractCloud {
     public synchronized @Nonnull AuthenticationContext getAuthenticationContext() throws CloudException, InternalException {
         APITrace.begin(this, "Cloud.getAuthenticationContext");
         try {
-            Cache<AuthenticationContext> cache = Cache.getInstance(this, "authenticationContext", AuthenticationContext.class, CacheLevel.CLOUD_ACCOUNT, new TimePeriod<Minute>(25, TimePeriod.MINUTE));
+            Cache<AuthenticationContext> cache = Cache.getInstance(this, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(25, TimePeriod.MINUTE));
             ProviderContext ctx = getContext();
 
             if( ctx == null ) {
@@ -322,9 +322,7 @@ public class NovaOpenStack extends AbstractCloud {
     static private OpenStackProvider provider;
 
     public @Nonnull OpenStackProvider getCloudProvider() {
-        if( provider == null ) {
-            provider = OpenStackProvider.getProvider(getProviderName());
-        }
+        provider = OpenStackProvider.getProvider(getProviderName());
         return provider;
     }
 
