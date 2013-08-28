@@ -152,7 +152,7 @@ public abstract class AbstractMethod {
             HashMap<String,Object> json = new HashMap<String,Object>();
             HashMap<String,Object> credentials = new HashMap<String,Object>();
 
-            if( provider.getProviderName().equals("HP") ) {
+            if( provider.getCloudProvider().equals(OpenStackProvider.HP ) ) {
                 if( std.isInfoEnabled() ) {
                     std.info("HP authentication");
                 }
@@ -167,7 +167,7 @@ public abstract class AbstractMethod {
                 }
                 json.put("apiAccessKeyCredentials", credentials);
             }
-            else if( provider.getProviderName().equals("Rackspace") ) {
+            else if( provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
                 if( std.isInfoEnabled() ) {
                     std.info("Rackspace authentication");
                 }
@@ -425,7 +425,7 @@ public abstract class AbstractMethod {
                                                 services.put(type, map);
                                                 bestVersion.put(type, verMap);
                                             }
-                                            if( regionId == null & version.equals("1.0") && !provider.getProviderName().equals("Rackspace") ) {
+                                            if( regionId == null & version.equals("1.0") && !provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
                                                 std.warn("authenticateKeystone(): No region defined, making one up based on the URL: " + url);
                                                 regionId = toRegion(url);
                                                 std.warn("authenticateKeystone(): Fabricated region is: " + regionId);
@@ -471,7 +471,7 @@ public abstract class AbstractMethod {
                             std.debug("services=" + services);
                         }
                         // TODO: remove this when HP has the DBaaS in the service catalog
-                        if( provider.getProviderName().equals("HP") && provider.getContext().getAccountNumber().equals("66565797737008") ) {
+                        if( provider.getCloudProvider().equals(OpenStackProvider.HP) && provider.getContext().getAccountNumber().equals("66565797737008") ) {
                             HashMap<String,String> endpoints = new HashMap<String, String>();
 
                             endpoints.put("region-a.geo-1", "https://region-a.geo-1.dbaas-mysql.hpcloudsvc.com:8779/v1.0/66565797737008");
