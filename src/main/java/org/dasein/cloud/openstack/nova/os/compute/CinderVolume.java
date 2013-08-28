@@ -453,6 +453,23 @@ public class CinderVolume extends AbstractVolumeSupport {
             NovaMethod method = new NovaMethod(((NovaOpenStack)getProvider()));
 
             method.deleteResource(SERVICE, getResource(), volumeId, null);
+
+            v = getVolume(volumeId);
+            timeout = System.currentTimeMillis() + (CalendarWrapper.MINUTE * 10L);
+            while( timeout > System.currentTimeMillis() ) {
+                if( v == null || v.getCurrentState().equals(VolumeState.DELETED)) {
+                    return;
+                }
+                try { Thread.sleep(15000L); }
+                catch( InterruptedException ignore ) { }
+                try {
+                    v = getVolume(volumeId);
+                }
+                catch( Throwable ignore ) {
+                    // ignore
+                }
+            }
+            logger.warn("Volume remove op accepted but still available: current state - "+v.getCurrentState());
         }
         finally {
             APITrace.end();
