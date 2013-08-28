@@ -322,9 +322,7 @@ public class NovaOpenStack extends AbstractCloud {
     static private OpenStackProvider provider;
 
     public @Nonnull OpenStackProvider getCloudProvider() {
-        if( provider == null ) {
-            provider = OpenStackProvider.getProvider(getProviderName());
-        }
+        provider = OpenStackProvider.getProvider(getProviderName());
         return provider;
     }
 
