@@ -90,7 +90,15 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
             json.put("to_port", endPort);
             json.put("parent_group_id", firewallId);
             switch( sourceEndpoint.getRuleTargetType() ) {
-                case CIDR: json.put("cidr", sourceEndpoint.getCidr()); break;
+                case CIDR: {
+                    if (sourceEndpoint.getCidr().indexOf("/") == -1) {
+                        json.put("cidr", sourceEndpoint.getCidr()+"/32");
+                    }
+                    else {
+                        json.put("cidr", sourceEndpoint.getCidr());
+                    }
+                    break;
+                }
                 case VLAN: throw new OperationNotSupportedException("Cannot target VLANs with firewall rules");
                 case VM: throw new OperationNotSupportedException("Cannot target virtual machines with firewall rules");
                 case GLOBAL:
