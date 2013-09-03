@@ -29,6 +29,7 @@ import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.ComputeServices;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineSupport;
+import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.AbstractVLANSupport;
 import org.dasein.cloud.network.AllocationPool;
 import org.dasein.cloud.network.IPVersion;
@@ -52,6 +53,7 @@ import org.json.JSONObject;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -843,6 +845,8 @@ public class Quantum extends AbstractVLANSupport {
                 }
             }
             Subnet subnet = Subnet.getInstance(vlan.getProviderOwnerId(), vlan.getProviderRegionId(), vlan.getProviderVlanId(), subnetId, SubnetState.AVAILABLE, name, description, cidr).supportingTraffic(traffic);
+            Collection<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(vlan.getProviderRegionId());
+            subnet.constrainedToDataCenter(dc.iterator().next().getProviderDataCenterId());
 
             if( json.has("allocation_pools") ) {
                 JSONArray p = json.getJSONArray("allocation_pools");
@@ -914,6 +918,9 @@ public class Quantum extends AbstractVLANSupport {
             v.setProviderOwnerId(getTenantId());
             v.setCurrentState(VLANState.AVAILABLE);
             v.setProviderRegionId(getContext().getRegionId());
+            Collection<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(getContext().getRegionId());
+            v.setProviderDataCenterId(dc.iterator().next().getProviderDataCenterId());
+
             if( network.has("id") ) {
                 v.setProviderVlanId(network.getString("id"));
             }
