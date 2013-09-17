@@ -331,24 +331,19 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             }
             else {
                 if( options.getVlanId() != null && !((NovaOpenStack)getProvider()).isRackspace() ) {
-                    try {
-                        NovaNetworkServices services = ((NovaOpenStack)getProvider()).getNetworkServices();
+                    NovaNetworkServices services = ((NovaOpenStack)getProvider()).getNetworkServices();
 
-                        if( services != null ) {
-                            Quantum support = services.getVlanSupport();
+                    if( services != null ) {
+                        Quantum support = services.getVlanSupport();
 
-                            if( support != null ) {
-                                ArrayList<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
-                                HashMap<String,Object> vlan = new HashMap<String, Object>();
+                        if( support != null ) {
+                            ArrayList<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
+                            HashMap<String,Object> vlan = new HashMap<String, Object>();
 
-                                vlan.put("port", support.createPort(options.getVlanId(), options.getHostName()));
-                                vlans.add(vlan);
-                                json.put("networks", vlans);
-                            }
+                            vlan.put("port", support.createPort(options.getVlanId(), options.getHostName()));
+                            vlans.add(vlan);
+                            json.put("networks", vlans);
                         }
-                    }
-                    catch( Throwable ignore ) {
-                        // ignore this error
                     }
                 }
 
