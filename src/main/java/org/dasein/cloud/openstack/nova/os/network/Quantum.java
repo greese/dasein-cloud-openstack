@@ -182,7 +182,12 @@ public class Quantum extends AbstractVLANSupport {
             Subnet subnet = getSubnet(subnetId);
 
             if( subnet == null ) {
-                throw new CloudException("No such subnet: " + subnetId);
+                // check is the id passed in is actually for a network
+                VLAN vlan = getVlan(subnetId);
+                if (vlan != null) {
+                    throw new CloudException("Cannot launch into the network without a subnet");
+                }
+                throw new CloudException("Invalid id no network or subnet found for " + subnetId);
             }
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
             HashMap<String,Object> json = new HashMap<String,Object>();

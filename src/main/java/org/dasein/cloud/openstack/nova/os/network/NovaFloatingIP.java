@@ -160,7 +160,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public boolean isAssigned(@Nonnull AddressType type) {
-        return type.equals(AddressType.PUBLIC);
+        return (type.equals(AddressType.PUBLIC) || type.equals(AddressType.PRIVATE));
     }
 
     @Override
@@ -185,7 +185,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public boolean isRequestable(@Nonnull AddressType type) {
-        return type.equals(AddressType.PUBLIC);
+        return (type.equals(AddressType.PUBLIC) || type.equals(AddressType.PRIVATE));
     }
 
     @Override
