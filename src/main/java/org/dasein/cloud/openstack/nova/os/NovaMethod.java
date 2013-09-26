@@ -93,6 +93,10 @@ public class NovaMethod extends AbstractMethod {
         else if( suffix ) {
             resource = resource + "/detail";
         }
+
+        if (resource != null && (!endpoint.endsWith("/") && !resource.startsWith("/"))) {
+            endpoint = endpoint+"/";
+        }
         String response = getString(context.getAuthToken(), endpoint, resource);
 
         if( response == null ) {
