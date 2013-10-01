@@ -269,7 +269,7 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
                         Protocol protocol = null;
                         String ruleId = null;
 
-                        if( rule.has("id") ) {
+                        if( rule.has("id") && !rule.isNull("id")) {
                             ruleId = rule.getString("id");
                         }
                         if( ruleId == null ) {
@@ -277,25 +277,25 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
                         }
                         RuleTarget sourceEndpoint = null;
 
-                        if( rule.has("ip_range") ) {
+                        if( rule.has("ip_range") && !rule.isNull("ip_range")) {
                             JSONObject range = rule.getJSONObject("ip_range");
 
-                            if( range.has("cidr") ) {
+                            if( range.has("cidr") && !range.isNull("cidr")) {
                                 sourceEndpoint = RuleTarget.getCIDR(range.getString("cidr"));
                             }
                         }
-                        if( rule.has("group") ) {
+                        if( rule.has("group") && !rule.isNull("group")) {
                             JSONObject g = rule.getJSONObject("group");
-                            String id = (g.has("id") ? g.getString("id") : null);
+                            String id = (g.has("id") && !g.isNull("id") ? g.getString("id") : null);
 
                             if( id != null ) {
                                 sourceEndpoint = RuleTarget.getGlobal(id);
                             }
                             else {
-                                String o = (g.has("tenant_id") ? g.getString("tenant_id") : null);
+                                String o = (g.has("tenant_id") && !g.isNull("tenant_id") ? g.getString("tenant_id") : null);
 
                                 if( getTenantId().equals(o) ) {
-                                    String n = (g.has("name") ? g.getString("name") : null);
+                                    String n = (g.has("name") && !g.isNull("name") ? g.getString("name") : null);
 
                                     if( n != null ) {
                                         if( myFirewalls == null ) {
@@ -316,10 +316,10 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
                             continue;
                         }
 
-                        if( rule.has("from_port") ) {
+                        if( rule.has("from_port") && !rule.isNull("from_port")) {
                             startPort = rule.getInt("from_port");
                         }
-                        if( rule.has("to_port") ) {
+                        if( rule.has("to_port") && !rule.isNull("to_port")) {
                             endPort = rule.getInt("to_port");
                         }
                         if( startPort == -1 && endPort != -1 ) {
