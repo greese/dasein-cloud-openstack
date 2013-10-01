@@ -64,6 +64,7 @@ import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.openstack.nova.os.OpenStackProvider;
 import org.dasein.cloud.openstack.nova.os.network.NovaNetworkServices;
 import org.dasein.cloud.openstack.nova.os.network.Quantum;
 import org.dasein.cloud.util.APITrace;
@@ -1031,10 +1032,15 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         vm.setLastBootTimestamp(-1L);
         vm.setLastPauseTimestamp(-1L);
         vm.setPausable(false);
-        vm.setPersistent(false);
+        vm.setPersistent(true);
         vm.setPlatform(Platform.UNKNOWN);
         vm.setRebootable(true);
         vm.setProviderOwnerId(getTenantId());
+
+        if (getProvider().getCloudProvider().equals(OpenStackProvider.RACKSPACE) || getProvider().getCloudProvider().equals(OpenStackProvider.HP)) {
+            vm.setPersistent(false);
+        }
+
         if( server.has("id") ) {
             vm.setProviderVirtualMachineId(server.getString("id"));
         }
