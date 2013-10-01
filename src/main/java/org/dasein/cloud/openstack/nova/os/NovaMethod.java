@@ -51,6 +51,9 @@ public class NovaMethod extends AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No network endpoint exists");
         }
+        if (resource != null && (!endpoint.endsWith("/") && !resource.startsWith("/"))) {
+            endpoint = endpoint+"/";
+        }
         delete(context.getAuthToken(), endpoint, resource + "/" + resourceId);
     }
     
@@ -158,6 +161,10 @@ public class NovaMethod extends AbstractMethod {
 
         if( endpoint == null ) {
             throw new CloudException("No network endpoint exists");
+        }
+
+        if (resource != null && (!endpoint.endsWith("/") && !resource.startsWith("/"))) {
+            endpoint = endpoint+"/";
         }
         String response = postString(context.getAuthToken(), endpoint, resource, body.toString());
 

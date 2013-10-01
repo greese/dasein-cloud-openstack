@@ -75,7 +75,9 @@ public class CinderVolume extends AbstractVolumeSupport {
     }
 
     private @Nonnull String getResource() {
-        return (((NovaOpenStack)getProvider()).isHP() ? "/os-volumes" : "/volumes");
+        // 20130930 dmayne: seems like hp may have upgraded and uses the same resource
+        return "/volumes";
+        // return (((NovaOpenStack)getProvider()).isHP() ? "/os-volumes" : "/volumes");
     }
 
     private @Nonnull String getTypesResource() {
