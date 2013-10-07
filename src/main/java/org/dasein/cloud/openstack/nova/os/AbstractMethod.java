@@ -394,12 +394,16 @@ public abstract class AbstractMethod {
 
                                         if( version == null || version.equals("") ) {
                                             std.debug("No versionId parameter... Parsing URL " + url + " for best guess.  (vSadTrombone)");
-                                            Pattern p = Pattern.compile("/v(.+?)/|/v(.+?)$");
+                                            Pattern p = Pattern.compile("/volume/v(.+?)/|/v(.+?)/|/v(.+?)$");
                                             Matcher m = p.matcher(url);
                                             if (m.find()) {
                                                 version = m.group(1);
-                                                if (version == null)
+                                                if (version == null)  {
                                                     version = m.group(2);
+                                                    if (version == null)  {
+                                                        version = m.group(3);
+                                                    }
+                                                }
                                             } else {
                                                 version = "1.0";
                                             }
