@@ -110,7 +110,11 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             dblist.add(database);
             
             json.put("databases", dblist);
-            json.put("flavorRef", getFlavorRef(product.getProductSize()));
+
+            //get the product id
+            String[] parts = product.getProductSize().split(":");
+            String id = parts[0];
+            json.put("flavorRef", getFlavorRef(id));
             json.put("name", dataSourceName);
             if( withAdminUser != null && withAdminPassword != null ) {
                 ArrayList<Map<String,Object>> users = new ArrayList<Map<String, Object>>();
@@ -310,8 +314,8 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                                 JSONObject flavor = flavors.getJSONObject(i);
 
                                 if( flavor != null ) {
-                                    for( int size : new int[] { 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 } ) {
-                                        DatabaseProduct product = toProduct(ctx, size, flavor);
+                                    for( int size : new int[] { 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150}) { //150 is max size , 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 } ) {
+                                       DatabaseProduct product = toProduct(ctx, size, flavor);
 
                                         if( product != null ) {
                                             products.add(product);
