@@ -41,7 +41,7 @@ public class NovaException extends CloudException {
         items.code = code;
         items.type = CloudErrorType.GENERAL;
         items.message = "unknown";
-        items.details = "The cloud provided an error code without explanation";
+        items.details = "The cloud returned an error code with explanation: ";
         if( json != null ) {
             try {
                 JSONObject ob = new JSONObject(json);
@@ -64,16 +64,24 @@ public class NovaException extends CloudException {
                 if (items.message.equals("unknown")) {
                     String[] names = JSONObject.getNames(ob);
                     for (String key : names) {
-                        if (key.contains("Error")) {
-                            items.message = ob.getString(key);
+                        if (key.contains("Error") || key.contains("Fault")) {
+                            try {
+                                JSONObject msg = ob.getJSONObject(key);
+                                if (msg.has("message") && !msg.isNull("message")) {
+                                    items.message = msg.getString("message");
+                                }
+                            }
+                            catch (JSONException e) {
+                                items.message = ob.getString(key);
+                            }
                         }
                     }
                 }
                 if( ob.has("details") ) {
-                    items.details = ob.getString("details");
+                    items.details = items.details + ob.getString("details");
                 }
                 else {
-                    items.details = "[" + code + "] " + items.message;
+                    items.details = items.details + "[" + code + "] " + items.message;
                 }
                 String t = items.message.toLowerCase().trim();
 
