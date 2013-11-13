@@ -341,9 +341,23 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                             ArrayList<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
                             HashMap<String,Object> vlan = new HashMap<String, Object>();
 
-                            vlan.put("port", support.createPort(options.getVlanId(), options.getHostName()));
-                            vlans.add(vlan);
-                            json.put("networks", vlans);
+                            try {
+                                vlan.put("port", support.createPort(options.getVlanId(), options.getHostName()));
+                                vlans.add(vlan);
+                                json.put("networks", vlans);
+                            }
+                            catch (CloudException e) {
+                                if (e.getHttpCode() != 403) {
+                                    throw new CloudException(e.getMessage());
+                                }
+
+                                logger.warn("Unable to create port - trying to launch into general network");
+                                Subnet subnet = support.getSubnet(options.getVlanId());
+
+                                vlan.put("uuid", subnet.getProviderVlanId());
+                                vlans.add(vlan);
+                                json.put("networks", vlans);
+                            }
                         }
                     }
                 }

@@ -1588,6 +1588,9 @@ public abstract class AbstractMethod {
                             if( ob.has("retryAfter") ) {
                                 int min = ob.getInt("retryAfter");
 
+                                if( min < 1 ) {
+                                    throw new CloudException(CloudErrorType.CAPACITY, 413, "Over Limit", ob.has("message") ? ob.getString("message") : "Over Limit");
+                                }
                                 try { Thread.sleep(CalendarWrapper.MINUTE * min); }
                                 catch( InterruptedException ignore ) { }
                                 return postHeaders(authToken, endpoint, resource, customHeaders);
@@ -1800,6 +1803,9 @@ public abstract class AbstractMethod {
                             if( ob.has("retryAfter") ) {
                                 int min = ob.getInt("retryAfter");
 
+                                if( min < 1 ) {
+                                    throw new CloudException(CloudErrorType.CAPACITY, 413, "Over Limit", ob.has("message") ? ob.getString("message") : "Over Limit");
+                                }
                                 try { Thread.sleep(CalendarWrapper.MINUTE * min); }
                                 catch( InterruptedException ignore ) { }
                                 return postString(authToken, endpoint, resource, payload);
