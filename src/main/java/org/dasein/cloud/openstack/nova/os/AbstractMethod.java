@@ -1165,7 +1165,6 @@ public abstract class AbstractMethod {
                 throw new NovaException(items);
             }
             else {
-                std.info("Expected OK for GET request, got " + code);
                 String data = null;
 
                 try {

@@ -64,16 +64,14 @@ public class NovaException extends CloudException {
                 if (items.message.equals("unknown")) {
                     String[] names = JSONObject.getNames(ob);
                     for (String key : names) {
-                        if (key.contains("Error") || key.contains("Fault")) {
-                            try {
-                                JSONObject msg = ob.getJSONObject(key);
-                                if (msg.has("message") && !msg.isNull("message")) {
-                                    items.message = msg.getString("message");
-                                }
+                        try {
+                            JSONObject msg = ob.getJSONObject(key);
+                            if (msg.has("message") && !msg.isNull("message")) {
+                                items.message = msg.getString("message");
                             }
-                            catch (JSONException e) {
-                                items.message = ob.getString(key);
-                            }
+                        }
+                        catch (JSONException e) {
+                            items.message = ob.getString(key);
                         }
                     }
                 }
