@@ -270,11 +270,11 @@ public class CinderVolume extends AbstractVolumeSupport {
             list.add("xvdj");
         }
         else {
-            list.add("/dev/sdf");
-            list.add("/dev/sdg");
-            list.add("/dev/sdh");
-            list.add("/dev/sdi");
-            list.add("/dev/sdj");
+            list.add("/dev/vdf");
+            list.add("/dev/vdg");
+            list.add("/dev/vdh");
+            list.add("/dev/vdi");
+            list.add("/dev/vdj");
         }
         return list;
     }
