@@ -69,7 +69,9 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
     }
 
     private @Nonnull String getResource() {
-        return (((NovaOpenStack)getProvider()).isHP() ? "/os-snapshots" : "/snapshots");
+        // hp seems to be used the regular grizzly resource
+        // return (((NovaOpenStack)getProvider()).isHP() ? "/os-snapshots" : "/snapshots");
+        return "/snapshots";
     }
 
     @Override
