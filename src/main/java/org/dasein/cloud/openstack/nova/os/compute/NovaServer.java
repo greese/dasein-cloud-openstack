@@ -469,7 +469,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 ArrayList<String> results = new ArrayList<String>();
 
                 NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
-                JSONObject ob = method.getServers("/servers", vmId + "/os-security-groups", true);
+                JSONObject ob = method.getServers("/os-security-groups/servers", vmId + "/os-security-groups", true);
 
                 if( ob != null ) {
 
