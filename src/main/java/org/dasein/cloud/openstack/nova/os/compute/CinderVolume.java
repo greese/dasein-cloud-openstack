@@ -263,11 +263,20 @@ public class CinderVolume extends AbstractVolumeSupport {
         ArrayList<String> list = new ArrayList<String>();
 
         if( platform.isWindows() ) {
-            list.add("xvdf");
-            list.add("xvdg");
-            list.add("xvdh");
-            list.add("xvdi");
-            list.add("xvdj");
+            if (((NovaOpenStack)getProvider()).isHP()) {
+                list.add("/dev/vdf");
+                list.add("/dev/vdg");
+                list.add("/dev/vdh");
+                list.add("/dev/vdi");
+                list.add("/dev/vdj");
+            }
+            else {
+                list.add("/dev/xvdf");
+                list.add("/dev/xvdg");
+                list.add("/dev/xvdh");
+                list.add("/dev/xvdi");
+                list.add("/dev/xvdj");
+            }
         }
         else {
             list.add("/dev/vdf");
