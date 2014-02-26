@@ -65,7 +65,8 @@ public enum OpenStackProvider {
 
     public boolean supportsStartStop(@Nonnull VirtualMachine vm) {
         switch( this ) {
-            case HP: case RACKSPACE: return false;
+            //case HP: case RACKSPACE: return false;
+            case RACKSPACE: return false;
             default: return true;
         }
     }
