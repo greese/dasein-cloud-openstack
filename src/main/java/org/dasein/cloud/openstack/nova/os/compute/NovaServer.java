@@ -1051,7 +1051,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         vm.setRebootable(true);
         vm.setProviderOwnerId(getTenantId());
 
-        if (getProvider().getCloudProvider().equals(OpenStackProvider.RACKSPACE) || getProvider().getCloudProvider().equals(OpenStackProvider.HP)) {
+        if (getProvider().getCloudProvider().equals(OpenStackProvider.RACKSPACE)) {
             vm.setPersistent(false);
         }
         if( server.has("id") ) {
