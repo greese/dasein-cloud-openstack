@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 
 import javax.annotation.Nonnull;
@@ -38,19 +37,16 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
-import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
-import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.MachineImage;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
+import org.dasein.cloud.compute.VirtualMachineCapabilities;
 import org.dasein.cloud.compute.VirtualMachineProduct;
 import org.dasein.cloud.compute.VmState;
-import org.dasein.cloud.identity.IdentityServices;
-import org.dasein.cloud.identity.ShellKeySupport;
 import org.dasein.cloud.network.Firewall;
 import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.IPVersion;
@@ -102,6 +98,16 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
     }
 
+    private transient volatile NovaServerCapabilities capabilities;
+    @Nonnull
+    @Override
+    public VirtualMachineCapabilities getCapabilities() throws InternalException, CloudException {
+        if( capabilities == null ) {
+            capabilities = new NovaServerCapabilities(getProvider());
+        }
+        return capabilities;
+    }
+
     @Override
     public @Nonnull String getConsoleOutput(@Nonnull String vmId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.getConsoleOutput");
@@ -140,11 +146,6 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public @Nonnull String getProviderTermForServer(@Nonnull Locale locale) {
-        return "server";
     }
 
     @Override
@@ -208,70 +209,6 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     }
 
     @Override
-    public @Nonnull Requirement identifyImageRequirement(@Nonnull ImageClass cls) throws CloudException, InternalException {
-        return (cls.equals(ImageClass.MACHINE) ? Requirement.REQUIRED : Requirement.OPTIONAL);
-    }
-
-    @Override
-    public @Nonnull Requirement identifyPasswordRequirement(Platform platform) throws CloudException, InternalException {
-        return Requirement.NONE;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyRootVolumeRequirement() throws CloudException, InternalException {
-        return Requirement.NONE;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyShellKeyRequirement(Platform platform) throws CloudException, InternalException {
-        IdentityServices services = getProvider().getIdentityServices();
-
-        if( services == null ) {
-            return Requirement.NONE;
-        }
-        ShellKeySupport support = services.getShellKeySupport();
-        if( support == null ) {
-            return Requirement.NONE;
-        }
-        return Requirement.OPTIONAL;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyStaticIPRequirement() throws CloudException, InternalException {
-        return Requirement.NONE;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyVlanRequirement() throws CloudException, InternalException {
-        NetworkServices services = getProvider().getNetworkServices();
-
-        if( services == null ) {
-            return Requirement.NONE;
-        }
-        VLANSupport support = services.getVlanSupport();
-
-        if( support == null || !support.isSubscribed() ) {
-            return Requirement.NONE;
-        }
-        return Requirement.OPTIONAL;
-    }
-
-    @Override
-    public boolean isAPITerminationPreventable() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public boolean isBasicAnalyticsSupported() throws CloudException, InternalException {
-        return true;
-    }
-
-    @Override
-    public boolean isExtendedAnalyticsSupported() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.isSubscribed");
         try {
@@ -280,11 +217,6 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public boolean isUserDataSupported() throws CloudException, InternalException {
-        return true;
     }
 
     @Override
@@ -634,15 +566,6 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     }
 
     @Override
-    public Iterable<Architecture> listSupportedArchitectures() throws InternalException, CloudException {
-        ArrayList<Architecture> architectures = new ArrayList<Architecture>();
-
-        architectures.add(Architecture.I32);
-        architectures.add(Architecture.I64);
-        return architectures;
-    }
-
-    @Override
     public @Nonnull Iterable<ResourceStatus> listVirtualMachineStatus() throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.listVirtualMachineStatus");
         try {
@@ -895,21 +818,6 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public boolean supportsPauseUnpause(@Nonnull VirtualMachine vm) {
-        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsPauseUnpause(vm);
-    }
-
-    @Override
-    public boolean supportsStartStop(@Nonnull VirtualMachine vm) {
-        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsStartStop(vm);
-    }
-
-    @Override
-    public boolean supportsSuspendResume(@Nonnull VirtualMachine vm) {
-        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsSuspendResume(vm);
     }
 
     @Override
