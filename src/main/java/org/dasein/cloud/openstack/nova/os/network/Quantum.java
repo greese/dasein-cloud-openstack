@@ -24,7 +24,6 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
-import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.ComputeServices;
 import org.dasein.cloud.compute.VirtualMachine;
@@ -32,6 +31,7 @@ import org.dasein.cloud.compute.VirtualMachineSupport;
 import org.dasein.cloud.dc.DataCenter;
 import org.dasein.cloud.network.AbstractVLANSupport;
 import org.dasein.cloud.network.AllocationPool;
+import org.dasein.cloud.network.InternetGateway;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.Networkable;
 import org.dasein.cloud.network.RawAddress;
@@ -39,6 +39,7 @@ import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.network.SubnetCreateOptions;
 import org.dasein.cloud.network.SubnetState;
 import org.dasein.cloud.network.VLAN;
+import org.dasein.cloud.network.VLANCapabilities;
 import org.dasein.cloud.network.VLANState;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -76,7 +77,7 @@ public class Quantum extends AbstractVLANSupport {
         super(provider);
     }
 
-    private enum QuantumType {
+    public enum QuantumType {
         NONE, RACKSPACE, NOVA, QUANTUM;
 
         public String getNetworkResource() {
@@ -103,7 +104,17 @@ public class Quantum extends AbstractVLANSupport {
         }
     }
 
-    private QuantumType getNetworkType() throws CloudException, InternalException {
+    private transient volatile NetworkCapabilities capabilities;
+    @Nonnull
+    @Override
+    public VLANCapabilities getCapabilities() throws InternalException, CloudException {
+        if( capabilities == null ) {
+            capabilities = new NetworkCapabilities((NovaOpenStack)getProvider());
+        }
+        return capabilities;
+    }
+
+    public QuantumType getNetworkType() throws CloudException, InternalException {
         Cache<QuantumType> cache = Cache.getInstance(getProvider(), "quantumness", QuantumType.class, CacheLevel.CLOUD);
 
         Iterable<QuantumType> it = cache.get(getContext());
@@ -154,26 +165,6 @@ public class Quantum extends AbstractVLANSupport {
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
         return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
-    }
-
-    @Override
-    public boolean allowsNewSubnetCreation() throws CloudException, InternalException {
-        return getNetworkType().equals(QuantumType.QUANTUM);
-    }
-
-    @Override
-    public boolean allowsNewVlanCreation() throws CloudException, InternalException {
-        return true;
-    }
-
-    @Override
-    public boolean allowsMultipleTrafficTypesOverSubnet() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public boolean allowsMultipleTrafficTypesOverVlan() throws CloudException, InternalException {
-        return true;
     }
 
     public @Nonnull String createPort(@Nonnull String subnetId, @Nonnull String vmName) throws CloudException, InternalException {
@@ -371,16 +362,6 @@ public class Quantum extends AbstractVLANSupport {
         }
     }
 
-    @Override
-    public int getMaxNetworkInterfaceCount() throws CloudException, InternalException {
-        return -2;
-    }
-
-    @Override
-    public int getMaxVlanCount() throws CloudException, InternalException {
-        return -2;
-    }
-
     private @Nonnull String getNetworkResource() throws CloudException, InternalException {
         QuantumType type = getNetworkType();
         if (type.equals(QuantumType.QUANTUM)) {
@@ -489,11 +470,6 @@ public class Quantum extends AbstractVLANSupport {
     }
 
     @Override
-    public @Nonnull Requirement getSubnetSupport() throws CloudException, InternalException {
-        return (getNetworkType().equals(QuantumType.QUANTUM) ? Requirement.REQUIRED : Requirement.NONE);
-    }
-
-    @Override
     public VLAN getVlan(@Nonnull String vlanId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.getVlan");
         try {
@@ -529,6 +505,18 @@ public class Quantum extends AbstractVLANSupport {
         }
     }
 
+    @Nullable
+    @Override
+    public String getAttachedInternetGatewayId(@Nonnull String vlanId) throws CloudException, InternalException {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
+    @Nullable
+    @Override
+    public InternetGateway getInternetGatewayById(@Nonnull String gatewayId) throws CloudException, InternalException {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
+
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.isSubscribed");
@@ -548,9 +536,10 @@ public class Quantum extends AbstractVLANSupport {
         }
     }
 
+    @Nonnull
     @Override
-    public boolean isVlanDataCenterConstrained() throws CloudException, InternalException {
-        return false;
+    public Collection<InternetGateway> listInternetGateways(@Nullable String vlanId) throws CloudException, InternalException {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
@@ -619,15 +608,6 @@ public class Quantum extends AbstractVLANSupport {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public @Nonnull Iterable<IPVersion> listSupportedIPVersions() throws CloudException, InternalException {
-        ArrayList<IPVersion> versions = new ArrayList<IPVersion>();
-
-        versions.add(IPVersion.IPV4);
-        versions.add(IPVersion.IPV6);
-        return versions;
     }
 
     @Override
@@ -714,6 +694,11 @@ public class Quantum extends AbstractVLANSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    @Override
+    public void removeInternetGatewayById(@Nonnull String id) throws CloudException, InternalException {
+        //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
