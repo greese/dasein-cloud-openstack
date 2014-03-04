@@ -135,6 +135,12 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
 
     @Nonnull
     @Override
+    public Requirement identifyDataCenterLaunchRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Nonnull
+    @Override
     public Requirement identifyImageRequirement(@Nonnull ImageClass cls) throws CloudException, InternalException {
         return (cls.equals(ImageClass.MACHINE) ? Requirement.REQUIRED : Requirement.OPTIONAL);
     }
@@ -170,6 +176,12 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
     @Override
     public Requirement identifyStaticIPRequirement() throws CloudException, InternalException {
         return Requirement.NONE;
+    }
+
+    @Nonnull
+    @Override
+    public Requirement identifySubnetRequirement() throws CloudException, InternalException {
+        return Requirement.REQUIRED;
     }
 
     @Nonnull
