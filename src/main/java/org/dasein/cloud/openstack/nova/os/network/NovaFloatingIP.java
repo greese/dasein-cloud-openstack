@@ -32,6 +32,7 @@ import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.network.AddressType;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.IpAddress;
+import org.dasein.cloud.network.IPAddressCapabilities;
 import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.IpForwardingRule;
 import org.dasein.cloud.network.Protocol;
@@ -109,6 +110,16 @@ public class NovaFloatingIP implements IpAddressSupport {
     @Override
     public @Nonnull String forward(@Nonnull String addressId, int publicPort, @Nonnull Protocol protocol, int privatePort, @Nonnull String onServerId) throws InternalException, CloudException {
         throw new OperationNotSupportedException("IP forwarding is not currently supported");
+    }
+
+    private transient volatile FloatingIPCapabilities capabilities;
+    @Nonnull
+    @Override
+    public IPAddressCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new FloatingIPCapabilities(provider);
+        }
+        return capabilities;
     }
 
     @Override
