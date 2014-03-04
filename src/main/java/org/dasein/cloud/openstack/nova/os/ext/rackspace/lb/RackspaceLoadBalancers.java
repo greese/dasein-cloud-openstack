@@ -37,8 +37,10 @@ import org.dasein.cloud.network.LbEndpointType;
 import org.dasein.cloud.network.LbListener;
 import org.dasein.cloud.network.LbPersistence;
 import org.dasein.cloud.network.LbProtocol;
+import org.dasein.cloud.network.LbType;
 import org.dasein.cloud.network.LoadBalancer;
 import org.dasein.cloud.network.LoadBalancerAddressType;
+import org.dasein.cloud.network.LoadBalancerCapabilities;
 import org.dasein.cloud.network.LoadBalancerCreateOptions;
 import org.dasein.cloud.network.LoadBalancerEndpoint;
 import org.dasein.cloud.network.LoadBalancerState;
@@ -279,7 +281,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
     @SuppressWarnings("deprecation")
     @Override
     @Deprecated
-    public @Nonnull String create(@Nonnull String name, @Nonnull String description, @Nullable String addressId, @Nullable String[] dataCenterIds, @Nullable LbListener[] listeners, @Nullable String[] serverIds) throws CloudException, InternalException {
+    public @Nonnull String create(@Nonnull String name, @Nonnull String description, @Nullable String addressId, @Nullable String[] dataCenterIds, @Nullable LbListener[] listeners, @Nullable String[] serverIds, @Nullable String[] subnetIds, @Nullable LbType type) throws CloudException, InternalException {
         LoadBalancerCreateOptions options;
 
         if( addressId == null ) {
@@ -296,6 +298,12 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         }
         if( serverIds != null ) {
             options.withVirtualMachines(serverIds);
+        }
+        if (subnetIds != null) {
+            options.withProviderSubnetIds(subnetIds);
+        }
+        if (type != null) {
+            options.asType(type);
         }
         return createLoadBalancer(options);
     }
@@ -506,6 +514,16 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
     @Override
     public @Nonnull LoadBalancerAddressType getAddressType() throws CloudException, InternalException {
         return LoadBalancerAddressType.IP;
+    }
+
+    private transient volatile RackspaceLBCapabilities capabilities;
+    @Nonnull
+    @Override
+    public LoadBalancerCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new RackspaceLBCapabilities(provider);
+        }
+        return capabilities;
     }
 
     @Override
