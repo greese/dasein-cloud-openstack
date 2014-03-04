@@ -20,11 +20,9 @@
 package org.dasein.cloud.openstack.nova.os.ext.rackspace;
 
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
-import org.dasein.cloud.openstack.nova.os.ext.hp.cdn.HPCDN;
 import org.dasein.cloud.openstack.nova.os.ext.rackspace.cdn.RackspaceCDN;
 import org.dasein.cloud.openstack.nova.os.ext.rackspace.db.RackspaceRDBMS;
 import org.dasein.cloud.platform.AbstractPlatformServices;
-import org.dasein.cloud.platform.CDNSupport;
 import org.dasein.cloud.platform.RelationalDatabaseSupport;
 
 /**

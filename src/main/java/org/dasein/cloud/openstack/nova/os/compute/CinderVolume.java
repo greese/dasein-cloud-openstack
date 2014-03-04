@@ -36,7 +36,6 @@ import org.dasein.cloud.compute.VolumeState;
 import org.dasein.cloud.compute.VolumeType;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
-import org.dasein.cloud.openstack.nova.os.OpenStackProvider;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
