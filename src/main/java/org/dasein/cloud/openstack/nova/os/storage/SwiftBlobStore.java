@@ -33,7 +33,6 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.NameRules;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.identity.ServiceAction;
@@ -44,6 +43,7 @@ import org.dasein.cloud.storage.AbstractBlobStoreSupport;
 import org.dasein.cloud.storage.Blob;
 import org.dasein.cloud.storage.FileTransfer;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.NamingConstraints;
 import org.dasein.util.Jiterator;
 import org.dasein.util.JiteratorPopulator;
 import org.dasein.util.PopulatorThread;
@@ -710,14 +710,17 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
     }
 
     @Override
-    public @Nonnull NameRules getBucketNameRules() throws CloudException, InternalException {
+    public @Nonnull
+    NamingConstraints getBucketNameRules() throws CloudException, InternalException {
         //return NameRules.getInstance(minChars, maxChars, mixedCase, allowNumbers, latin1Only, specialChars);
-        return NameRules.getInstance(1, 255, false, true, true, new char[] { '-', '.' });
+        return NamingConstraints.getAlphaNumeric(1, 255).lowerCaseOnly().limitedToLatin1().constrainedBy(new char[] { '-', '.' });
+        //return NameRules.getInstance(1, 255, false, true, true, new char[] { '-', '.' });
     }
 
     @Override
-    public @Nonnull NameRules getObjectNameRules() throws CloudException, InternalException {
-        return NameRules.getInstance(1, 255, false, true, true, new char[] { '-', '.', ',', '#', '+' });
+    public @Nonnull NamingConstraints getObjectNameRules() throws CloudException, InternalException {
+        return NamingConstraints.getAlphaNumeric(1, 255).lowerCaseOnly().limitedToLatin1().constrainedBy(new char[] { '-', '.', ',', '#', '+' });
+        //return NameRules.getInstance(1, 255, false, true, true, new char[] { '-', '.', ',', '#', '+' });
     }
 
 }
