@@ -24,10 +24,10 @@ import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
-import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.AbstractSnapshotSupport;
 import org.dasein.cloud.compute.Snapshot;
+import org.dasein.cloud.compute.SnapshotCapabilities;
 import org.dasein.cloud.compute.SnapshotCreateOptions;
 import org.dasein.cloud.compute.SnapshotFilterOptions;
 import org.dasein.cloud.compute.SnapshotState;
@@ -120,6 +120,16 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
         }
     }
 
+    private transient volatile CinderSnapshotCapabilities capabilities;
+    @Nonnull
+    @Override
+    public SnapshotCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new CinderSnapshotCapabilities((NovaOpenStack)getProvider());
+        }
+        return capabilities;
+    }
+
     @Override
     public @Nonnull String getProviderTermForSnapshot(@Nonnull Locale locale) {
         return "snapshot";
@@ -149,11 +159,6 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public @Nonnull Requirement identifyAttachmentRequirement() throws InternalException, CloudException {
-        return Requirement.OPTIONAL;
     }
 
     @Override
@@ -317,11 +322,6 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public boolean supportsSnapshotCreation() throws CloudException, InternalException {
-        return true;
     }
 
     @Override
