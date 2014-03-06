@@ -29,6 +29,7 @@ import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.AbstractVolumeSupport;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
+import org.dasein.cloud.compute.VolumeCapabilities;
 import org.dasein.cloud.compute.VolumeCreateOptions;
 import org.dasein.cloud.compute.VolumeFormat;
 import org.dasein.cloud.compute.VolumeProduct;
@@ -197,6 +198,15 @@ public class CinderVolume extends AbstractVolumeSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    private transient volatile CinderVolumeCapabilities capabilities;
+    @Override
+    public VolumeCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new CinderVolumeCapabilities((NovaOpenStack)getProvider());
+        }
+        return capabilities;
     }
 
     @Override
