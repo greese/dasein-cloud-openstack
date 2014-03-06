@@ -16,6 +16,7 @@ import org.dasein.cloud.identity.ShellKeySupport;
 import org.dasein.cloud.network.NetworkServices;
 import org.dasein.cloud.network.VLANSupport;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.NamingConstraints;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -131,6 +132,12 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
     @Override
     public VMScalingCapabilities getVerticalScalingCapabilities() throws CloudException, InternalException {
         return null;
+    }
+
+    @Nonnull
+    @Override
+    public NamingConstraints getVirtualMachineNamingConstraints() throws CloudException, InternalException {
+        return NamingConstraints.getAlphaNumeric(1, 100);
     }
 
     @Nonnull
