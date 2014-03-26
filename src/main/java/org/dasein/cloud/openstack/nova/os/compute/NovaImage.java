@@ -38,6 +38,7 @@ import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.compute.AbstractImageSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ComputeServices;
+import org.dasein.cloud.compute.ImageCapabilities;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.ImageCreateOptions;
 import org.dasein.cloud.compute.ImageFilterOptions;
@@ -228,6 +229,15 @@ public class NovaImage extends AbstractImageSupport {
         }
     }
 
+    private transient volatile NovaImageCapabilities capabilities;
+    @Override
+    public ImageCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new NovaImageCapabilities((NovaOpenStack)getProvider());
+        }
+        return capabilities;
+    }
+
     @Override
     public MachineImage getImage(@Nonnull String providerImageId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "Image.getImage");
@@ -272,11 +282,6 @@ public class NovaImage extends AbstractImageSupport {
     @Override
     public boolean hasPublicLibrary() {
         return true;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyLocalBundlingRequirement() throws CloudException, InternalException {
-        return Requirement.NONE;
     }
 
     @Override
@@ -383,19 +388,6 @@ public class NovaImage extends AbstractImageSupport {
     }
 
     @Override
-    public @Nonnull Iterable<ImageClass> listSupportedImageClasses() throws CloudException, InternalException {
-        ArrayList<ImageClass> values = new ArrayList<ImageClass>();
-
-        Collections.addAll(values, ImageClass.values());
-        return values;
-    }
-
-    @Override
-    public @Nonnull Iterable<MachineImageType> listSupportedImageTypes() throws CloudException, InternalException {
-        return Collections.singletonList(MachineImageType.VOLUME);
-    }
-
-    @Override
     public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "Image.remove");
         try {
@@ -455,21 +447,6 @@ public class NovaImage extends AbstractImageSupport {
 
     @Override
     public boolean supportsCustomImages() {
-        return true;
-    }
-
-    @Override
-    public boolean supportsDirectImageUpload() throws CloudException, InternalException {
-        return false; // need Glance support
-    }
-
-    @Override
-    public boolean supportsImageCapture(@Nonnull MachineImageType type) throws CloudException, InternalException {
-        return true;
-    }
-
-    @Override
-    public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
         return true;
     }
 

@@ -27,6 +27,7 @@ import java.net.URISyntaxException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
@@ -64,6 +65,7 @@ import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
+import org.dasein.cloud.ContextRequirements;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.openstack.nova.os.ext.hp.db.HPRDBMS;
@@ -146,62 +148,63 @@ public abstract class AbstractMethod {
             wire.debug("");
         }
         try {
+            String accessPublic = null;
+            String accessPrivate = null;
+            String account = null;
+            try {
+                List<ContextRequirements.Field> fields = provider.getContextRequirements().getConfigurableValues();
+                for(ContextRequirements.Field f : fields ) {
+                    if(f.type.equals(ContextRequirements.FieldType.KEYPAIR)){
+                        byte[][] keyPair = (byte[][])provider.getContext().getConfigurationValue(f);
+                        accessPublic = new String(keyPair[0], "utf-8");
+                        accessPrivate = new String(keyPair[1], "utf-8");
+                    }
+                    else if (f.type.equals(ContextRequirements.FieldType.TEXT)) {
+                        account = (String)provider.getContext().getConfigurationValue(f);
+                    }
+                }
+            }
+            catch( UnsupportedEncodingException e ) {
+                std.error("authenticateKeystone(): Unable to read access credentials: " + e.getMessage());
+                e.printStackTrace();
+                throw new InternalException(e);
+            }
+
             if( std.isInfoEnabled() ) {
                 std.info("authenticateKeystone(): Attempting keystone authentication...");
             }
             HashMap<String,Object> json = new HashMap<String,Object>();
             HashMap<String,Object> credentials = new HashMap<String,Object>();
 
-            if( provider.getCloudProvider().equals(OpenStackProvider.HP ) ) {
+            if( provider.getCloudProvider().equals(OpenStackProvider.HP) ) {
                 if( std.isInfoEnabled() ) {
                     std.info("HP authentication");
                 }
-                try {
-                    credentials.put("accessKey", new String(provider.getContext().getAccessPublic(), "utf-8"));
-                    credentials.put("secretKey", new String(provider.getContext().getAccessPrivate(), "utf-8"));
-                }
-                catch( UnsupportedEncodingException e ) {
-                    std.error("authenticateKeystone(): Unable to read access credentials: " + e.getMessage());
-                    e.printStackTrace();
-                    throw new InternalException(e);
-                }
+                credentials.put("accessKey", accessPublic);
+                credentials.put("secretKey", accessPrivate);
                 json.put("apiAccessKeyCredentials", credentials);
             }
             else if( provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
                 if( std.isInfoEnabled() ) {
                     std.info("Rackspace authentication");
                 }
-                try {
-                    credentials.put("username", new String(provider.getContext().getAccessPublic(), "utf-8"));
-                    credentials.put("apiKey", new String(provider.getContext().getAccessPrivate(), "utf-8"));
-                }
-                catch( UnsupportedEncodingException e ) {
-                    std.error("authenticateKeystone(): Unable to read access credentials: " + e.getMessage());
-                    e.printStackTrace();
-                    throw new InternalException(e);
-                }
+                credentials.put("username", accessPublic);
+                credentials.put("apiKey", accessPrivate);
                 json.put("RAX-KSKEY:apiKeyCredentials", credentials);
             }
             else {
                 if( std.isInfoEnabled() ) {
                     std.info("Standard authentication");
                 }
-                try {
-                    credentials.put("username", new String(provider.getContext().getAccessPublic(), "utf-8"));
-                    credentials.put("password", new String(provider.getContext().getAccessPrivate(), "utf-8"));
-                }
-                catch( UnsupportedEncodingException e ) {
-                    std.error("authenticateKeystone(): Unable to read access credentials: " + e.getMessage());
-                    e.printStackTrace();
-                    throw new InternalException(e);
-                }
+                credentials.put("username", accessPublic);
+                credentials.put("password", accessPrivate);
                 json.put("passwordCredentials", credentials);
             }
             if( std.isDebugEnabled() ) {
-                std.debug("authenticateKeystone(): tenantId=" + provider.getContext().getAccountNumber());
+                std.debug("authenticateKeystone(): tenantId=" + account);
             }
             if( !provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
-                String acct = provider.getContext().getAccountNumber();
+                String acct = account;
 
                 if( provider.getCloudProvider().equals(OpenStackProvider.HP) ) {
                     json.put("tenantId", acct);
@@ -354,7 +357,7 @@ public abstract class AbstractMethod {
                         throw new CloudException(e);
                     }
                     if( tenantId == null ) {
-                        tenantId = provider.getContext().getAccountNumber();
+                        tenantId = account;
                     }
                     if( id != null ) {
                         HashMap<String,Map<String,String>> services = new HashMap<String,Map<String,String>>();
@@ -506,6 +509,27 @@ public abstract class AbstractMethod {
             std.trace("enter - " + AbstractMethod.class.getName() + ".authenticateStandard(" + endpointUrls + ")");
         }
         try {
+            String accessPublic = null;
+            String accessPrivate = null;
+            String account = null;
+            try {
+                List<ContextRequirements.Field> fields = provider.getContextRequirements().getConfigurableValues();
+                for(ContextRequirements.Field f : fields ) {
+                    if(f.type.equals(ContextRequirements.FieldType.KEYPAIR)){
+                        byte[][] keyPair = (byte[][])provider.getContext().getConfigurationValue(f);
+                        accessPublic = new String(keyPair[0], "utf-8");
+                        accessPrivate = new String(keyPair[1], "utf-8");
+                    }
+                    else if (f.type.equals(ContextRequirements.FieldType.TEXT)) {
+                        account = (String)provider.getContext().getConfigurationValue(f);
+                    }
+                }
+            }
+            catch( UnsupportedEncodingException e ) {
+                std.error("authenticateKeystone(): Unable to read access credentials: " + e.getMessage());
+                e.printStackTrace();
+                throw new InternalException(e);
+            }
             String[] endpoints;
             
             if( endpointUrls.indexOf(',') > 0 ) {
@@ -516,7 +540,7 @@ public abstract class AbstractMethod {
             }
             HashMap<String,Map<String,String>> services = new HashMap<String,Map<String,String>>();
             String authToken = null, myRegion = provider.getContext().getRegionId();
-            String tenantId = provider.getContext().getAccountNumber();
+            String tenantId = account;
 
             for( String endpoint : endpoints ) {
                 if( wire.isDebugEnabled() ) {
@@ -527,20 +551,11 @@ public abstract class AbstractMethod {
                     ProviderContext ctx = provider.getContext();
                     HttpClient client = getClient();
                     HttpGet get = new HttpGet(endpoint);
-                    
-                    try {
-                        get.addHeader("Content-Type", "application/json");
-                        get.addHeader("X-Auth-User", new String(ctx.getAccessPublic(), "utf-8"));
-                        get.addHeader("X-Auth-Key", new String(ctx.getAccessPrivate(), "utf-8"));
-                        get.addHeader("X-Auth-Project-Id", ctx.getAccountNumber());
-                    }
-                    catch( UnsupportedEncodingException e ) {
-                        std.error("authenticate(): Unsupported encoding when building request headers: " + e.getMessage());
-                        if( std.isTraceEnabled() ) {
-                            e.printStackTrace();
-                        }
-                        throw new InternalException(e);
-                    }
+
+                    get.addHeader("Content-Type", "application/json");
+                    get.addHeader("X-Auth-User", accessPublic);
+                    get.addHeader("X-Auth-Key", accessPrivate);
+                    get.addHeader("X-Auth-Project-Id", account);
                     if( wire.isDebugEnabled() ) {
                         wire.debug(get.getRequestLine().toString());
                         for( Header header : get.getAllHeaders() ) {
@@ -694,7 +709,28 @@ public abstract class AbstractMethod {
         if( std.isTraceEnabled() ) {
             std.trace("enter - " + AbstractMethod.class.getName() + ".authenticate()");
         }
-        String tenantId = provider.getContext().getAccountNumber();
+        String accessPublic = null;
+        String accessPrivate = null;
+        String accountNum = null;
+        try {
+            List<ContextRequirements.Field> fields = provider.getContextRequirements().getConfigurableValues();
+            for(ContextRequirements.Field f : fields ) {
+                if(f.type.equals(ContextRequirements.FieldType.KEYPAIR)){
+                    byte[][] keyPair = (byte[][])provider.getContext().getConfigurationValue(f);
+                    accessPublic = new String(keyPair[0], "utf-8");
+                    accessPrivate = new String(keyPair[1], "utf-8");
+                }
+                else if (f.type.equals(ContextRequirements.FieldType.TEXT)) {
+                    accountNum = (String)provider.getContext().getConfigurationValue(f);
+                }
+            }
+        }
+        catch( UnsupportedEncodingException e ) {
+            std.error("authenticateKeystone(): Unable to read access credentials: " + e.getMessage());
+            e.printStackTrace();
+            throw new InternalException(e);
+        }
+        String tenantId = accountNum;
         String authToken = null, storageToken = null;
         String thisRegion = toRegion(endpoint);
 
@@ -705,35 +741,26 @@ public abstract class AbstractMethod {
         try {
             HttpClient client = getClient();
             HttpGet get = new HttpGet(endpoint);
-            
-            try {
-                ProviderContext ctx = provider.getContext();
-                String account;
-            
-                if( ctx.getAccessPublic().length < 1 ) {
-                    account = ctx.getAccountNumber();
+
+            ProviderContext ctx = provider.getContext();
+            String account;
+
+            if( accessPublic.length() < 1 ) {
+                account = accountNum;
+            }
+            else {
+                String pk = accessPublic;
+
+                if( pk.equals("-----") ) {
+                    account = accountNum;
                 }
                 else {
-                    String pk = new String(ctx.getAccessPublic(), "utf-8");
-                    
-                    if( pk.equals("-----") ) {
-                        account = ctx.getAccountNumber();                        
-                    }
-                    else {
-                        account = ctx.getAccountNumber() + ":" + new String(ctx.getAccessPublic(), "utf-8");
-                    }
+                    account = accountNum + ":" + accessPublic;
                 }
-                get.addHeader("Content-Type", "application/json");
-                get.addHeader("X-Auth-User", account);
-                get.addHeader("X-Auth-Key", new String(ctx.getAccessPrivate(), "utf-8"));
             }
-            catch( UnsupportedEncodingException e ) {
-                std.error("authenticate(): Unsupported encoding when building request headers: " + e.getMessage());
-                if( std.isTraceEnabled() ) {
-                    e.printStackTrace();
-                }
-                throw new InternalException(e);
-            }
+            get.addHeader("Content-Type", "application/json");
+            get.addHeader("X-Auth-User", account);
+            get.addHeader("X-Auth-Key", accessPrivate);
             if( wire.isDebugEnabled() ) {
                 wire.debug(get.getRequestLine().toString());
                 for( Header header : get.getAllHeaders() ) {

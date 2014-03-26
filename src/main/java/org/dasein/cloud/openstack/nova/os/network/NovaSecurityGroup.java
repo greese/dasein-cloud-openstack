@@ -30,6 +30,7 @@ import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.network.AbstractFirewallSupport;
 import org.dasein.cloud.network.Direction;
 import org.dasein.cloud.network.Firewall;
+import org.dasein.cloud.network.FirewallCapabilities;
 import org.dasein.cloud.network.FirewallCreateOptions;
 import org.dasein.cloud.network.FirewallRule;
 import org.dasein.cloud.network.Permission;
@@ -205,6 +206,16 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
         }
     }
 
+    private transient volatile SecurityGroupCapabilities capabilities;
+    @Nonnull
+    @Override
+    public FirewallCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new SecurityGroupCapabilities((NovaOpenStack)getProvider());
+        }
+        return capabilities;
+    }
+
     @Override
     public @Nullable Firewall getFirewall(@Nonnull String firewallId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "Firewall.getFirewall");
@@ -368,11 +379,6 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
         }
     }
 
-    @Override
-    public @Nonnull Requirement identifyPrecedenceRequirement(boolean inVlan) throws InternalException, CloudException {
-        return Requirement.NONE;
-    }
-
     private boolean verifySupport() throws InternalException, CloudException {
         APITrace.begin(getProvider(), "Firewall.verifySupport");
         try {
@@ -410,11 +416,6 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public boolean isZeroPrecedenceHighest() throws InternalException, CloudException {
-        return true;  // nonsense since no precedence is supported
     }
 
     @Override
@@ -653,11 +654,6 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public boolean supportsRules(@Nonnull Direction direction, @Nonnull Permission permission, boolean inVlan) throws CloudException, InternalException {
-        return (!inVlan && Direction.INGRESS.equals(direction) && Permission.ALLOW.equals(permission));
     }
 
     @Override

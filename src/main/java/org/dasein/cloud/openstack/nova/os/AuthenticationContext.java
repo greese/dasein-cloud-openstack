@@ -61,7 +61,7 @@ public class AuthenticationContext {
     public @Nullable String getNetworkUrl() {
         return getServiceUrl("network");
     }
-    
+
     public String getStorageToken() {
         if( storageToken == null ) {
             return getAuthToken();

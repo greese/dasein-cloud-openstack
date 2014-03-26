@@ -179,6 +179,34 @@ public class NovaMethod extends AbstractMethod {
         }
     }
 
+    public @Nullable JSONObject postNetworks(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
+        AuthenticationContext context = provider.getAuthenticationContext();
+
+        if( resourceId != null ) {
+            resource = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
+        }
+        String endpoint = context.getNetworkUrl();
+
+        if( endpoint == null ) {
+            throw new CloudException("No network endpoint exists");
+        }
+
+        if (resource != null && (!endpoint.endsWith("/") && !resource.startsWith("/"))) {
+            endpoint = endpoint+"/";
+        }
+        String response = postString(context.getAuthToken(), endpoint, resource, body.toString());
+
+        if( response == null ) {
+            return null;
+        }
+        try {
+            return new JSONObject(response);
+        }
+        catch( JSONException e ) {
+            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        }
+    }
+
     public @Nullable String getHPCDN(@Nullable String resourceId) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getServiceUrl(HPCDN.SERVICE);

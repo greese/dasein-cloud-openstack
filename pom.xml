@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-openstack</artifactId>
-  <version>2013.07.13</version>
+  <version>2014.03.2-SNAPSHOT</version>
   <name>Dasein Cloud Nova</name>
   <description>Dasein Cloud implementation for the OpenStack APIs</description>
   
@@ -41,7 +41,7 @@
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2013.07.1</version>
+        <version>2014.03.1</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>
@@ -75,6 +75,11 @@
           <version>20090211</version>
           <scope>compile</scope>
       </dependency>
+      <dependency>
+        <groupId>commons-net</groupId>
+        <artifactId>commons-net</artifactId>
+        <version>3.0.1</version>
+    </dependency>
 
       <!-- Test -->
       <dependency>
@@ -86,7 +91,7 @@
       <dependency>
           <groupId>org.dasein</groupId>
           <artifactId>dasein-cloud-test</artifactId>
-          <version>2013.07.1</version>
+          <version>2014.03.1</version>
           <scope>test</scope>
           <optional>false</optional>
       </dependency>
@@ -184,11 +189,11 @@
                     <value>${accountNumber}</value>
                 </property>
                 <property>
-                    <name>apiSharedKey</name>
+                    <name>apiKeyShared</name>
                     <value>${apiSharedKey}</value>
                 </property>
                 <property>
-                    <name>apiSecretKey</name>
+                    <name>apiKeySecret</name>
                     <value>${apiSecretKey}</value>
                 </property>
                 <property>

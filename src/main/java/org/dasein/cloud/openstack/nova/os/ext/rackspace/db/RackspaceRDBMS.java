@@ -315,7 +315,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
                                 if( flavor != null ) {
                                     for( int size : new int[] { 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150}) { //150 is max size , 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 } ) {
-                                        DatabaseProduct product = toProduct(ctx, size, flavor);
+                                       DatabaseProduct product = toProduct(ctx, size, flavor);
 
                                         if( product != null ) {
                                             products.add(product);
