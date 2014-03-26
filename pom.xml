@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-openstack</artifactId>
-  <version>2014.03.2-SNAPSHOT</version>
+  <version>2014.07-SNAPSHOT</version>
   <name>Dasein Cloud Nova</name>
   <description>Dasein Cloud implementation for the OpenStack APIs</description>
   
@@ -41,7 +41,7 @@
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2014.03.1</version>
+        <version>2014.07.1-SNAPSHOT</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>
@@ -86,7 +86,7 @@
       <dependency>
           <groupId>org.dasein</groupId>
           <artifactId>dasein-cloud-test</artifactId>
-          <version>2014.03.1</version>
+          <version>2014.07.1-SNAPSHOT</version>
           <scope>test</scope>
           <optional>false</optional>
       </dependency>
