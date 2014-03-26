@@ -223,7 +223,7 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
         if( support == null || !support.isSubscribed() ) {
             return Requirement.NONE;
         }
-        return Requirement.OPTIONAL;
+        return Requirement.REQUIRED;
     }
 
     @Override

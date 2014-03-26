@@ -228,7 +228,7 @@ public class Quantum extends AbstractVLANSupport {
 
     @Override
     public @Nonnull Subnet createSubnet(@Nonnull SubnetCreateOptions options) throws CloudException, InternalException {
-        if( !allowsNewSubnetCreation() ) {
+        if( !getCapabilities().allowsNewSubnetCreation() ) {
             throw new OperationNotSupportedException("Subnets are not currently implemented for " + getProvider().getCloudName());
         }
         APITrace.begin(getProvider(), "VLAN.createSubnet");
