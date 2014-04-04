@@ -145,6 +145,9 @@ public abstract class AbstractMethod {
             wire.debug("KEYSTONE --------------------------------------------------------> " + endpoint);
             wire.debug("");
         }
+
+        HttpClient client = null;
+
         try {
             if( std.isInfoEnabled() ) {
                 std.info("authenticateKeystone(): Attempting keystone authentication...");
@@ -220,7 +223,7 @@ public abstract class AbstractMethod {
             
             jsonAuth.put("auth", json);
 
-            HttpClient client = getClient();
+            client = getClient();
             HttpPost post = new HttpPost(endpoint + "/tokens");
             
             post.addHeader("Content-Type", "application/json");
@@ -484,13 +487,16 @@ public abstract class AbstractMethod {
             throw new CloudException("No authentication tokens were provided");
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".authenticateKeystone()");
             }
             if( wire.isDebugEnabled() ) {
                 wire.debug("");
                 wire.debug("KEYSTONE --------------------------------------------------------> " + endpoint);
-            }            
+            }
         }
     }
     
@@ -519,9 +525,12 @@ public abstract class AbstractMethod {
                     wire.debug("STANDARD --------------------------------------------------------> " + endpoint);
                     wire.debug("");
                 }
+                
+                HttpClient client = null;
+
                 try {
                     ProviderContext ctx = provider.getContext();
-                    HttpClient client = getClient();
+                    client = getClient();
                     HttpGet get = new HttpGet(endpoint);
                     
                     try {
@@ -663,6 +672,9 @@ public abstract class AbstractMethod {
                     }
                 }
                finally {
+                   if (client != null) {
+                       client.getConnectionManager().shutdown();
+                   }
                    if( wire.isDebugEnabled() ) {
                        wire.debug("");
                        wire.debug("STANDARD --------------------------------------------------------> " + endpoint);
@@ -698,8 +710,10 @@ public abstract class AbstractMethod {
             wire.debug("--------------------------------------------------------> " + endpoint);
             wire.debug("");
         }
+        
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpGet get = new HttpGet(endpoint);
             
             try {
@@ -835,6 +849,9 @@ public abstract class AbstractMethod {
             }
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".authenticate()");
             }
@@ -872,8 +889,9 @@ public abstract class AbstractMethod {
             wire.debug("--------------------------------------------------------> " + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpDelete delete = new HttpDelete(endpoint + resource);
             
             delete.addHeader("Content-Type", "application/json");
@@ -943,6 +961,9 @@ public abstract class AbstractMethod {
             }
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".delete()");
             }
@@ -1048,8 +1069,9 @@ public abstract class AbstractMethod {
             wire.debug("--------------------------------------------------------> " + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpGet get = new HttpGet(resource == null ? endpoint : endpoint + resource);
             
             get.addHeader("Content-Type", "application/json");
@@ -1184,6 +1206,9 @@ public abstract class AbstractMethod {
             }
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".getString()");
             }
@@ -1205,8 +1230,9 @@ public abstract class AbstractMethod {
             wire.debug("--------------------------------------------------------> " + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpGet get = new HttpGet(endpoint + resource);
             
             get.addHeader("Content-Type", "application/json");
@@ -1300,6 +1326,9 @@ public abstract class AbstractMethod {
             }
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".getStream()");
             }
@@ -1406,8 +1435,9 @@ public abstract class AbstractMethod {
             wire.debug("--------------------------------------------------------> " + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpHead head = new HttpHead(endpoint + resource);
             
             head.addHeader("X-Auth-Token", authToken);
@@ -1478,6 +1508,9 @@ public abstract class AbstractMethod {
             return map;
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".head()");
             }
@@ -1513,8 +1546,9 @@ public abstract class AbstractMethod {
             wire.debug("---------------------------------------------------------------------------------" + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpPost post = new HttpPost(endpoint + resource);
             
             post.addHeader("Content-Type", "application/json");
@@ -1656,6 +1690,9 @@ public abstract class AbstractMethod {
             }
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".postString()");
             }
@@ -1721,8 +1758,9 @@ public abstract class AbstractMethod {
             wire.debug("---------------------------------------------------------------------------------" + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpPost post = new HttpPost(endpoint + resource);
             
             post.addHeader("Content-Type", "application/json");
@@ -1876,6 +1914,9 @@ public abstract class AbstractMethod {
             }
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".postString()");
             }
@@ -1898,8 +1939,9 @@ public abstract class AbstractMethod {
             wire.debug("---------------------------------------------------------------------------------" + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpPost post = new HttpPost(endpoint + resource);
             
             post.addHeader("Content-Type", "application/octet-stream");
@@ -2009,6 +2051,9 @@ public abstract class AbstractMethod {
             }
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + NovaOpenStack.class.getName() + ".postStream()");
             }
@@ -2050,8 +2095,9 @@ public abstract class AbstractMethod {
             wire.debug("---------------------------------------------------------------------------------" + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpPut put = new HttpPut(endpoint + resource);
             
             put.addHeader("Content-Type", "application/json");
@@ -2153,6 +2199,9 @@ public abstract class AbstractMethod {
             }
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".putString()");
             }
@@ -2174,8 +2223,9 @@ public abstract class AbstractMethod {
             wire.debug("---------------------------------------------------------------------------------" + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpPut put = new HttpPut(endpoint + resource);
             
             put.addHeader("Content-Type", "application/json");
@@ -2283,6 +2333,9 @@ public abstract class AbstractMethod {
             }
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".putString()");
             }
@@ -2304,8 +2357,9 @@ public abstract class AbstractMethod {
             wire.debug("---------------------------------------------------------------------------------" + endpoint + resource);
             wire.debug("");
         }
+        HttpClient client = null;
         try {
-            HttpClient client = getClient();
+            client = getClient();
             HttpPut put = new HttpPut(endpoint + resource);
             
             put.addHeader("Content-Type", "application/octet-stream");
@@ -2417,6 +2471,9 @@ public abstract class AbstractMethod {
             }
         }
         finally {
+            if (client != null) {
+                client.getConnectionManager().shutdown();
+            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + NovaOpenStack.class.getName() + ".putStream()");
             }
