@@ -1256,9 +1256,8 @@ public abstract class AbstractMethod {
             wire.debug("--------------------------------------------------------> " + endpoint + resource);
             wire.debug("");
         }
-        HttpClient client = null;
         try {
-            client = getClient();
+            HttpClient client = getClient();
             HttpGet get = new HttpGet(endpoint + resource);
             
             get.addHeader("Content-Type", "application/json");
@@ -1352,9 +1351,6 @@ public abstract class AbstractMethod {
             }
         }
         finally {
-            if (client != null) {
-                client.getConnectionManager().shutdown();
-            }
             if( std.isTraceEnabled() ) {
                 std.trace("exit - " + AbstractMethod.class.getName() + ".getStream()");
             }
