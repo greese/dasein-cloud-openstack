@@ -259,4 +259,9 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
         }
         return architectures;
     }
+
+    @Override
+    public boolean supportsSpotVirtualMachines() throws InternalException, CloudException {
+        return false;
+    }
 }
