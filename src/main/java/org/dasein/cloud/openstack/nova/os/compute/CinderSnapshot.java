@@ -68,6 +68,10 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
         return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
     }
 
+    private @Nonnull String getAccountNumber() throws CloudException, InternalException {
+        return getProvider().getContext().getAccountNumber();
+    }
+
     private @Nonnull String getResource() {
         // hp seems to be used the regular grizzly resource
         // return (((NovaOpenStack)getProvider()).isHP() ? "/os-snapshots" : "/snapshots");
@@ -395,7 +399,7 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
             snapshot.setCurrentState(currentState);
             snapshot.setDescription(description);
             snapshot.setName(name);
-            snapshot.setOwner(getTenantId());
+            snapshot.setOwner(getAccountNumber());
             snapshot.setProviderSnapshotId(snapshotId);
             snapshot.setRegionId(regionId);
             snapshot.setSizeInGb(size);
