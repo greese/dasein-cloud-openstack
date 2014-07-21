@@ -388,6 +388,11 @@ public class NovaImage extends AbstractImageSupport {
     }
 
     @Override
+    public void remove(@Nonnull String providerImageId) throws CloudException, InternalException {
+        remove(providerImageId, false);
+    }
+
+    @Override
     public void remove(@Nonnull String providerImageId, boolean checkState) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "Image.remove");
         try {
