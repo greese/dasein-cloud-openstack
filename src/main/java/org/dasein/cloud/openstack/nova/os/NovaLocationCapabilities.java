@@ -26,7 +26,17 @@ public class NovaLocationCapabilities extends AbstractCapabilities<NovaOpenStack
     }
 
     @Override
+    public boolean supportsAffinityGroups() {
+        return false;
+    }
+
+    @Override
     public boolean supportsResourcePools() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsStoragePools() {
         return false;
     }
 }
