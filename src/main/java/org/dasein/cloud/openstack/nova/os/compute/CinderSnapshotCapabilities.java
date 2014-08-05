@@ -19,14 +19,12 @@
 
 package org.dasein.cloud.openstack.nova.os.compute;
 
-import org.dasein.cloud.AbstractCapabilities;
-import org.dasein.cloud.CloudException;
-import org.dasein.cloud.InternalException;
-import org.dasein.cloud.Requirement;
+import org.dasein.cloud.*;
 import org.dasein.cloud.compute.SnapshotCapabilities;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Locale;
 
 /**
@@ -44,6 +42,12 @@ public class CinderSnapshotCapabilities extends AbstractCapabilities<NovaOpenSta
     @Override
     public String getProviderTermForSnapshot(@Nonnull Locale locale) {
         return "snapshot";
+    }
+
+    @Nullable
+    @Override
+    public VisibleScope getSnapshotVisibleScope() {
+        return VisibleScope.ACCOUNT_REGION;
     }
 
     @Nonnull

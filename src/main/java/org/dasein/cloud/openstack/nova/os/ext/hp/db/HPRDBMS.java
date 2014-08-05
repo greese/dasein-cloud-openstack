@@ -30,15 +30,7 @@ import org.dasein.cloud.TimeWindow;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
-import org.dasein.cloud.platform.ConfigurationParameter;
-import org.dasein.cloud.platform.Database;
-import org.dasein.cloud.platform.DatabaseConfiguration;
-import org.dasein.cloud.platform.DatabaseEngine;
-import org.dasein.cloud.platform.DatabaseProduct;
-import org.dasein.cloud.platform.DatabaseSnapshot;
-import org.dasein.cloud.platform.DatabaseSnapshotState;
-import org.dasein.cloud.platform.DatabaseState;
-import org.dasein.cloud.platform.RelationalDatabaseSupport;
+import org.dasein.cloud.platform.*;
 import org.dasein.cloud.util.APITrace;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -105,19 +97,20 @@ public class HPRDBMS implements RelationalDatabaseSupport {
    
             json.put("name", dataSourceName);
             json.put("port", hostPort > 0 ? hostPort : 3306);
-            if( product.getEngine().isMySQL() ) {
+            if( product.getEngine().equals(DatabaseEngine.MYSQL) ) {
                 HashMap<String,Object> type = new HashMap<String, Object>();
                 
                 type.put("name", "mysql");
                 if( databaseVersion != null ) {
                     type.put("version", databaseVersion);
                 }
-                else if( product.getEngine().equals(DatabaseEngine.MYSQL51) ) {
+                //no longer engine differentiation on MYSQL versions
+                /*else if( product.getEngine().equals(DatabaseEngine.MYSQL51) ) {
                     type.put("version", "5.1");
                 }
                 else if( product.getEngine().equals(DatabaseEngine.MYSQL50) ) {
                     type.put("version", "5.0");
-                }
+                } */
                 else {
                     type.put("version", "5.5");
                 }
@@ -241,6 +234,16 @@ public class HPRDBMS implements RelationalDatabaseSupport {
         }
     }
 
+    private transient volatile HPRDBMSCapabilities capabilities;
+    @Nonnull
+    @Override
+    public RelationalDatabaseCapabilities getCapabilities() throws InternalException, CloudException {
+        if( capabilities == null ) {
+            capabilities = new HPRDBMSCapabilities((NovaOpenStack)provider);
+        }
+        return capabilities;
+    }
+
     @Override
     public @Nullable DatabaseConfiguration getConfiguration(@Nonnull String providerConfigurationId) throws CloudException, InternalException {
         return null;
@@ -280,12 +283,12 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public Iterable<DatabaseEngine> getDatabaseEngines() throws CloudException, InternalException {
-        return Collections.singletonList(DatabaseEngine.MYSQL55);
+        return Collections.singletonList(DatabaseEngine.MYSQL);
     }
 
     @Override
     public @Nullable String getDefaultVersion(@Nonnull DatabaseEngine forEngine) throws CloudException, InternalException {
-        if( forEngine.isMySQL() ) {
+        if( forEngine.equals(DatabaseEngine.MYSQL) ) {
             return "5.5";
         }
         return null;
@@ -293,7 +296,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public Iterable<String> getSupportedVersions(DatabaseEngine forEngine) throws CloudException, InternalException {
-        if( forEngine.isMySQL() ) {
+        if( forEngine.equals(DatabaseEngine.MYSQL) ) {
             return Collections.singletonList("5.5");
         }
         return Collections.emptyList();
@@ -317,7 +320,65 @@ public class HPRDBMS implements RelationalDatabaseSupport {
     
     @Override
     public Iterable<DatabaseProduct> getDatabaseProducts(DatabaseEngine forEngine) throws CloudException, InternalException {
-        if( DatabaseEngine.MYSQL55.equals(forEngine) ) {
+        if( DatabaseEngine.MYSQL.equals(forEngine) ) {
+            Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
+
+            if( std.isTraceEnabled() ) {
+                std.trace("ENTER: " + HPRDBMS.class.getName() + ".getDatabaseProducts()");
+            }
+            try {
+                ProviderContext ctx = provider.getContext();
+
+                if( ctx == null ) {
+                    std.error("No context exists for this request");
+                    throw new InternalException("No context exists for this request");
+                }
+                NovaMethod method = new NovaMethod(provider);
+
+                JSONObject json = method.getResource(SERVICE, "/flavors", null, false);
+
+                ArrayList<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
+
+                if( json != null && json.has("flavors") ) {
+                    try {
+                        JSONArray flavors = json.getJSONArray("flavors");
+
+                        for( int i=0; i<flavors.length(); i++ ) {
+                            JSONObject flavor = flavors.getJSONObject(i);
+
+                            if( flavor != null ) {
+                                for( int size : new int[] { 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 } ) {
+                                    DatabaseProduct product = toProduct(ctx, size, flavor);
+
+                                    if( product != null ) {
+                                        products.add(product);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch( JSONException e ) {
+                        std.error("getDatabaseProducts(): Unable to identify expected values in JSON: " + e.getMessage());
+                        e.printStackTrace();
+                        throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors in " + json.toString());
+                    }
+                }
+                return products;
+            }
+            finally {
+                if( std.isTraceEnabled() ) {
+                    std.trace("exit - " + HPRDBMS.class.getName() + ".getDatabaseProducts()");
+                }
+            }
+        }
+        else {
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public Iterable<DatabaseProduct> listDatabaseProducts(DatabaseEngine databaseEngine) throws CloudException, InternalException {
+        if( DatabaseEngine.MYSQL.equals(databaseEngine) ) {
             Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
 
             if( std.isTraceEnabled() ) {
@@ -832,7 +893,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
                 }
             }
             int port = (json.has("port") ? json.getInt("port") : 3306);
-            DatabaseEngine engine = DatabaseEngine.MYSQL55;
+            DatabaseEngine engine = DatabaseEngine.MYSQL;
             
             if( json.has("dbtype") ) {
                 JSONObject t = json.getJSONObject("dbtype");
@@ -846,16 +907,18 @@ public class HPRDBMS implements RelationalDatabaseSupport {
                 }
                 if( db.equalsIgnoreCase("mysql") ) {
                     if( !version.startsWith("5.5") ) {
-                        if( version.startsWith("5.1") ) {
-                            engine = DatabaseEngine.MYSQL51;
-                        }
-                        else if( version.startsWith("5.0") ) {
-                            engine = DatabaseEngine.MYSQL50;
-                        }
-                        else {
-                            System.out.println("DEBUG OS UNKNOWN MYSQL VERSION " + version);
+                        //no longer engine differentiation
+                        /*if( version.startsWith("5.1") ) {
                             engine = DatabaseEngine.MYSQL;
                         }
+                        else if( version.startsWith("5.0") ) {
+                            engine = DatabaseEngine.MYSQL;
+                        }
+                        else {
+                        */
+                            System.out.println("DEBUG OS UNKNOWN MYSQL VERSION " + version);
+                            engine = DatabaseEngine.MYSQL;
+                       // }
                     }
                 }
                 else {
@@ -972,7 +1035,7 @@ public class HPRDBMS implements RelationalDatabaseSupport {
             else {
                 product.setCurrency("USD");
             }
-            product.setEngine(DatabaseEngine.MYSQL55);
+            product.setEngine(DatabaseEngine.MYSQL);
             product.setHighAvailability(false);
             product.setProviderDataCenterId(regionId + "-1");
             product.setStandardHourlyRate(0.0f);

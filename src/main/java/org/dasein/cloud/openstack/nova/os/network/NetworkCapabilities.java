@@ -19,15 +19,13 @@
 
 package org.dasein.cloud.openstack.nova.os.network;
 
-import org.dasein.cloud.AbstractCapabilities;
-import org.dasein.cloud.CloudException;
-import org.dasein.cloud.InternalException;
-import org.dasein.cloud.Requirement;
+import org.dasein.cloud.*;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.VLANCapabilities;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Collections;
 import java.util.Locale;
 
@@ -112,6 +110,12 @@ public class NetworkCapabilities extends AbstractCapabilities<NovaOpenStack> imp
     public Requirement getSubnetSupport() throws CloudException, InternalException {
         Quantum q = new Quantum(getProvider());
         return (q.getNetworkType().equals(Quantum.QuantumType.QUANTUM) ? Requirement.REQUIRED : Requirement.NONE);
+    }
+
+    @Nullable
+    @Override
+    public VisibleScope getVLANVisibleScope() {
+        return VisibleScope.ACCOUNT_REGION;
     }
 
     @Nonnull

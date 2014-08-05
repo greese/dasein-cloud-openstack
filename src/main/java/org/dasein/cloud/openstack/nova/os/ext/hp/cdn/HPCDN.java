@@ -28,6 +28,7 @@ import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.platform.CDNCapabilities;
 import org.dasein.cloud.platform.CDNSupport;
 import org.dasein.cloud.platform.Distribution;
 import org.dasein.cloud.util.APITrace;
@@ -106,6 +107,16 @@ public class HPCDN implements CDNSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    private transient volatile HPCDNCapabilities capabilities;
+    @Nonnull
+    @Override
+    public CDNCapabilities getCapabilities() throws InternalException, CloudException {
+        if( capabilities == null ) {
+            capabilities = new HPCDNCapabilities((NovaOpenStack)provider);
+        }
+        return capabilities;
     }
 
     @Override
