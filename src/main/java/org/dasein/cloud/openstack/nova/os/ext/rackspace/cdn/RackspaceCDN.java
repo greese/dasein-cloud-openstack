@@ -26,6 +26,7 @@ import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.platform.CDNCapabilities;
 import org.dasein.cloud.platform.CDNSupport;
 import org.dasein.cloud.platform.Distribution;
 import org.dasein.cloud.util.APITrace;
@@ -55,6 +56,16 @@ public class RackspaceCDN implements CDNSupport {
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
         return provider.getAuthenticationContext().getTenantId();
+    }
+
+    private transient volatile RackspaceCDNCapabilities capabilities;
+    @Nonnull
+    @Override
+    public CDNCapabilities getCapabilities() throws InternalException, CloudException {
+        if( capabilities == null ) {
+            capabilities = new RackspaceCDNCapabilities((NovaOpenStack)provider);
+        }
+        return capabilities;
     }
 
     @Override

@@ -26,16 +26,26 @@ import java.util.Locale;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
-import org.dasein.cloud.dc.DataCenter;
-import org.dasein.cloud.dc.DataCenterServices;
-import org.dasein.cloud.dc.Region;
+import org.dasein.cloud.dc.*;
 import org.dasein.cloud.util.APITrace;
+
+import javax.annotation.Nonnull;
 
 public class NovaLocationServices implements DataCenterServices {
     private NovaOpenStack provider;
     
     public NovaLocationServices(NovaOpenStack provider) { this.provider = provider; }
-    
+
+    private transient volatile NovaLocationCapabilities capabilities;
+    @Nonnull
+    @Override
+    public DataCenterCapabilities getCapabilities() throws InternalException, CloudException {
+        if( capabilities == null ) {
+            capabilities = new NovaLocationCapabilities(provider);
+        }
+        return capabilities;
+    }
+
     @Override
     public DataCenter getDataCenter(String providerDataCenterId) throws InternalException, CloudException {
         APITrace.begin(provider, "DC.getDataCenter");
@@ -122,5 +132,20 @@ public class NovaLocationServices implements DataCenterServices {
         finally {
             APITrace.end();
         }
+    }
+
+    @Override
+    public Collection<ResourcePool> listResourcePools(String providerDataCenterId) throws InternalException, CloudException {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public ResourcePool getResourcePool(String providerResourcePoolId) throws InternalException, CloudException {
+        return null;
+    }
+
+    @Override
+    public Collection<StoragePool> listStoragePools() throws InternalException, CloudException {
+        return Collections.emptyList();
     }
 }

@@ -28,6 +28,7 @@ import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.compute.VolumeCapabilities;
 import org.dasein.cloud.compute.VolumeFormat;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.NamingConstraints;
 import org.dasein.util.uom.storage.Gigabyte;
 import org.dasein.util.uom.storage.Storage;
 
@@ -63,6 +64,26 @@ public class CinderVolumeCapabilities extends AbstractCapabilities<NovaOpenStack
         return -2;
     }
 
+    @Override
+    public int getMaximumVolumeProductIOPS() throws InternalException, CloudException {
+        return LIMIT_UNKNOWN;
+    }
+
+    @Override
+    public int getMinimumVolumeProductIOPS() throws InternalException, CloudException {
+        return LIMIT_UNKNOWN;
+    }
+
+    @Override
+    public int getMaximumVolumeSizeIOPS() throws InternalException, CloudException {
+        return LIMIT_UNKNOWN;
+    }
+
+    @Override
+    public int getMinimumVolumeSizeIOPS() throws InternalException, CloudException {
+        return LIMIT_UNKNOWN;
+    }
+
     @Nullable
     @Override
     public Storage<Gigabyte> getMaximumVolumeSize() throws InternalException, CloudException {
@@ -76,6 +97,12 @@ public class CinderVolumeCapabilities extends AbstractCapabilities<NovaOpenStack
             return new Storage<Gigabyte>(100, Storage.GIGABYTE);
         }
         return new Storage<Gigabyte>(1, Storage.GIGABYTE);
+    }
+
+    @Nonnull
+    @Override
+    public NamingConstraints getVolumeNamingConstraints() throws CloudException, InternalException {
+        return null;
     }
 
     @Nonnull

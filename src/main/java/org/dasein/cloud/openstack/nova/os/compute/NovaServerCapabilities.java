@@ -19,11 +19,7 @@
 
 package org.dasein.cloud.openstack.nova.os.compute;
 
-import org.dasein.cloud.AbstractCapabilities;
-import org.dasein.cloud.Capabilities;
-import org.dasein.cloud.CloudException;
-import org.dasein.cloud.InternalException;
-import org.dasein.cloud.Requirement;
+import org.dasein.cloud.*;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ImageClass;
 import org.dasein.cloud.compute.Platform;
@@ -159,6 +155,18 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
         return NamingConstraints.getAlphaNumeric(1, 100);
     }
 
+    @Nullable
+    @Override
+    public VisibleScope getVirtualMachineVisibleScope() {
+        return VisibleScope.ACCOUNT_DATACENTER;
+    }
+
+    @Nullable
+    @Override
+    public VisibleScope getVirtualMachineProductVisibleScope() {
+        return VisibleScope.ACCOUNT_DATACENTER;
+    }
+
     @Nonnull
     @Override
     public Requirement identifyDataCenterLaunchRequirement() throws CloudException, InternalException {
@@ -258,5 +266,60 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
             architectures = Collections.unmodifiableList(a);
         }
         return architectures;
+    }
+
+    @Override
+    public boolean supportsSpotVirtualMachines() throws InternalException, CloudException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsAlterVM() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsClone() {
+        return false;
+    }
+
+    @Override
+    public boolean supportsPause() {
+        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsPauseUnpause(null);
+    }
+
+    @Override
+    public boolean supportsReboot() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsResume() {
+        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsSuspendResume(null);
+    }
+
+    @Override
+    public boolean supportsStart() {
+        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsStartStop(null);
+    }
+
+    @Override
+    public boolean supportsStop() {
+        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsStartStop(null);
+    }
+
+    @Override
+    public boolean supportsSuspend() {
+        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsSuspendResume(null);
+    }
+
+    @Override
+    public boolean supportsTerminate() {
+        return true;
+    }
+
+    @Override
+    public boolean supportsUnPause() {
+        return ((NovaOpenStack)getProvider()).getCloudProvider().supportsPauseUnpause(null);
     }
 }

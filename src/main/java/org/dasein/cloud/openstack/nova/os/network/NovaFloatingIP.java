@@ -53,6 +53,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * IP addresses services for Dasein Cloud to access OpenStack Nova floating IPs.
@@ -69,6 +73,7 @@ public class NovaFloatingIP implements IpAddressSupport {
     static public final String NOVA_TARGET     = "/os-floating-ips";
 
     private NovaOpenStack provider;
+    static private final ExecutorService threadPool = Executors.newFixedThreadPool(10);
     
     NovaFloatingIP(NovaOpenStack cloud) {
         provider = cloud;
@@ -257,6 +262,18 @@ public class NovaFloatingIP implements IpAddressSupport {
     public @Nonnull Iterable<IpAddress> listIpPool(@Nonnull IPVersion version, boolean unassignedOnly) throws InternalException, CloudException {
         APITrace.begin(provider, "IpAddress.listIpPool");
         try {
+            Future<Iterable<IpAddress>> ipPoolFuture = listIpPoolConcurrently(version, unassignedOnly);
+            return ipPoolFuture.get();
+        } catch (CloudException ce) {
+            throw ce;
+        } catch (Exception e) {
+            throw new InternalException(e);
+        }
+        finally {
+            APITrace.end();
+        }
+
+        /*try {
             if( !getVersions().contains(version) ) {
                 return Collections.emptyList();
             }
@@ -302,6 +319,72 @@ public class NovaFloatingIP implements IpAddressSupport {
         }
         finally {
             APITrace.end();
+        } */
+    }
+
+    @Nonnull
+    @Override
+    public Future<Iterable<IpAddress>> listIpPoolConcurrently(@Nonnull IPVersion ipVersion, boolean unassignedOnly) throws InternalException, CloudException {
+        return threadPool.submit(
+            new ListIpPoolCallable(
+                ipVersion,
+                unassignedOnly
+            )
+        );
+    }
+
+    public class ListIpPoolCallable implements Callable {
+        IPVersion version;
+        boolean unassignedOnly;
+
+        public ListIpPoolCallable( IPVersion version, boolean unassignedOnly ) {
+            this.version = version;
+            this.unassignedOnly = unassignedOnly;
+        }
+
+        public Iterable<IpAddress> call() throws CloudException, InternalException {
+            if( !getVersions().contains(version) ) {
+                return Collections.emptyList();
+            }
+            ProviderContext ctx = provider.getContext();
+
+            if( ctx == null ) {
+                logger.error("No context exists for this request");
+                throw new InternalException("No context exists for this request");
+            }
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject ob = method.getServers(getEndpoint(), null, false);
+            ArrayList<IpAddress> addresses = new ArrayList<IpAddress>();
+
+            try {
+                if( ob != null && ob.has("floating_ips") ) {
+                    JSONArray list = ob.getJSONArray("floating_ips");
+
+                    for( int i=0; i<list.length(); i++ ) {
+                        JSONObject json = list.getJSONObject(i);
+
+                        try {
+                            IpAddress addr = toIP(ctx, json);
+
+                            if( addr != null ) {
+                                if( !unassignedOnly || addr.getServerId() == null ) {
+                                    addresses.add(addr);
+                                }
+                            }
+                        }
+                        catch( JSONException e ) {
+                            logger.error("Invalid JSON from cloud: " + e.getMessage());
+                            throw new CloudException("Invalid JSON from cloud: " + e.getMessage());
+                        }
+                    }
+                }
+            }
+            catch( JSONException e ) {
+                logger.error("list(): Unable to identify expected values in JSON: " + e.getMessage());
+                e.printStackTrace();
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for floating IP in " + ob.toString());
+            }
+            return addresses;
         }
     }
 

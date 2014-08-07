@@ -19,10 +19,7 @@
 
 package org.dasein.cloud.openstack.nova.os.network;
 
-import org.dasein.cloud.AbstractCapabilities;
-import org.dasein.cloud.CloudException;
-import org.dasein.cloud.InternalException;
-import org.dasein.cloud.Requirement;
+import org.dasein.cloud.*;
 import org.dasein.cloud.network.Direction;
 import org.dasein.cloud.network.FirewallCapabilities;
 import org.dasein.cloud.network.FirewallConstraints;
@@ -31,6 +28,7 @@ import org.dasein.cloud.network.RuleTargetType;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Locale;
@@ -57,6 +55,12 @@ public class SecurityGroupCapabilities extends AbstractCapabilities<NovaOpenStac
     @Override
     public String getProviderTermForFirewall(@Nonnull Locale locale) {
         return "security group";
+    }
+
+    @Nullable
+    @Override
+    public VisibleScope getFirewallVisibleScope() {
+        return VisibleScope.ACCOUNT_DATACENTER;
     }
 
     @Nonnull

@@ -30,14 +30,7 @@ import org.dasein.cloud.TimeWindow;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
-import org.dasein.cloud.platform.ConfigurationParameter;
-import org.dasein.cloud.platform.Database;
-import org.dasein.cloud.platform.DatabaseConfiguration;
-import org.dasein.cloud.platform.DatabaseEngine;
-import org.dasein.cloud.platform.DatabaseProduct;
-import org.dasein.cloud.platform.DatabaseSnapshot;
-import org.dasein.cloud.platform.DatabaseState;
-import org.dasein.cloud.platform.RelationalDatabaseSupport;
+import org.dasein.cloud.platform.*;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.util.CalendarWrapper;
 import org.json.JSONArray;
@@ -188,6 +181,16 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
         throw new OperationNotSupportedException("Rackspace does not support snapshots");
     }
 
+    private transient volatile RackspaceRDBMSCapabilities capabilities;
+    @Nonnull
+    @Override
+    public RelationalDatabaseCapabilities getCapabilities() throws InternalException, CloudException {
+        if( capabilities == null ) {
+            capabilities = new RackspaceRDBMSCapabilities((NovaOpenStack)provider);
+        }
+        return capabilities;
+    }
+
     @Override
     public @Nullable DatabaseConfiguration getConfiguration(@Nonnull String providerConfigurationId) throws CloudException, InternalException {
         return null;
@@ -227,12 +230,12 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public Iterable<DatabaseEngine> getDatabaseEngines() throws CloudException, InternalException {
-        return Collections.singletonList(DatabaseEngine.MYSQL55);
+        return Collections.singletonList(DatabaseEngine.MYSQL);
     }
 
     @Override
     public @Nullable String getDefaultVersion(@Nonnull DatabaseEngine forEngine) throws CloudException, InternalException {
-        if( forEngine.isMySQL() ) {
+        if( forEngine.equals(DatabaseEngine.MYSQL) ) {
             return "5.5";
         }
         return null;
@@ -240,7 +243,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public Iterable<String> getSupportedVersions(DatabaseEngine forEngine) throws CloudException, InternalException {
-        if( forEngine.isMySQL() ) {
+        if( forEngine.equals(DatabaseEngine.MYSQL) ) {
             return Collections.singletonList("5.5");
         }
         return Collections.emptyList();
@@ -287,7 +290,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     public Iterable<DatabaseProduct> getDatabaseProducts(DatabaseEngine forEngine) throws CloudException, InternalException {
         APITrace.begin(provider, "RDBMS.getDatabaseProducts");
         try {
-            if( DatabaseEngine.MYSQL55.equals(forEngine) ) {
+            if( DatabaseEngine.MYSQL.equals(forEngine) ) {
                 Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
 
                 if( std.isTraceEnabled() ) {
@@ -316,6 +319,70 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                                 if( flavor != null ) {
                                     for( int size : new int[] { 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150}) { //150 is max size , 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 } ) {
                                        DatabaseProduct product = toProduct(ctx, size, flavor);
+
+                                        if( product != null ) {
+                                            products.add(product);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch( JSONException e ) {
+                            std.error("getDatabaseProducts(): Unable to identify expected values in JSON: " + e.getMessage());
+                            e.printStackTrace();
+                            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors in " + json.toString());
+                        }
+                    }
+                    return products;
+                }
+                finally {
+                    if( std.isTraceEnabled() ) {
+                        std.trace("exit - " + RackspaceRDBMS.class.getName() + ".getDatabaseProducts()");
+                    }
+                }
+            }
+            else {
+                return Collections.emptyList();
+            }
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    @Override
+    public Iterable<DatabaseProduct> listDatabaseProducts(DatabaseEngine databaseEngine) throws CloudException, InternalException {
+        APITrace.begin(provider, "RDBMS.getDatabaseProducts");
+        try {
+            if( DatabaseEngine.MYSQL.equals(databaseEngine) ) {
+                Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
+
+                if( std.isTraceEnabled() ) {
+                    std.trace("ENTER: " + RackspaceRDBMS.class.getName() + ".getDatabaseProducts()");
+                }
+                try {
+                    ProviderContext ctx = provider.getContext();
+
+                    if( ctx == null ) {
+                        std.error("No context exists for this request");
+                        throw new InternalException("No context exists for this request");
+                    }
+                    NovaMethod method = new NovaMethod(provider);
+
+                    JSONObject json = method.getResource(SERVICE, "/flavors", null, false);
+
+                    ArrayList<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
+
+                    if( json != null && json.has("flavors") ) {
+                        try {
+                            JSONArray flavors = json.getJSONArray("flavors");
+
+                            for( int i=0; i<flavors.length(); i++ ) {
+                                JSONObject flavor = flavors.getJSONObject(i);
+
+                                if( flavor != null ) {
+                                    for( int size : new int[] { 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150}) { //150 is max size , 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 } ) {
+                                        DatabaseProduct product = toProduct(ctx, size, flavor);
 
                                         if( product != null ) {
                                             products.add(product);
@@ -713,7 +780,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             database.setAllocatedStorageInGb(size);
             database.setCreationTimestamp(created);
             database.setCurrentState(currentState);
-            database.setEngine(DatabaseEngine.MYSQL55);
+            database.setEngine(DatabaseEngine.MYSQL);
             database.setHighAvailability(false);
             database.setHostName(hostname);
             database.setHostPort(port);
@@ -764,7 +831,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             else {
                 product.setCurrency("USD");
             }
-            product.setEngine(DatabaseEngine.MYSQL55);
+            product.setEngine(DatabaseEngine.MYSQL);
             product.setHighAvailability(false);
             product.setProviderDataCenterId(regionId + "-1");
             product.setStandardHourlyRate(0.0f);
