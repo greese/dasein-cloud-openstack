@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Nonnull;
@@ -46,6 +47,7 @@ import org.dasein.cloud.compute.VMLaunchOptions;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineCapabilities;
 import org.dasein.cloud.compute.VirtualMachineProduct;
+import org.dasein.cloud.compute.VirtualMachineProductFilterOptions;
 import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.network.Firewall;
 import org.dasein.cloud.network.FirewallSupport;
@@ -274,7 +276,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                             HashMap<String,Object> vlan = new HashMap<String, Object>();
 
                             try {
-                                vlan.put("port", support.createPort(options.getVlanId(), options.getHostName()));
+                                vlan.put("port", support.createPort(options.getSubnetId(), options.getHostName()));
                                 vlans.add(vlan);
                                 json.put("networks", vlans);
                             }
@@ -284,7 +286,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                                 }
 
                                 logger.warn("Unable to create port - trying to launch into general network");
-                                Subnet subnet = support.getSubnet(options.getVlanId());
+                                Subnet subnet = support.getSubnet(options.getSubnetId());
 
                                 vlan.put("uuid", subnet.getProviderVlanId());
                                 vlans.add(vlan);
@@ -545,10 +547,41 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         }
         return null;
     }
-    
+
     @Override
     public @Nonnull Iterable<VirtualMachineProduct> listProducts(@Nonnull Architecture architecture) throws InternalException, CloudException {
-        if( !architecture.equals(Architecture.I32) && !architecture.equals(Architecture.I64) ) {
+        return listProducts(null, architecture);
+    }
+
+    @Override
+    public Iterable<VirtualMachineProduct> listProducts( VirtualMachineProductFilterOptions options ) throws InternalException, CloudException {
+        List<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();
+        for( Architecture arch : Architecture.values() ) {
+            mergeProductLists(products, listProducts(options, arch));
+        }
+        return products;
+    }
+
+    // Merges product iterable to the list, using providerProductId as a unique key
+    private void mergeProductLists(List<VirtualMachineProduct> to, Iterable<VirtualMachineProduct> from) {
+        List<VirtualMachineProduct> copy = new ArrayList<VirtualMachineProduct>(to);
+        for( VirtualMachineProduct productFrom : from ) {
+            boolean found = false;
+            for( VirtualMachineProduct productTo : copy ) {
+                if( productTo.getProviderProductId().equalsIgnoreCase(productFrom.getProviderProductId()) ) {
+                    found = true;
+                    break;
+                }
+            }
+            if( !found ) {
+                to.add(productFrom);
+            }
+        }
+    }
+
+    @Override
+    public Iterable<VirtualMachineProduct> listProducts(VirtualMachineProductFilterOptions options, Architecture architecture) throws InternalException, CloudException {
+        if( architecture != null && !architecture.equals(Architecture.I32) && !architecture.equals(Architecture.I64) ) {
             return Collections.emptyList();
         }
         APITrace.begin(getProvider(), "VM.listProducts");
@@ -556,7 +589,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             ArrayList<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();
 
             for( FlavorRef flavor : listFlavors() ) {
-                products.add(flavor.product);
+                if (options != null) {
+                    if (options.matches(flavor.product)) {
+                        products.add(flavor.product);
+                    }
+                }
+                else {
+                    products.add(flavor.product);
+                }
             }
             return products;
         }
