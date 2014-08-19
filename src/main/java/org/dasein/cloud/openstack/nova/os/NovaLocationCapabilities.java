@@ -39,4 +39,9 @@ public class NovaLocationCapabilities extends AbstractCapabilities<NovaOpenStack
     public boolean supportsStoragePools() {
         return false;
     }
+
+    @Override
+    public boolean supportsFolders() {
+        return false;
+    }
 }
