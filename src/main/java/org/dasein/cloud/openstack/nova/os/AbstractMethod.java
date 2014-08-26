@@ -153,7 +153,7 @@ public abstract class AbstractMethod {
         try {
             String accessPublic = null;
             String accessPrivate = null;
-            String account = null;
+            String account = provider.getContext().getAccountNumber();;
             try {
                 List<ContextRequirements.Field> fields = provider.getContextRequirements().getConfigurableValues();
                 for(ContextRequirements.Field f : fields ) {
@@ -161,9 +161,6 @@ public abstract class AbstractMethod {
                         byte[][] keyPair = (byte[][])provider.getContext().getConfigurationValue(f);
                         accessPublic = new String(keyPair[0], "utf-8");
                         accessPrivate = new String(keyPair[1], "utf-8");
-                    }
-                    else if (f.type.equals(ContextRequirements.FieldType.TEXT)) {
-                        account = (String)provider.getContext().getConfigurationValue(f);
                     }
                 }
             }
@@ -517,7 +514,7 @@ public abstract class AbstractMethod {
         try {
             String accessPublic = null;
             String accessPrivate = null;
-            String account = null;
+            String account = provider.getContext().getAccountNumber();;
             try {
                 List<ContextRequirements.Field> fields = provider.getContextRequirements().getConfigurableValues();
                 for(ContextRequirements.Field f : fields ) {
@@ -525,9 +522,6 @@ public abstract class AbstractMethod {
                         byte[][] keyPair = (byte[][])provider.getContext().getConfigurationValue(f);
                         accessPublic = new String(keyPair[0], "utf-8");
                         accessPrivate = new String(keyPair[1], "utf-8");
-                    }
-                    else if (f.type.equals(ContextRequirements.FieldType.TEXT)) {
-                        account = (String)provider.getContext().getConfigurationValue(f);
                     }
                 }
             }
@@ -723,7 +717,7 @@ public abstract class AbstractMethod {
         }
         String accessPublic = null;
         String accessPrivate = null;
-        String accountNum = null;
+        String accountNum = provider.getContext().getAccountNumber();;
         try {
             List<ContextRequirements.Field> fields = provider.getContextRequirements().getConfigurableValues();
             for(ContextRequirements.Field f : fields ) {
@@ -731,9 +725,6 @@ public abstract class AbstractMethod {
                     byte[][] keyPair = (byte[][])provider.getContext().getConfigurationValue(f);
                     accessPublic = new String(keyPair[0], "utf-8");
                     accessPrivate = new String(keyPair[1], "utf-8");
-                }
-                else if (f.type.equals(ContextRequirements.FieldType.TEXT)) {
-                    accountNum = (String)provider.getContext().getConfigurationValue(f);
                 }
             }
         }

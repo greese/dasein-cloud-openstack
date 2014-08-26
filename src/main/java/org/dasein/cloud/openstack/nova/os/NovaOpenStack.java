@@ -145,8 +145,7 @@ public class NovaOpenStack extends AbstractCloud {
     public @Nonnull
     ContextRequirements getContextRequirements() {
         return new ContextRequirements(
-                new ContextRequirements.Field("apiKey", "The API Keypair", ContextRequirements.FieldType.KEYPAIR, ContextRequirements.Field.ACCESS_KEYS, true),
-                new ContextRequirements.Field("accountNumber", "The account/tenant id", ContextRequirements.FieldType.TEXT, ContextRequirements.Field.ACCESS_KEYS)
+                new ContextRequirements.Field("apiKey", "The API Keypair", ContextRequirements.FieldType.KEYPAIR, ContextRequirements.Field.ACCESS_KEYS, true)
         );
     }
     

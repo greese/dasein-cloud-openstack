@@ -145,8 +145,8 @@ public class Quantum extends AbstractVLANSupport {
                 // ignore
             }
             try {
-                JSONObject ob = method.getServers(
-                            "QuantumType.NOVA.getNetworkResource()", null, false);
+				JSONObject ob = method.getServers(
+						QuantumType.NOVA.getNetworkResource(), null, false);
 
                 if( ob != null && ob.has("networks") ) {
                     cache.put(getContext(), Collections.singletonList(QuantumType.NOVA));
@@ -539,7 +539,7 @@ public class Quantum extends AbstractVLANSupport {
     @Nonnull
     @Override
     public Collection<InternetGateway> listInternetGateways(@Nullable String vlanId) throws CloudException, InternalException {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return Collections.emptyList();
     }
 
     @Override
