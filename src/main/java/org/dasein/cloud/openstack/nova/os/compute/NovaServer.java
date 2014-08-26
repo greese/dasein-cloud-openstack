@@ -1038,11 +1038,21 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             map.put("host", server.getString("hostId"));
         }
         vm.setTags(map);
-        if( server.has("image") ) {
-            JSONObject img = server.getJSONObject("image");
+        if( server.has("image") && !server.isNull("image")) {
+            try {
+                JSONObject img = server.getJSONObject("image");
 
-            if( img.has("id") ) {
-                vm.setProviderMachineImageId(img.getString("id"));
+                if( img.has("id") ) {
+                    vm.setProviderMachineImageId(img.getString("id"));
+                }
+            }
+            catch (JSONException ex) {
+                logger.error("Unable to parse the image object");
+                try {
+                    server.getString("image");
+                    logger.error("Image object has been returned as a string from cloud "+server.getString("image"));
+                }
+                catch (JSONException ignore) {}
             }
         }
         if( server.has("flavor") ) {
@@ -1246,10 +1256,11 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             Platform p = Platform.guess(vm.getName() + " " + vm.getDescription());
 
             if( p.equals(Platform.UNKNOWN) ) {
-                MachineImage img = getProvider().getComputeServices().getImageSupport().getImage(vm.getProviderMachineImageId());
-
-                if( img != null ) {
-                    p = img.getPlatform();
+                if (vm.getProviderMachineImageId() != null) {
+                    MachineImage img = getProvider().getComputeServices().getImageSupport().getImage(vm.getProviderMachineImageId());
+                    if( img != null ) {
+                        p = img.getPlatform();
+                    }
                 }
             }
             vm.setPlatform(p);
