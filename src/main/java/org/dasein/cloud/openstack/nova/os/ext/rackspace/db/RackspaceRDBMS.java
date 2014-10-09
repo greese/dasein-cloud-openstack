@@ -704,6 +704,26 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     }
 
     @Override
+    public DatabaseBackup getBackup( String providerDbBackupId ) throws CloudException, InternalException {
+        throw new OperationNotSupportedException(provider.getCloudName() + " does not support database backups");
+    }
+
+    @Override
+    public Iterable<DatabaseBackup> listBackups( String forOptionalProviderDatabaseId ) throws CloudException, InternalException {
+        throw new OperationNotSupportedException(provider.getCloudName() + " does not support database backups");
+    }
+
+    @Override
+    public String createFromBackup( String dataSourceName, String providerDatabaseId, String providerDbBackupId, String productSize, String providerDataCenterId, int hostPort ) throws CloudException, InternalException {
+        throw new OperationNotSupportedException(provider.getCloudName() + " does not support database backups");
+    }
+
+    @Override
+    public boolean removeBackup( String providerBackupId ) throws CloudException, InternalException {
+        throw new OperationNotSupportedException(provider.getCloudName() + " does not support database backups");
+    }
+
+    @Override
     public @Nonnull String[] mapServiceAction(@Nonnull ServiceAction action) {
         return new String[0];
     }

@@ -58,7 +58,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class NovaImage extends AbstractImageSupport {
+public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
     static private final Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
 
     NovaImage(NovaOpenStack provider) {
