@@ -58,4 +58,34 @@ public class HPRDBMSCapabilities extends AbstractCapabilities<NovaOpenStack> imp
     public boolean isSupportsSnapshots() throws CloudException, InternalException {
         return true;
     }
+
+    @Override
+    public @Nonnull String getProviderTermForBackup( Locale locale ) {
+        return "backup"; // Should really throw an unsupported exception but core signature doesn't allow!
+    }
+
+    @Override
+    public boolean isSupportsDatabaseBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isSupportsScheduledDatabaseBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isSupportsDemandBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isSupportsRestoreBackup() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isSupportsDeleteBackup() throws CloudException, InternalException {
+        return false;
+    }
 }

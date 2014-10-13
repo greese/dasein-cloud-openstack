@@ -23,10 +23,8 @@ import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
-import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.ResourceStatus;
-import org.dasein.cloud.TimeWindow;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -40,12 +38,7 @@ import org.json.JSONObject;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Implements Dasein Cloud relational database support for the Rackspace cloud.
@@ -54,51 +47,41 @@ import java.util.Map;
  * @version 2012.04.1
  * @version 2013.02 updated for 2013.02 model
  */
-public class RackspaceRDBMS implements RelationalDatabaseSupport {
+public class RackspaceRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenStack> {
     static private final Logger logger = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
 
     static public final String RESOURCE  = "/instances";
 
     static public final String SERVICE  = "rax:database";
 
-    private NovaOpenStack provider;
-
-    public RackspaceRDBMS(NovaOpenStack provider) { this.provider = provider; }
+    public RackspaceRDBMS(NovaOpenStack provider) {
+        super(provider);
+    }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return provider.getAuthenticationContext().getTenantId();
-    }
-
-    @Override
-    public void addAccess(String providerDatabaseId, String sourceCidr) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Access management is not yet supported");
-    }
-
-    @Override
-    public void alterDatabase(String providerDatabaseId, boolean applyImmediately, String productSize, int storageInGigabytes, String configurationId, String newAdminUser, String newAdminPassword, int newPort, int snapshotRetentionInDays, TimeWindow preferredMaintenanceWindow, TimeWindow preferredBackupWindow) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Not able to alter databases yet");
+        return getProvider().getAuthenticationContext().getTenantId();
     }
 
     @Override
     public @Nonnull String createFromScratch(@Nonnull String dataSourceName, @Nonnull DatabaseProduct product, @Nonnull String databaseVersion, @Nonnull String withAdminUser, @Nonnull String withAdminPassword, int hostPort) throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.createFromScratch");
+        APITrace.begin(getProvider(), "RDBMS.createFromScratch");
         try {
-            ProviderContext ctx = provider.getContext();
+            ProviderContext ctx = getProvider().getContext();
 
             if( ctx == null ) {
                 logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
             
-            HashMap<String,Object> wrapper = new HashMap<String,Object>();
-            HashMap<String,Object> json = new HashMap<String,Object>();
-            NovaMethod method = new NovaMethod(provider);
+            Map<String,Object> wrapper = new HashMap<String,Object>();
+            Map<String,Object> json = new HashMap<String,Object>();
+            NovaMethod method = new NovaMethod(getProvider());
 
-            HashMap<String,Object> database = new HashMap<String, Object>();
+            Map<String,Object> database = new HashMap<String, Object>();
 
             database.put("name", dataSourceName);
             
-            ArrayList<Map<String,Object>> dblist= new ArrayList<Map<String, Object>>();
+            List<Map<String,Object>> dblist= new ArrayList<Map<String, Object>>();
             
             dblist.add(database);
             
@@ -110,14 +93,14 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             json.put("flavorRef", getFlavorRef(id));
             json.put("name", dataSourceName);
             if( withAdminUser != null && withAdminPassword != null ) {
-                ArrayList<Map<String,Object>> users = new ArrayList<Map<String, Object>>();
-                HashMap<String,Object> entry = new HashMap<String, Object>();
+                List<Map<String,Object>> users = new ArrayList<Map<String, Object>>();
+                Map<String,Object> entry = new HashMap<String, Object>();
                 
                 entry.put("name", withAdminUser);
                 entry.put("password", withAdminPassword);
                 
-                ArrayList<Map<String,Object>> dbaccess = new ArrayList<Map<String, Object>>();
-                HashMap<String,Object> oneDb = new HashMap<String, Object>();
+                List<Map<String,Object>> dbaccess = new ArrayList<Map<String, Object>>();
+                Map<String,Object> oneDb = new HashMap<String, Object>();
                 
                 oneDb.put("name", dataSourceName);
                 dbaccess.add(oneDb);
@@ -131,7 +114,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             if( size < 1 ) {
                 size = 5;
             }
-            HashMap<String,Object> volume = new HashMap<String, Object>();
+            Map<String,Object> volume = new HashMap<String, Object>();
             
             volume.put("size", String.valueOf(size));
             
@@ -166,27 +149,12 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
         }
     }
 
-    @Override
-    public String createFromLatest(String dataSourceName, String providerDatabaseId, String productSize, String providerDataCenterId, int hostPort) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Rackspace does not support snapshots");
-    }
-
-    @Override
-    public String createFromSnapshot(String dataSourceName, String providerDatabaseId, String providerDbSnapshotId, String productSize, String providerDataCenterId, int hostPort) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Rackspace does not support snapshots");
-    }
-
-    @Override
-    public String createFromTimestamp(String dataSourceName, String providerDatabaseId, long beforeTimestamp, String productSize, String providerDataCenterId, int hostPort) throws InternalException, CloudException {
-        throw new OperationNotSupportedException("Rackspace does not support snapshots");
-    }
-
     private transient volatile RackspaceRDBMSCapabilities capabilities;
-    @Nonnull
+
     @Override
-    public RelationalDatabaseCapabilities getCapabilities() throws InternalException, CloudException {
+    public @Nonnull RelationalDatabaseCapabilities getCapabilities() throws InternalException, CloudException {
         if( capabilities == null ) {
-            capabilities = new RackspaceRDBMSCapabilities((NovaOpenStack)provider);
+            capabilities = new RackspaceRDBMSCapabilities(getProvider());
         }
         return capabilities;
     }
@@ -198,15 +166,15 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public @Nullable Database getDatabase(@Nonnull String providerDatabaseId) throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.getDatabase");
+        APITrace.begin(getProvider(), "RDBMS.getDatabase");
         try {
-            ProviderContext ctx = provider.getContext();
+            ProviderContext ctx = getProvider().getContext();
 
             if( ctx == null ) {
                 logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject ob = method.getResource(SERVICE, RESOURCE, providerDatabaseId, false);
 
             if( ob == null ) {
@@ -250,9 +218,9 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     }
 
     public @Nullable DatabaseProduct getDatabaseProduct(@Nonnull String flavor) throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.getDatabaseProduct");
+        APITrace.begin(getProvider(), "RDBMS.getDatabaseProduct");
         try {
-            ProviderContext ctx = provider.getContext();
+            ProviderContext ctx = getProvider().getContext();
 
             if( ctx == null ) {
                 logger.error("No context exists for this request");
@@ -265,7 +233,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                 size = Integer.parseInt(flavor.substring(idx+1));
                 flavor = flavor.substring(0, idx);
             }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
 
             JSONObject json = method.getResource(SERVICE, "/flavors", flavor, false);
 
@@ -288,7 +256,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     
     @Override
     public Iterable<DatabaseProduct> getDatabaseProducts(DatabaseEngine forEngine) throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.getDatabaseProducts");
+        APITrace.begin(getProvider(), "RDBMS.getDatabaseProducts");
         try {
             if( DatabaseEngine.MYSQL.equals(forEngine) ) {
                 Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
@@ -297,17 +265,17 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                     std.trace("ENTER: " + RackspaceRDBMS.class.getName() + ".getDatabaseProducts()");
                 }
                 try {
-                    ProviderContext ctx = provider.getContext();
+                    ProviderContext ctx = getProvider().getContext();
 
                     if( ctx == null ) {
                         std.error("No context exists for this request");
                         throw new InternalException("No context exists for this request");
                     }
-                    NovaMethod method = new NovaMethod(provider);
+                    NovaMethod method = new NovaMethod(getProvider());
 
                     JSONObject json = method.getResource(SERVICE, "/flavors", null, false);
 
-                    ArrayList<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
+                    List<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
 
                     if( json != null && json.has("flavors") ) {
                         try {
@@ -352,7 +320,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public Iterable<DatabaseProduct> listDatabaseProducts(DatabaseEngine databaseEngine) throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.getDatabaseProducts");
+        APITrace.begin(getProvider(), "RDBMS.getDatabaseProducts");
         try {
             if( DatabaseEngine.MYSQL.equals(databaseEngine) ) {
                 Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
@@ -361,17 +329,17 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                     std.trace("ENTER: " + RackspaceRDBMS.class.getName() + ".getDatabaseProducts()");
                 }
                 try {
-                    ProviderContext ctx = provider.getContext();
+                    ProviderContext ctx = getProvider().getContext();
 
                     if( ctx == null ) {
                         std.error("No context exists for this request");
                         throw new InternalException("No context exists for this request");
                     }
-                    NovaMethod method = new NovaMethod(provider);
+                    NovaMethod method = new NovaMethod(getProvider());
 
                     JSONObject json = method.getResource(SERVICE, "/flavors", null, false);
 
-                    ArrayList<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
+                    List<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
 
                     if( json != null && json.has("flavors") ) {
                         try {
@@ -415,9 +383,9 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     }
 
     private @Nullable String getFlavorRef(@Nonnull String productId) throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.getFlavorRef");
+        APITrace.begin(getProvider(), "RDBMS.getFlavorRef");
         try {
-            ProviderContext ctx = provider.getContext();
+            ProviderContext ctx = getProvider().getContext();
 
             if( ctx == null ) {
                 logger.error("No context exists for this request");
@@ -428,7 +396,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
             if( idx > -1 ) {
                 productId = productId.substring(0, idx);
             }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
 
             JSONObject json = method.getResource(SERVICE, "/flavors", productId, false);
 
@@ -484,9 +452,9 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.isSubscribed");
+        APITrace.begin(getProvider(), "RDBMS.isSubscribed");
         try {
-            return (provider.getAuthenticationContext().getServiceUrl(SERVICE) != null);
+            return (getProvider().getAuthenticationContext().getServiceUrl(SERVICE) != null);
         }
         finally {
             APITrace.end();
@@ -494,51 +462,16 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     }
 
     @Override
-    public boolean isSupportsFirewallRules() {
-        return false;
-    }
-
-    @Override
-    public boolean isSupportsHighAvailability() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public boolean isSupportsLowAvailability() throws CloudException, InternalException {
-        return true;
-    }
-
-    @Override
-    public boolean isSupportsMaintenanceWindows() {
-        return false;
-    }
-
-    @Override
-    public boolean isSupportsSnapshots() {
-        return false;
-    }
-
-    @Override
-    public Iterable<String> listAccess(String toProviderDatabaseId) throws CloudException, InternalException {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public Iterable<DatabaseConfiguration> listConfigurations() throws CloudException, InternalException {
-        return Collections.emptyList();
-    }
-
-    @Override
     public @Nonnull Iterable<ResourceStatus> listDatabaseStatus() throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.listDatabaseStatus");
+        APITrace.begin(getProvider(), "RDBMS.listDatabaseStatus");
         try {
-            ProviderContext ctx = provider.getContext();
+            ProviderContext ctx = getProvider().getContext();
 
             if( ctx == null ) {
                 throw new InternalException("No context exists for this request");
             }
-            NovaMethod method = new NovaMethod(provider);
-            ArrayList<ResourceStatus> databases = new ArrayList<ResourceStatus>();
+            NovaMethod method = new NovaMethod(getProvider());
+            List<ResourceStatus> databases = new ArrayList<ResourceStatus>();
 
             JSONObject json = method.getResource(SERVICE, RESOURCE, null, false);
 
@@ -567,16 +500,16 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
 
     @Override
     public Iterable<Database> listDatabases() throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.listDatabases");
+        APITrace.begin(getProvider(), "RDBMS.listDatabases");
         try {
-            ProviderContext ctx = provider.getContext();
+            ProviderContext ctx = getProvider().getContext();
 
             if( ctx == null ) {
                 logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
-            NovaMethod method = new NovaMethod(provider);
-            ArrayList<Database> databases = new ArrayList<Database>();
+            NovaMethod method = new NovaMethod(getProvider());
+            List<Database> databases = new ArrayList<Database>();
 
             JSONObject json = method.getResource(SERVICE, RESOURCE, null, false);
 
@@ -606,31 +539,16 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     }
 
     @Override
-    public Collection<ConfigurationParameter> listParameters(String forProviderConfigurationId) throws CloudException, InternalException {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public Iterable<DatabaseSnapshot> listSnapshots(String forOptionalProviderDatabaseId) throws CloudException, InternalException {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public void removeConfiguration(String providerConfigurationId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("No configuration management yet exists");
-    }
-
-    @Override
     public void removeDatabase(String providerDatabaseId) throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.removeDatabase");
+        APITrace.begin(getProvider(), "RDBMS.removeDatabase");
         try {
-            ProviderContext ctx = provider.getContext();
+            ProviderContext ctx = getProvider().getContext();
 
             if( ctx == null ) {
                 logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
 
             method.deleteResource(SERVICE, RESOURCE, providerDatabaseId, null);
 
@@ -657,28 +575,23 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
     }
 
     @Override
-    public void removeSnapshot(String providerSnapshotId) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Rackspace does not support snapshots");
-    }
-
-    @Override
     public void resetConfiguration(String providerConfigurationId, String... parameters) throws CloudException, InternalException {
         // NO-OP since all configurations are at their defaults without configuration support
     }
 
     @Override
     public void restart(String providerDatabaseId, boolean blockUntilDone) throws CloudException, InternalException {
-        APITrace.begin(provider, "RDBMS.restart");
+        APITrace.begin(getProvider(), "RDBMS.restart");
         try {
-            ProviderContext ctx = provider.getContext();
+            ProviderContext ctx = getProvider().getContext();
 
             if( ctx == null ) {
                 logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
 
-            NovaMethod method = new NovaMethod(provider);
-            HashMap<String,Object> wrapper = new HashMap<String, Object>();
+            NovaMethod method = new NovaMethod(getProvider());
+            Map<String,Object> wrapper = new HashMap<String, Object>();
 
             wrapper.put("restart", new HashMap<String,Object>());
             method.postString(SERVICE, RESOURCE, "action", new JSONObject(wrapper), false);
@@ -686,21 +599,6 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public void revokeAccess(String providerDatabaseId, String sourceCide) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("No access management yet exists");
-    }
-
-    @Override
-    public void updateConfiguration(String providerConfigurationId, ConfigurationParameter... parameters) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("No configuration management yet exists");
-    }
-
-    @Override
-    public DatabaseSnapshot snapshot(String providerDatabaseId, String name) throws CloudException, InternalException {
-        throw new OperationNotSupportedException("Rackspace does not support database snapshots");
     }
 
     @Override
@@ -751,7 +649,7 @@ public class RackspaceRDBMS implements RelationalDatabaseSupport {
                     System.out.println("DEBUG OS Rackspace DB STATE: " + status);
                 }
             }
-            long created = (json.has("created") ? provider.parseTimestamp(json.getString("created")) : -1L);
+            long created = (json.has("created") ? getProvider().parseTimestamp(json.getString("created")) : -1L);
 
             String hostname = (json.has("hostname") ? json.getString("hostname") : null);
             String flavor = null;

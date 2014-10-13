@@ -58,4 +58,34 @@ public class RackspaceRDBMSCapabilities extends AbstractCapabilities<NovaOpenSta
     public boolean isSupportsSnapshots() throws CloudException, InternalException {
         return false;
     }
+
+    @Override
+    public @Nonnull String getProviderTermForBackup( Locale locale ) {
+        return "backup"; // TODO: Should throw an exception but core doesn't allow!
+    }
+
+    @Override
+    public boolean isSupportsDatabaseBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isSupportsScheduledDatabaseBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isSupportsDemandBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isSupportsRestoreBackup() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean isSupportsDeleteBackup() throws CloudException, InternalException {
+        return false;
+    }
 }
