@@ -176,7 +176,7 @@ public class Quantum extends AbstractVLANSupport {
         return true;
     }
 
-    public @Nonnull String createPort(@Nonnull String subnetId, @Nonnull String vmName) throws CloudException, InternalException {
+    public @Nonnull String createPort(@Nonnull String subnetId, @Nonnull String vmName, @Nullable String[] firewallIds) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.createPort");
         try {
             Subnet subnet = getSubnet(subnetId);
@@ -195,6 +195,13 @@ public class Quantum extends AbstractVLANSupport {
 
             json.put("name", "Port for " + vmName);
             json.put("network_id", subnet.getProviderVlanId());
+            if (firewallIds != null) {
+                JSONArray firewalls = new JSONArray();
+                for (String firewall : firewallIds) {
+                    firewalls.put(firewall);
+                }
+                json.put("security_groups", firewalls);
+            }
 
             ArrayList<Map<String,Object>> ips = new ArrayList<Map<String, Object>>();
             HashMap<String,Object> ip = new HashMap<String, Object>();

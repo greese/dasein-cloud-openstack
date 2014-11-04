@@ -342,7 +342,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                             HashMap<String,Object> vlan = new HashMap<String, Object>();
 
                             try {
-                                vlan.put("port", support.createPort(options.getVlanId(), options.getHostName()));
+                                vlan.put("port", support.createPort(options.getVlanId(), options.getHostName(), options.getFirewallIds()));
                                 vlans.add(vlan);
                                 json.put("networks", vlans);
                             }
