@@ -59,6 +59,12 @@ public class FloatingIPCapabilities extends AbstractCapabilities<NovaOpenStack> 
         return Requirement.NONE;
     }
 
+    @Nonnull
+    @Override
+    public Requirement identifyVlanForIPRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
     @Override
     public boolean isAssigned(@Nonnull IPVersion version) throws CloudException, InternalException {
         return getVersions().contains(version);
