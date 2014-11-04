@@ -254,6 +254,11 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
         return true;
     }
 
+    @Override
+    public boolean isUserDefinedPrivateIPSupported() throws CloudException, InternalException {
+        return false;
+    }
+
     private transient Collection<Architecture> architectures;
     @Nonnull
     @Override
