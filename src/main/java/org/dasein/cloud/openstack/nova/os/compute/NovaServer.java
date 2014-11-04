@@ -265,21 +265,33 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 json.put("networks", vlans);
             }
             else {
-                if( options.getVlanId() != null && !((NovaOpenStack)getProvider()).isRackspace() ) {
+                if( options.getSubnetId() != null && !((NovaOpenStack)getProvider()).isRackspace() ) {
                     NovaNetworkServices services = ((NovaOpenStack)getProvider()).getNetworkServices();
 
                     if( services != null ) {
                         Quantum support = services.getVlanSupport();
 
-                        if (support != null) {
-                            ArrayList<Map<String, Object>> vlans = new ArrayList<Map<String, Object>>();
-                            HashMap<String, Object> vlan = new HashMap<String, Object>();
+                        if( support != null ) {
+                            ArrayList<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
+                            HashMap<String,Object> vlan = new HashMap<String, Object>();
 
-                            Subnet subnet = support.getSubnet(options.getSubnetId());
+                            try {
+                                vlan.put("port", support.createPort(options.getSubnetId(), options.getHostName(), options.getFirewallIds()));
+                                vlans.add(vlan);
+                                json.put("networks", vlans);
+                            }
+                            catch (CloudException e) {
+                                if (e.getHttpCode() != 403) {
+                                    throw new CloudException(e.getMessage());
+                                }
 
-                            vlan.put("uuid", subnet.getProviderVlanId());
-                            vlans.add(vlan);
-                            json.put("networks", vlans);
+                                logger.warn("Unable to create port - trying to launch into general network");
+                                Subnet subnet = support.getSubnet(options.getSubnetId());
+
+                                vlan.put("uuid", subnet.getProviderVlanId());
+                                vlans.add(vlan);
+                                json.put("networks", vlans);
+                            }
                         }
                     }
                 }
