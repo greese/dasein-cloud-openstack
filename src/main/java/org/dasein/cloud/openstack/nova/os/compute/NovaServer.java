@@ -264,7 +264,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 json.put("networks", vlans);
             }
             else {
-                if( options.getVlanId() != null && !((NovaOpenStack)getProvider()).isRackspace() ) {
+                if( options.getSubnetId() != null && !((NovaOpenStack)getProvider()).isRackspace() ) {
                     NovaNetworkServices services = ((NovaOpenStack)getProvider()).getNetworkServices();
 
                     if( services != null ) {
