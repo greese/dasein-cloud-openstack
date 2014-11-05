@@ -186,7 +186,7 @@ public class Quantum extends AbstractVLANSupport {
 
             json.put("name", "Port for " + vmName);
             json.put("network_id", subnet.getProviderVlanId());
-            if (firewallIds != null) {
+            if (firewallIds != null && firewallIds.length > 0) {
                 JSONArray firewalls = new JSONArray();
                 for (String firewall : firewallIds) {
                     firewalls.put(firewall);
