@@ -604,10 +604,6 @@ public class NovaFloatingIP implements IpAddressSupport {
             }
 
             NovaMethod method = new NovaMethod(provider);
-
-            if( pool != null ) {
-                wrapper.put("pool", pool);
-            }
             JSONObject result = method.postServers(getEndpoint(), null, new JSONObject(wrapper), false);
 
             if( result != null && result.has("floating_ip") ) {

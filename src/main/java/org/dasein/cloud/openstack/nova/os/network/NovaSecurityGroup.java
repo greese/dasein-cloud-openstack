@@ -81,6 +81,9 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
             if( direction.equals(Direction.EGRESS) ) {
                 throw new OperationNotSupportedException(getProvider().getCloudName() + " does not support egress rules.");
             }
+            if( permission.equals(Permission.DENY) ) {
+                throw new OperationNotSupportedException(getProvider().getCloudName() + " dies not support deny rules.") ;
+            }
 
             HashMap<String,Object> wrapper = new HashMap<String,Object>();
             HashMap<String,Object> json = new HashMap<String,Object>();

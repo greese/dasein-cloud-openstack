@@ -325,7 +325,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 options.withMetaData("org.dasein.platform", targetImage.getPlatform().name());
             }
             options.withMetaData("org.dasein.description", options.getDescription());
-            json.put("metadata", options.getMetaData());
+            Map<String, Object> tmpMeta = options.getMetaData();
+            Map<String, Object> newMeta = new HashMap<String, Object>();
+            for (Map.Entry entry : tmpMeta.entrySet()) {
+                if (entry.getValue() != null) { //null values not supported by openstack
+                    newMeta.put(entry.getKey().toString(), entry.getValue());
+                }
+            }
+            json.put("metadata", newMeta);
             wrapper.put("server", json);
             JSONObject result = method.postServers("/servers", null, new JSONObject(wrapper), true);
 

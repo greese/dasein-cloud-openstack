@@ -256,7 +256,7 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
 
     @Override
     public boolean isUserDefinedPrivateIPSupported() throws CloudException, InternalException {
-        return false;
+        return false;    //todo is supported in openstack but not in dasein yet
     }
 
     private transient Collection<Architecture> architectures;
