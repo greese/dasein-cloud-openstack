@@ -23,6 +23,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Properties;
+import java.util.Random;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
@@ -47,6 +48,7 @@ import org.dasein.cloud.storage.StorageServices;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
+import org.dasein.util.uom.time.Day;
 import org.dasein.util.uom.time.Minute;
 import org.dasein.util.uom.time.TimePeriod;
 
@@ -99,32 +101,56 @@ public class NovaOpenStack extends AbstractCloud {
     public synchronized @Nonnull AuthenticationContext getAuthenticationContext() throws CloudException, InternalException {
         APITrace.begin(this, "Cloud.getAuthenticationContext");
         try {
-            Cache<AuthenticationContext> cache = Cache.getInstance(this, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(25, TimePeriod.MINUTE));
+            Cache<AuthenticationContext> cache = Cache.getInstance(this, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
             ProviderContext ctx = getContext();
 
             if( ctx == null ) {
                 throw new CloudException("No context was set for this request");
             }
             Iterable<AuthenticationContext> current = cache.get(ctx);
-            AuthenticationContext authenticationContext;
+            AuthenticationContext authenticationContext = null;
+
+            NovaMethod method = new NovaMethod(this);
 
             if( current != null ) {
                 authenticationContext = current.iterator().next();
-            }
-            else {
-                NovaMethod method = new NovaMethod(this);
-
-                authenticationContext = method.authenticate();
-                if( authenticationContext == null ) {
-                    NovaException.ExceptionItems items = new NovaException.ExceptionItems();
-
-                    items.code = HttpStatus.SC_UNAUTHORIZED;
-                    items.type = CloudErrorType.AUTHENTICATION;
-                    items.message = "unauthorized";
-                    items.details = "The API keys failed to authentication with the specified endpoint.";
-                    throw new NovaException(items);
+                // check the existing token periodically
+                Random r = new Random();
+                if (r.nextInt(10) == 1) {
+                    try {
+                        method.getString(authenticationContext.getAuthToken(), ctx.getEndpoint(), "/tenants");
+                    }
+                    catch (NovaException ex) {
+                        if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                            // authentication failed with existing token we need a new one
+                            System.out.println("authentication failed with existing token we need a new one");
+                            cache.clear();
+                            current = null;
+                            authenticationContext = null;
+                        }
+                        else {
+                            throw ex;
+                        }
+                    }
                 }
-                cache.put(ctx, Collections.singletonList(authenticationContext));
+            }
+            if (current == null) {
+                try {
+                    authenticationContext = method.authenticate();
+                }
+                finally {
+                    if( authenticationContext == null ) {
+                        NovaException.ExceptionItems items = new NovaException.ExceptionItems();
+
+                        items.code = HttpStatus.SC_UNAUTHORIZED;
+                        items.type = CloudErrorType.AUTHENTICATION;
+                        items.message = "unauthorized";
+                        items.details = "The API keys failed to authenticate with the specified endpoint.";
+                        throw new NovaException(items);
+                    }
+                    cache.put(ctx, Collections.singletonList(authenticationContext));
+                    return authenticationContext;
+                }
             }
             return authenticationContext;
         }
@@ -386,8 +412,7 @@ public class NovaOpenStack extends AbstractCloud {
         APITrace.begin(this, "Cloud.testContext");
         try {
             try {
-                NovaMethod method = new NovaMethod(this);
-                AuthenticationContext ctx = method.authenticate();
+                AuthenticationContext ctx = getAuthenticationContext();
 
                 return (ctx == null ? null : ctx.getTenantId());
             }

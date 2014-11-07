@@ -1194,6 +1194,10 @@ public abstract class AbstractMethod {
                 if( items == null ) {
                     return null;
                 }
+                if (items.code == HttpStatus.SC_UNAUTHORIZED) {
+                    std.error("getString(): [" +  code + " : " + items.message + "] " + items.details);
+                    throw new NovaException(items);
+                }
                 if( provider.getMajorVersion() == 1 && provider.getMinorVersion() == 0 && items.message != null && (items.message.contains("not found") || items.message.contains("unknown")) ) {
                     return null;
                 }
