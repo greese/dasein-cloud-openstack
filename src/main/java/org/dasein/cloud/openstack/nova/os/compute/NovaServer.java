@@ -96,7 +96,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+        return ((NovaOpenStack)getProvider()).getContext().getAccountNumber();
     }
 
     private transient volatile NovaServerCapabilities capabilities;

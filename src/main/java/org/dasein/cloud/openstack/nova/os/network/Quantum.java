@@ -164,7 +164,7 @@ public class Quantum extends AbstractVLANSupport {
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+        return ((NovaOpenStack)getProvider()).getContext().getAccountNumber();
     }
 
     public @Nonnull String createPort(@Nonnull String subnetId, @Nonnull String vmName, @Nullable String[] firewallIds) throws CloudException, InternalException {

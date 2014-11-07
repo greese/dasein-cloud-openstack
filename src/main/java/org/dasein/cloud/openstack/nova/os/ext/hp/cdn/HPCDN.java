@@ -67,7 +67,7 @@ public class HPCDN implements CDNSupport {
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return provider.getAuthenticationContext().getTenantId();
+        return provider.getContext().getAccountNumber();
     }
 
     @Override

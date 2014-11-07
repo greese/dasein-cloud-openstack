@@ -71,7 +71,7 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+        return ((NovaOpenStack)getProvider()).getContext().getAccountNumber();
     }
 
     @Override

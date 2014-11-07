@@ -57,7 +57,7 @@ public class HPRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenStack> {
     public HPRDBMS(NovaOpenStack provider) { super(provider); }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return getProvider().getAuthenticationContext().getTenantId();
+        return getProvider().getContext().getAccountNumber();
     }
 
     @Override

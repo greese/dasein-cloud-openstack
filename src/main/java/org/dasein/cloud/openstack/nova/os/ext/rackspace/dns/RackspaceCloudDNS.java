@@ -67,7 +67,7 @@ public class RackspaceCloudDNS implements DNSSupport {
     public RackspaceCloudDNS(NovaOpenStack provider) { this.provider = provider; }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return provider.getAuthenticationContext().getTenantId();
+        return provider.getContext().getAccountNumber();
     }
 
     @Override

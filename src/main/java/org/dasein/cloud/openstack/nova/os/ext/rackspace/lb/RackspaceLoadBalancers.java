@@ -81,7 +81,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return getProvider().getAuthenticationContext().getTenantId();
+        return getProvider().getContext().getAccountNumber();
     }
 
     public void addIPEndpoints(@Nonnull String toLoadBalancerId, @Nonnull String ... ipAddresses) throws CloudException, InternalException {

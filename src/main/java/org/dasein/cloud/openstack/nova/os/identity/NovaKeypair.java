@@ -61,7 +61,7 @@ public class NovaKeypair implements ShellKeySupport {
     NovaKeypair(@Nonnull NovaOpenStack cloud) { provider = cloud; }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return provider.getAuthenticationContext().getTenantId();
+        return provider.getContext().getAccountNumber();
     }
 
     @Override
