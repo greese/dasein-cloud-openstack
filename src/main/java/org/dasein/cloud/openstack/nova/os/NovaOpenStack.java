@@ -49,7 +49,6 @@ import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
 import org.dasein.util.uom.time.Day;
-import org.dasein.util.uom.time.Minute;
 import org.dasein.util.uom.time.TimePeriod;
 
 public class NovaOpenStack extends AbstractCloud {
@@ -114,27 +113,8 @@ public class NovaOpenStack extends AbstractCloud {
 
             if( current != null ) {
                 authenticationContext = current.iterator().next();
-                // check the existing token periodically
-                Random r = new Random();
-                if (r.nextInt(10) == 1) {
-                    try {
-                        method.getString(authenticationContext.getAuthToken(), ctx.getEndpoint(), "/tenants");
-                    }
-                    catch (NovaException ex) {
-                        if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
-                            // authentication failed with existing token we need a new one
-                            System.out.println("authentication failed with existing token we need a new one");
-                            cache.clear();
-                            current = null;
-                            authenticationContext = null;
-                        }
-                        else {
-                            throw ex;
-                        }
-                    }
-                }
             }
-            if (current == null) {
+            else {
                 try {
                     authenticationContext = method.authenticate();
                 }
@@ -162,7 +142,7 @@ public class NovaOpenStack extends AbstractCloud {
     @Override
     public @Nonnull String getCloudName() {
         ProviderContext ctx = getContext();
-        String name = (ctx == null ? null : ctx.getCloudName());
+        String name = (ctx == null ? null : ctx.getCloud().getCloudName());
 
         return (name != null ? name : "OpenStack");
     }
@@ -233,7 +213,7 @@ public class NovaOpenStack extends AbstractCloud {
     @Override
     public @Nonnull String getProviderName() {
         ProviderContext ctx = getContext();
-        String name = (ctx == null ? null : ctx.getProviderName());
+        String name = (ctx == null ? null : ctx.getCloud().getProviderName());
         
         return (name != null ? name : "OpenStack");
     }
