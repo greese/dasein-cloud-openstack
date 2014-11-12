@@ -121,6 +121,11 @@ public class NovaImageCapabilities extends AbstractCapabilities<NovaOpenStack> i
     }
 
     @Override
+    public boolean supportsImageCopy() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
     public boolean supportsImageSharing() throws CloudException, InternalException {
         return false;
     }
