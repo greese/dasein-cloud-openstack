@@ -102,6 +102,12 @@ public class RackspaceLBCapabilities extends AbstractCapabilities<NovaOpenStack>
         return Requirement.REQUIRED;
     }
 
+    @Nonnull
+    @Override
+    public Requirement identifyVlanOnCreateRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
     @Override
     public boolean isAddressAssignedByProvider() throws CloudException, InternalException {
         return true;

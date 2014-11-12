@@ -30,6 +30,66 @@ public class RackspaceRDBMSCapabilities extends AbstractCapabilities<NovaOpenSta
     }
 
     @Override
+    public boolean supportsFirewallRules() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsHighAvailability() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsLowAvailability() throws CloudException, InternalException {
+        return true;
+    }
+
+    @Override
+    public boolean supportsMaintenanceWindows() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsAlterDatabase() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsSnapshots() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsDatabaseBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsScheduledDatabaseBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsDemandBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsRestoreBackup() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsDeleteBackup() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsBackupConfigurations() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
     public boolean isSupportsFirewallRules() throws CloudException, InternalException {
         return false;
     }
@@ -62,30 +122,5 @@ public class RackspaceRDBMSCapabilities extends AbstractCapabilities<NovaOpenSta
     @Override
     public @Nonnull String getProviderTermForBackup( Locale locale ) {
         return "backup"; // TODO: Should throw an exception but core doesn't allow!
-    }
-
-    @Override
-    public boolean isSupportsDatabaseBackups() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public boolean isSupportsScheduledDatabaseBackups() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public boolean isSupportsDemandBackups() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public boolean isSupportsRestoreBackup() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public boolean isSupportsDeleteBackup() throws CloudException, InternalException {
-        return false;
     }
 }
