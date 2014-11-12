@@ -70,7 +70,11 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.openstack.nova.os.ext.hp.db.HPRDBMS;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.Cache;
+import org.dasein.cloud.util.CacheLevel;
 import org.dasein.util.CalendarWrapper;
+import org.dasein.util.uom.time.Day;
+import org.dasein.util.uom.time.TimePeriod;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -893,7 +897,19 @@ public abstract class AbstractMethod {
         else {
             resource = resource + "/" + resourceId + "/" + suffix;
         }
-        delete(context.getAuthToken(), endpoint, resource);
+        try {
+            delete(context.getAuthToken(), endpoint, resource);
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                deleteResource(service, resource, resourceId, suffix);
+            }
+            else {
+                throw ex;
+            }
+        }
     }
     
     protected void delete(@Nonnull String authToken, @Nonnull String endpoint, @Nonnull String resource) throws CloudException, InternalException {
@@ -1002,16 +1018,29 @@ public abstract class AbstractMethod {
         if( suffix ) {
             resource = resource + "/detail";
         }
-        String response = getString(context.getAuthToken(), endpoint, resource);
 
-        if( response == null ) {
-            return null;
-        }
         try {
-            return new JSONArray(response);
+            String response = getString(context.getAuthToken(), endpoint, resource);
+
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONArray(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
         }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return getList(service, resource, suffix);
+            }
+            else {
+                throw ex;
+            }
         }
     }
 
@@ -1025,23 +1054,35 @@ public abstract class AbstractMethod {
         if( suffix ) {
             resource = resource + "/detail";
         }
-        String response = getString(context.getAuthToken(), endpoint, resource);
+        try {
+            String response = getString(context.getAuthToken(), endpoint, resource);
 
-        if( response == null ) {
-            return null;
-        }
-        if( response.length() < 1 ) {
-            return new String[0];
-        }
-        String[] items = response.split("\n");
+            if( response == null ) {
+                return null;
+            }
+            if( response.length() < 1 ) {
+                return new String[0];
+            }
+            String[] items = response.split("\n");
 
-        if( items == null || items.length < 1 ) {
-            return new String[] { response.trim() };
+            if( items == null || items.length < 1 ) {
+                return new String[] { response.trim() };
+            }
+            for( int i=0; i< items.length; i++ ) {
+                items[i] = items[i].trim();
+            }
+            return items;
         }
-        for( int i=0; i< items.length; i++ ) {
-            items[i] = items[i].trim();
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return getItemList(service, resource, suffix);
+            }
+            else {
+                throw ex;
+            }
         }
-        return items;
     }
     
     public @Nullable JSONObject getResource(@Nonnull String service, @Nonnull String resource, @Nullable String resourceId, boolean suffix) throws CloudException, InternalException {
@@ -1063,16 +1104,28 @@ public abstract class AbstractMethod {
         else if( suffix ) {
             resource = resource + "/detail";
         }
-        String response = getString(context.getAuthToken(), endpoint, resource);
-
-        if( response == null ) {
-            return null;
-        }
         try {
-            return new JSONObject(response);
+            String response = getString(context.getAuthToken(), endpoint, resource);
+
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONObject(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
         }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return getResource(service, resource, resourceId, suffix);
+            }
+            else {
+                throw ex;
+            }
         }
     }
     
@@ -1193,6 +1246,10 @@ public abstract class AbstractMethod {
                 
                 if( items == null ) {
                     return null;
+                }
+                if (items.code == HttpStatus.SC_UNAUTHORIZED) {
+                    std.error("getString(): [" +  code + " : " + items.message + "] " + items.details);
+                    throw new NovaException(items);
                 }
                 if( provider.getMajorVersion() == 1 && provider.getMinorVersion() == 0 && items.message != null && (items.message.contains("not found") || items.message.contains("unknown")) ) {
                     return null;
@@ -1434,7 +1491,19 @@ public abstract class AbstractMethod {
         else if( resourceId != null ) {
             resource = resource + "/" + resourceId;
         }
-        return head(context.getAuthToken(), endpoint, resource);
+        try {
+            return head(context.getAuthToken(), endpoint, resource);
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return headResource(service, resource, resourceId);
+            }
+            else {
+                throw ex;
+            }
+        }
     }
 
     protected @Nullable Map<String,String> head(@Nonnull String authToken, @Nonnull String endpoint, @Nonnull String resource) throws CloudException, InternalException {
@@ -1544,7 +1613,19 @@ public abstract class AbstractMethod {
         if( resourceId == null ) {
             throw new InternalException("No container was specified");
         }
-        postHeaders(context.getAuthToken(), endpoint, resource + "/" + resourceId, headers);
+        try {
+            postHeaders(context.getAuthToken(), endpoint, resource + "/" + resourceId, headers);
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                postResourceHeaders(service, resource, resourceId, headers);
+            }
+            else {
+                throw ex;
+            }
+        }
     }
     
     @SuppressWarnings("unused")
@@ -1726,16 +1807,28 @@ public abstract class AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No " + service + " endpoint exists");
         }
-        String response = postString(context.getAuthToken(), endpoint, resource + "/" + resourceId + "/" + extra, body.toString());
-
-        if( response == null ) {
-            return null;
-        }
         try {
-            return new JSONObject(response);
+            String response = postString(context.getAuthToken(), endpoint, resource + "/" + resourceId + "/" + extra, body.toString());
+
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONObject(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
         }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return postString(service, resource, resourceId, extra, body);
+            }
+            else {
+                throw ex;
+            }
         }
     }
     
@@ -1750,16 +1843,27 @@ public abstract class AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No " + service + " endpoint exists");
         }
-        String response = postString(context.getAuthToken(), endpoint, resource, body.toString());
-
-        if( response == null ) {
-            return null;
-        }
         try {
-            return new JSONObject(response);
+            String response = postString(context.getAuthToken(), endpoint, resource, body.toString());
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONObject(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
         }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return postString(service, resource, resourceId, body, suffix);
+            }
+            else {
+                throw ex;
+            }
         }
     }
     
@@ -2099,7 +2203,19 @@ public abstract class AbstractMethod {
         else if( resourceId != null ) {
             resource = resource + "/" + resourceId;
         }
-        putHeaders(context.getAuthToken(), endpoint, resource, headers);
+        try {
+            putHeaders(context.getAuthToken(), endpoint, resource, headers);
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                putResourceHeaders(service, resource, resourceId, headers);
+            }
+            else {
+                throw ex;
+            }
+        }
     }
 
     @SuppressWarnings("unused")

@@ -59,7 +59,7 @@ public class RackspaceRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenSt
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return getProvider().getAuthenticationContext().getTenantId();
+        return getProvider().getContext().getAccountNumber();
     }
 
     @Override

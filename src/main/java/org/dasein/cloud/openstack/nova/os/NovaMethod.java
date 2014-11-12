@@ -19,10 +19,15 @@
 
 package org.dasein.cloud.openstack.nova.os;
 
+import org.apache.http.HttpStatus;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.openstack.nova.os.ext.hp.cdn.HPCDN;
+import org.dasein.cloud.util.Cache;
+import org.dasein.cloud.util.CacheLevel;
+import org.dasein.util.uom.time.Day;
+import org.dasein.util.uom.time.TimePeriod;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -41,7 +46,19 @@ public class NovaMethod extends AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No compute endpoint exists");
         }
-        delete(context.getAuthToken(), endpoint, resource + "/" + resourceId);
+        try {
+            delete(context.getAuthToken(), endpoint, resource + "/" + resourceId);
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                deleteServers(resource, resourceId);
+            }
+            else {
+                throw ex;
+            }
+        }
     }
 
     public void deleteNetworks(@Nonnull String resource, @Nonnull String resourceId) throws CloudException, InternalException {
@@ -54,7 +71,19 @@ public class NovaMethod extends AbstractMethod {
         if (resource != null && (!endpoint.endsWith("/") && !resource.startsWith("/"))) {
             endpoint = endpoint+"/";
         }
-        delete(context.getAuthToken(), endpoint, resource + "/" + resourceId);
+        try {
+            delete(context.getAuthToken(), endpoint, resource + "/" + resourceId);
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                deleteNetworks(resource, resourceId);
+            }
+            else {
+                throw ex;
+            }
+        }
     }
     
     public @Nullable JSONObject getServers(@Nonnull String resource, @Nullable String resourceId, boolean suffix) throws CloudException, InternalException {
@@ -70,16 +99,28 @@ public class NovaMethod extends AbstractMethod {
         else if( suffix ) {
             resource = resource + "/detail";
         }
-        String response = getString(context.getAuthToken(), endpoint, resource);
-
-        if( response == null ) {
-            return null;
-        }
         try {
-            return new JSONObject(response);
+            String response = getString(context.getAuthToken(), endpoint, resource);
+
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONObject(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
         }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return getServers(resource, resourceId, suffix);
+            }
+            else {
+                throw ex;
+            }
         }
     }
 
@@ -100,16 +141,28 @@ public class NovaMethod extends AbstractMethod {
         if (resource != null && (!endpoint.endsWith("/") && !resource.startsWith("/"))) {
             endpoint = endpoint+"/";
         }
-        String response = getString(context.getAuthToken(), endpoint, resource);
-
-        if( response == null ) {
-            return null;
-        }
         try {
-            return new JSONObject(response);
+            String response = getString(context.getAuthToken(), endpoint, resource);
+
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONObject(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
         }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return getNetworks(resource, resourceId, suffix);
+            }
+            else {
+                throw ex;
+            }
         }
     }
 
@@ -124,7 +177,19 @@ public class NovaMethod extends AbstractMethod {
         if( computeEndpoint == null ) {
             throw new CloudException("No compute endpoint exists");
         }
-        return postString(context.getAuthToken(), computeEndpoint, resource, body.toString());
+        try {
+            return postString(context.getAuthToken(), computeEndpoint, resource, body.toString());
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return postServersForString(resource, resourceId, body, suffix);
+            }
+            else {
+                throw ex;
+            }
+        }
     }
 
     public @Nullable JSONObject postServers(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
@@ -138,16 +203,28 @@ public class NovaMethod extends AbstractMethod {
         if( computeEndpoint == null ) {
             throw new CloudException("No compute endpoint exists");
         }
-        String response = postString(context.getAuthToken(), computeEndpoint, resource, body.toString());
-        
-        if( response == null ) {
-            return null;
-        }
         try {
-            return new JSONObject(response);
+            String response = postString(context.getAuthToken(), computeEndpoint, resource, body.toString());
+        
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONObject(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
         }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return postServers(resource, resourceId, body, suffix);
+            }
+            else {
+                throw ex;
+            }
         }
     }
 
@@ -166,16 +243,28 @@ public class NovaMethod extends AbstractMethod {
         if (resource != null && (!endpoint.endsWith("/") && !resource.startsWith("/"))) {
             endpoint = endpoint+"/";
         }
-        String response = postString(context.getAuthToken(), endpoint, resource, body.toString());
-
-        if( response == null ) {
-            return null;
-        }
         try {
-            return new JSONObject(response);
+            String response = postString(context.getAuthToken(), endpoint, resource, body.toString());
+
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONObject(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
         }
-        catch( JSONException e ) {
-            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return postNetworks(resource, resourceId, body, suffix);
+            }
+            else {
+                throw ex;
+            }
         }
     }
 
@@ -186,7 +275,19 @@ public class NovaMethod extends AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No CDN URL has been established in " + context.getMyRegion());
         }
-        return getString(context.getAuthToken(), endpoint, resourceId == null ? "" : ("/" + resourceId));
+        try {
+            return getString(context.getAuthToken(), endpoint, resourceId == null ? "" : ("/" + resourceId));
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return getHPCDN(resourceId);
+            }
+            else {
+                throw ex;
+            }
+        }
     }
     
     public void putHPCDN(String container) throws CloudException, InternalException {
@@ -201,11 +302,23 @@ public class NovaMethod extends AbstractMethod {
             throw new InternalException("No container was specified");
         }
         headers.put("X-TTL", "86400");
-        putHeaders(context.getAuthToken(), endpoint, "/" + container, headers);
+        try {
+            putHeaders(context.getAuthToken(), endpoint, "/" + container, headers);
         
-        headers = headResource(HPCDN.SERVICE, HPCDN.RESOURCE, container);
-        if( headers == null ) {
-            throw new CloudException("No container enabled");
+            headers = headResource(HPCDN.SERVICE, HPCDN.RESOURCE, container);
+            if( headers == null ) {
+                throw new CloudException("No container enabled");
+            }
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                putHPCDN(container);
+            }
+            else {
+                throw ex;
+            }
         }
     }
 
@@ -219,7 +332,19 @@ public class NovaMethod extends AbstractMethod {
         if( container == null ) {
             throw new InternalException("No container was specified");
         }
-        postHeaders(context.getAuthToken(), endpoint, "/" + container, headers);
+        try {
+            postHeaders(context.getAuthToken(), endpoint, "/" + container, headers);
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                postHPCDN(container, headers);
+            }
+            else {
+                throw ex;
+            }
+        }
     }
     
     public void deleteHPCDN(String container) throws CloudException, InternalException {
@@ -229,7 +354,19 @@ public class NovaMethod extends AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No CDN URL has been established in " + context.getMyRegion());
         }
-        delete(context.getAuthToken(), endpoint, "/" + container);
+        try {
+            delete(context.getAuthToken(), endpoint, "/" + container);
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                deleteHPCDN(container);
+            }
+            else {
+                throw ex;
+            }
+        }
     }
 }
 

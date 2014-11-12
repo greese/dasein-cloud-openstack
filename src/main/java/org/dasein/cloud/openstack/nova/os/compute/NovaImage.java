@@ -66,7 +66,7 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+        return ((NovaOpenStack)getProvider()).getContext().getAccountNumber();
     }
 
     public @Nullable String getImageRef(@Nonnull String machineImageId) throws CloudException, InternalException {

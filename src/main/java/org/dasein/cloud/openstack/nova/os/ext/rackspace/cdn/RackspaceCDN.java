@@ -55,7 +55,7 @@ public class RackspaceCDN implements CDNSupport {
     public RackspaceCDN(NovaOpenStack provider) { this.provider = provider; }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return provider.getAuthenticationContext().getTenantId();
+        return provider.getContext().getAccountNumber();
     }
 
     private transient volatile RackspaceCDNCapabilities capabilities;
