@@ -543,8 +543,8 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
                     else if( s.equals("deleting") ) {
                         currentState = MachineImageState.PENDING;
                     }
-                    else if( s.equals("failed") ) {
-                        return null;
+                    else if( s.equals("killed") || s.equals("deleted") ) {
+                        currentState = MachineImageState.DELETED;
                     }
                     else {
                         logger.warn("toImage(): Unknown image status: " + s);

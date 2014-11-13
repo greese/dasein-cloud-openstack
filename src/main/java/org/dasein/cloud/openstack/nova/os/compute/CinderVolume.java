@@ -138,18 +138,9 @@ public class CinderVolume extends AbstractVolumeSupport {
                 json.put("metadata", md);
             }
             if( options.getVolumeProductId() != null ) {
-                // TODO: cinder is broken and expects the name; should be fixed in Grizzly
-                VolumeProduct product = null;
+                // TODO: cinder was broken and expected the name prior Grizzly
+                    json.put("volume_type", options.getVolumeProductId());
 
-                for( VolumeProduct p : listVolumeProducts() ) {
-                    if( p.getProviderProductId().equals(options.getVolumeProductId()) ) {
-                        product = p;
-                        break;
-                    }
-                }
-                if( product != null ) {
-                    json.put("volume_type", product.getName());
-                }
             }
             wrapper.put("volume", json);
             JSONObject result = method.postString(SERVICE, getResource(), null, new JSONObject(wrapper), true);
