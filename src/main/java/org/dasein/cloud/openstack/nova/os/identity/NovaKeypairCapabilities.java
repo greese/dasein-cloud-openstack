@@ -47,8 +47,4 @@ public class NovaKeypairCapabilities extends AbstractCapabilities<NovaOpenStack>
         return "keypair";
     }
 
-    @Override
-    public boolean supportsKeypairGeneration() throws CloudException, InternalException {
-        return true;
-    }
 }
