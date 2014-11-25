@@ -20,11 +20,7 @@
 package org.dasein.cloud.openstack.nova.os.compute;
 
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -941,7 +937,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 state = VmState.SUSPENDING;
             }
             else if( s.equals("error") ) {
-                return null;
+                state = VmState.ERROR;
             }
             else if( s.equals("reboot") || s.equals("hard_reboot") ) {
                 state = VmState.REBOOTING;
@@ -1108,7 +1104,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 vm.setCurrentState(VmState.SUSPENDING);
             }
             else if( s.equals("error") ) {
-                return null;
+                vm.setCurrentState(VmState.ERROR);
             }
             else if( s.equals("reboot") || s.equals("hard_reboot") ) {
                 vm.setCurrentState(VmState.REBOOTING);
