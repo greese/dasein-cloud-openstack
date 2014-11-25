@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -121,12 +121,22 @@ public class NovaImageCapabilities extends AbstractCapabilities<NovaOpenStack> i
     }
 
     @Override
+    public boolean supportsImageCopy() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
     public boolean supportsImageSharing() throws CloudException, InternalException {
         return false;
     }
 
     @Override
     public boolean supportsImageSharingWithPublic() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsListingAllRegions() throws CloudException, InternalException {
         return false;
     }
 

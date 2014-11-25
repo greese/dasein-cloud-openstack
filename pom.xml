@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.dasein</groupId>
   <artifactId>dasein-cloud-openstack</artifactId>
-  <version>2014.08.4</version>
+  <version>2014.11.2-SNAPSHOT</version>
   <name>Dasein Cloud Nova</name>
   <description>Dasein Cloud implementation for the OpenStack APIs</description>
   
@@ -41,7 +41,7 @@
     <dependency>
         <groupId>org.dasein</groupId>
         <artifactId>dasein-cloud-core</artifactId>
-        <version>2014.08.1</version>
+        <version>2014.11.1</version>
         <scope>compile</scope>
         <optional>false</optional>
     </dependency>
@@ -91,7 +91,7 @@
       <dependency>
           <groupId>org.dasein</groupId>
           <artifactId>dasein-cloud-test</artifactId>
-          <version>2014.08.1</version>
+          <version>2014.11.1</version>
           <scope>test</scope>
           <optional>false</optional>
       </dependency>
@@ -151,7 +151,7 @@
                     <exclude>**/LICENSE-APACHE.txt</exclude>
                 </excludes>
                 <properties>
-                    <year>2009-2013</year>
+                    <year>2009-2014</year>
                     <copyrightHolder>Dell, Inc.</copyrightHolder>
                 </properties>
             </configuration>

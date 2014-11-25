@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -252,6 +252,11 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
     @Override
     public boolean isUserDataSupported() throws CloudException, InternalException {
         return true;
+    }
+
+    @Override
+    public boolean isUserDefinedPrivateIPSupported() throws CloudException, InternalException {
+        return false;    //todo is supported in openstack but not in dasein yet
     }
 
     private transient Collection<Architecture> architectures;

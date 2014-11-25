@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -71,7 +71,7 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+        return ((NovaOpenStack)getProvider()).getContext().getAccountNumber();
     }
 
     @Override
@@ -80,6 +80,9 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
         try {
             if( direction.equals(Direction.EGRESS) ) {
                 throw new OperationNotSupportedException(getProvider().getCloudName() + " does not support egress rules.");
+            }
+            if( permission.equals(Permission.DENY) ) {
+                throw new OperationNotSupportedException(getProvider().getCloudName() + " dies not support deny rules.") ;
             }
 
             HashMap<String,Object> wrapper = new HashMap<String,Object>();

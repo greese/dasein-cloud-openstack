@@ -17,34 +17,35 @@
  * ====================================================================
  */
 
-package org.dasein.cloud.openstack.nova.os.ext.rackspace;
+package org.dasein.cloud.openstack.nova.os.identity;
 
+import org.dasein.cloud.AbstractCapabilities;
+import org.dasein.cloud.CloudException;
+import org.dasein.cloud.InternalException;
+import org.dasein.cloud.Requirement;
+import org.dasein.cloud.identity.ShellKeyCapabilities;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
-import org.dasein.cloud.openstack.nova.os.ext.rackspace.cdn.RackspaceCDN;
-import org.dasein.cloud.openstack.nova.os.ext.rackspace.db.RackspaceRDBMS;
-import org.dasein.cloud.platform.AbstractPlatformServices;
-import org.dasein.cloud.platform.RelationalDatabaseSupport;
+
+import javax.annotation.Nonnull;
+import java.util.Locale;
 
 /**
- * Implements support for platform services specific to the Rackspace Cloud.
- * @author George Reese (george.reese@imaginary.com)
- * @since 2012.04.1
- * @version 2012.04.1
+ * Created by stas on 14/11/2014.
  */
-public class RackspacePlatformServices extends AbstractPlatformServices {
-    private NovaOpenStack provider;
+public class NovaKeypairCapabilities extends AbstractCapabilities<NovaOpenStack> implements ShellKeyCapabilities {
 
-    public RackspacePlatformServices(NovaOpenStack provider) {
-        this.provider = provider;
+    public NovaKeypairCapabilities( @Nonnull NovaOpenStack provider ) {
+        super(provider);
     }
 
     @Override
-    public RackspaceCDN getCDNSupport() {
-        return new RackspaceCDN(provider);
+    public @Nonnull Requirement identifyKeyImportRequirement() throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
     }
 
     @Override
-    public RelationalDatabaseSupport getRelationalDatabaseSupport() {
-        return new RackspaceRDBMS(provider);
+    public @Nonnull String getProviderTermForKeypair( @Nonnull Locale locale ) {
+        return "keypair";
     }
+
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -20,12 +20,7 @@
 package org.dasein.cloud.openstack.nova.os.compute;
 
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -97,7 +92,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+        return ((NovaOpenStack)getProvider()).getContext().getAccountNumber();
     }
 
     private transient volatile NovaServerCapabilities capabilities;
@@ -326,7 +321,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 options.withMetaData("org.dasein.platform", targetImage.getPlatform().name());
             }
             options.withMetaData("org.dasein.description", options.getDescription());
-            json.put("metadata", options.getMetaData());
+            Map<String, Object> tmpMeta = options.getMetaData();
+            Map<String, Object> newMeta = new HashMap<String, Object>();
+            for (Map.Entry entry : tmpMeta.entrySet()) {
+                if (entry.getValue() != null) { //null values not supported by openstack
+                    newMeta.put(entry.getKey().toString(), entry.getValue());
+                }
+            }
+            json.put("metadata", newMeta);
             wrapper.put("server", json);
             JSONObject result = method.postServers("/servers", null, new JSONObject(wrapper), true);
 
@@ -547,39 +549,9 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         return null;
     }
 
+    @Nonnull
     @Override
-    public @Nonnull Iterable<VirtualMachineProduct> listProducts(@Nonnull Architecture architecture) throws InternalException, CloudException {
-        return listProducts(null, architecture);
-    }
-
-    @Override
-    public Iterable<VirtualMachineProduct> listProducts( VirtualMachineProductFilterOptions options ) throws InternalException, CloudException {
-        List<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();
-        for( Architecture arch : Architecture.values() ) {
-            mergeProductLists(products, listProducts(options, arch));
-        }
-        return products;
-    }
-
-    // Merges product iterable to the list, using providerProductId as a unique key
-    private void mergeProductLists(List<VirtualMachineProduct> to, Iterable<VirtualMachineProduct> from) {
-        List<VirtualMachineProduct> copy = new ArrayList<VirtualMachineProduct>(to);
-        for( VirtualMachineProduct productFrom : from ) {
-            boolean found = false;
-            for( VirtualMachineProduct productTo : copy ) {
-                if( productTo.getProviderProductId().equalsIgnoreCase(productFrom.getProviderProductId()) ) {
-                    found = true;
-                    break;
-                }
-            }
-            if( !found ) {
-                to.add(productFrom);
-            }
-        }
-    }
-
-    @Override
-    public Iterable<VirtualMachineProduct> listProducts(VirtualMachineProductFilterOptions options, Architecture architecture) throws InternalException, CloudException {
+    public Iterable<VirtualMachineProduct> listProducts(@Nullable VirtualMachineProductFilterOptions options, @Nullable Architecture architecture) throws InternalException, CloudException {
         if( architecture != null && !architecture.equals(Architecture.I32) && !architecture.equals(Architecture.I64) ) {
             return Collections.emptyList();
         }
@@ -965,7 +937,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 state = VmState.SUSPENDING;
             }
             else if( s.equals("error") ) {
-                return null;
+                state = VmState.ERROR;
             }
             else if( s.equals("reboot") || s.equals("hard_reboot") ) {
                 state = VmState.REBOOTING;
@@ -1132,7 +1104,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 vm.setCurrentState(VmState.SUSPENDING);
             }
             else if( s.equals("error") ) {
-                return null;
+                vm.setCurrentState(VmState.ERROR);
             }
             else if( s.equals("reboot") || s.equals("hard_reboot") ) {
                 vm.setCurrentState(VmState.REBOOTING);

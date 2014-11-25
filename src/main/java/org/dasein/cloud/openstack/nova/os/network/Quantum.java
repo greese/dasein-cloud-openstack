@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -20,11 +20,7 @@
 package org.dasein.cloud.openstack.nova.os.network;
 
 import org.apache.log4j.Logger;
-import org.dasein.cloud.CloudErrorType;
-import org.dasein.cloud.CloudException;
-import org.dasein.cloud.InternalException;
-import org.dasein.cloud.OperationNotSupportedException;
-import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.*;
 import org.dasein.cloud.compute.ComputeServices;
 import org.dasein.cloud.compute.VirtualMachine;
 import org.dasein.cloud.compute.VirtualMachineSupport;
@@ -164,7 +160,7 @@ public class Quantum extends AbstractVLANSupport {
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+        return ((NovaOpenStack)getProvider()).getContext().getAccountNumber();
     }
 
     public @Nonnull String createPort(@Nonnull String subnetId, @Nonnull String vmName, @Nullable String[] firewallIds) throws CloudException, InternalException {
@@ -186,7 +182,7 @@ public class Quantum extends AbstractVLANSupport {
 
             json.put("name", "Port for " + vmName);
             json.put("network_id", subnet.getProviderVlanId());
-            if (firewallIds != null) {
+            if (firewallIds != null && firewallIds.length > 0) {
                 JSONArray firewalls = new JSONArray();
                 for (String firewall : firewallIds) {
                     firewalls.put(firewall);
@@ -745,6 +741,11 @@ public class Quantum extends AbstractVLANSupport {
         finally {
             APITrace.end();
         }
+    }
+
+    @Override
+    public void updateInternetGatewayTags(@Nonnull String internetGatewayId, @Nonnull Tag... tags) throws CloudException, InternalException {
+        //To change body of implemented methods use File | Settings | File Templates.
     }
 
     private @Nonnull VLANState toState(@Nonnull String s) {

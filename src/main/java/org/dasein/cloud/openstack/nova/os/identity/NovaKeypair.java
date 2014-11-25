@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -28,6 +28,7 @@ import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.identity.SSHKeypair;
 import org.dasein.cloud.identity.ServiceAction;
+import org.dasein.cloud.identity.ShellKeyCapabilities;
 import org.dasein.cloud.identity.ShellKeySupport;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
@@ -57,11 +58,12 @@ public class NovaKeypair implements ShellKeySupport {
     static private final Logger logger = NovaOpenStack.getLogger(NovaKeypair.class, "std");
 
     private NovaOpenStack provider;
+    private transient volatile NovaKeypairCapabilities capabilities;
 
     NovaKeypair(@Nonnull NovaOpenStack cloud) { provider = cloud; }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return provider.getAuthenticationContext().getTenantId();
+        return provider.getContext().getAccountNumber();
     }
 
     @Override
@@ -156,6 +158,7 @@ public class NovaKeypair implements ShellKeySupport {
     }
 
     @Override
+    @Deprecated
     public Requirement getKeyImportSupport() throws CloudException, InternalException {
         return Requirement.OPTIONAL;
     }
@@ -211,8 +214,17 @@ public class NovaKeypair implements ShellKeySupport {
     }
 
     @Override
+    @Deprecated
     public @Nonnull String getProviderTermForKeypair(@Nonnull Locale locale) {
         return "keypair";
+    }
+
+    @Override
+    public @Nonnull ShellKeyCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new NovaKeypairCapabilities(provider);
+        }
+        return capabilities;
     }
 
     @Override

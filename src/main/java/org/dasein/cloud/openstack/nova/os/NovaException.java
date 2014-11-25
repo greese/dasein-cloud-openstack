@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -19,6 +19,7 @@
 
 package org.dasein.cloud.openstack.nova.os;
 
+import org.apache.http.HttpStatus;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.json.JSONException;
@@ -42,6 +43,9 @@ public class NovaException extends CloudException {
         items.type = CloudErrorType.GENERAL;
         items.message = "unknown";
         items.details = "The cloud returned an error code with explanation: ";
+        if (items.code == HttpStatus.SC_UNAUTHORIZED) {
+            items.type = CloudErrorType.AUTHENTICATION;
+        }
         if( json != null ) {
             try {
                 JSONObject ob = new JSONObject(json);
@@ -110,7 +114,7 @@ public class NovaException extends CloudException {
             }
             catch( JSONException e ) {
                 NovaOpenStack.getLogger(NovaException.class, "std").warn("parseException(): Invalid JSON in cloud response: " + json);
-                items.details = json;
+                items.details = items.details+" "+json;
             }
         }
         return items;

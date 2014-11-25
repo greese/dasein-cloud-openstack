@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -20,16 +20,13 @@
 package org.dasein.cloud.openstack.nova.os.network;
 
 import org.dasein.cloud.*;
-import org.dasein.cloud.network.Direction;
-import org.dasein.cloud.network.FirewallCapabilities;
-import org.dasein.cloud.network.FirewallConstraints;
-import org.dasein.cloud.network.Permission;
-import org.dasein.cloud.network.RuleTargetType;
+import org.dasein.cloud.network.*;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Locale;
 
@@ -45,27 +42,23 @@ public class SecurityGroupCapabilities extends AbstractCapabilities<NovaOpenStac
         super(provider);
     }
 
-    @Nonnull
     @Override
-    public FirewallConstraints getFirewallConstraintsForCloud() throws InternalException, CloudException {
+    public @Nonnull FirewallConstraints getFirewallConstraintsForCloud() throws InternalException, CloudException {
         return FirewallConstraints.getInstance();
     }
 
-    @Nonnull
     @Override
-    public String getProviderTermForFirewall(@Nonnull Locale locale) {
+    public @Nonnull String getProviderTermForFirewall(@Nonnull Locale locale) {
         return "security group";
     }
 
-    @Nullable
     @Override
-    public VisibleScope getFirewallVisibleScope() {
+    public @Nullable VisibleScope getFirewallVisibleScope() {
         return VisibleScope.ACCOUNT_DATACENTER;
     }
 
-    @Nonnull
     @Override
-    public Requirement identifyPrecedenceRequirement(boolean inVlan) throws InternalException, CloudException {
+    public @Nonnull Requirement identifyPrecedenceRequirement(boolean inVlan) throws InternalException, CloudException {
         return Requirement.NONE;
     }
 
@@ -74,36 +67,37 @@ public class SecurityGroupCapabilities extends AbstractCapabilities<NovaOpenStac
         return true;
     }
 
-    @Nonnull
     @Override
-    public Iterable<RuleTargetType> listSupportedDestinationTypes(boolean inVlan) throws InternalException, CloudException {
+    public @Nonnull Iterable<RuleTargetType> listSupportedDestinationTypes(boolean inVlan) throws InternalException, CloudException {
         if( inVlan ) {
             return Collections.emptyList();
         }
         return Collections.singletonList(RuleTargetType.GLOBAL);
     }
 
-    @Nonnull
     @Override
-    public Iterable<Direction> listSupportedDirections(boolean inVlan) throws InternalException, CloudException {
+    public @Nonnull Iterable<Direction> listSupportedDirections(boolean inVlan) throws InternalException, CloudException {
         if( inVlan ) {
             return Collections.emptyList();
         }
         return Collections.singletonList(Direction.INGRESS);
     }
 
-    @Nonnull
     @Override
-    public Iterable<Permission> listSupportedPermissions(boolean inVlan) throws InternalException, CloudException {
+    public @Nonnull Iterable<Permission> listSupportedPermissions(boolean inVlan) throws InternalException, CloudException {
         if( inVlan ) {
             return Collections.emptyList();
         }
         return Collections.singletonList(Permission.ALLOW);
     }
 
-    @Nonnull
     @Override
-    public Iterable<RuleTargetType> listSupportedSourceTypes(boolean inVlan) throws InternalException, CloudException {
+    public @Nonnull Iterable<Protocol> listSupportedProtocols( boolean inVlan ) throws InternalException, CloudException {
+        return Arrays.asList(Protocol.ICMP, Protocol.TCP, Protocol.UDP, Protocol.ANY);
+    }
+
+    @Override
+    public @Nonnull Iterable<RuleTargetType> listSupportedSourceTypes(boolean inVlan) throws InternalException, CloudException {
         if( inVlan ) {
             return Collections.emptyList();
         }

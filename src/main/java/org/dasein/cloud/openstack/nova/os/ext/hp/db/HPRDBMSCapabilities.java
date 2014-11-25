@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -49,6 +49,66 @@ public class HPRDBMSCapabilities extends AbstractCapabilities<NovaOpenStack> imp
     }
 
     @Override
+    public boolean supportsFirewallRules() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsHighAvailability() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsLowAvailability() throws CloudException, InternalException {
+        return true;
+    }
+
+    @Override
+    public boolean supportsMaintenanceWindows() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsAlterDatabase() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsSnapshots() throws CloudException, InternalException {
+        return true;
+    }
+
+    @Override
+    public boolean supportsDatabaseBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsScheduledDatabaseBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsDemandBackups() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsRestoreBackup() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsDeleteBackup() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsBackupConfigurations() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
     public boolean isSupportsFirewallRules() throws CloudException, InternalException {
         return false;
     }
@@ -77,4 +137,11 @@ public class HPRDBMSCapabilities extends AbstractCapabilities<NovaOpenStack> imp
     public boolean isSupportsSnapshots() throws CloudException, InternalException {
         return true;
     }
+
+    @Override
+    public @Nonnull String getProviderTermForBackup( Locale locale ) {
+        return "backup"; // Should really throw an unsupported exception but core signature doesn't allow!
+    }
+
+
 }

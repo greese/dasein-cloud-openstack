@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -56,6 +56,12 @@ public class FloatingIPCapabilities extends AbstractCapabilities<NovaOpenStack> 
     @Nonnull
     @Override
     public Requirement identifyVlanForVlanIPRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
+    }
+
+    @Nonnull
+    @Override
+    public Requirement identifyVlanForIPRequirement() throws CloudException, InternalException {
         return Requirement.NONE;
     }
 

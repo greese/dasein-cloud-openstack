@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -100,6 +100,12 @@ public class RackspaceLBCapabilities extends AbstractCapabilities<NovaOpenStack>
     @Override
     public Requirement identifyListenersOnCreateRequirement() throws CloudException, InternalException {
         return Requirement.REQUIRED;
+    }
+
+    @Nonnull
+    @Override
+    public Requirement identifyVlanOnCreateRequirement() throws CloudException, InternalException {
+        return Requirement.NONE;
     }
 
     @Override

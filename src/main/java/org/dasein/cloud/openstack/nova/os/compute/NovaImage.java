@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -58,7 +58,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class NovaImage extends AbstractImageSupport {
+public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
     static private final Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
 
     NovaImage(NovaOpenStack provider) {
@@ -66,7 +66,7 @@ public class NovaImage extends AbstractImageSupport {
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return ((NovaOpenStack)getProvider()).getAuthenticationContext().getTenantId();
+        return ((NovaOpenStack)getProvider()).getContext().getAccountNumber();
     }
 
     public @Nullable String getImageRef(@Nonnull String machineImageId) throws CloudException, InternalException {
@@ -543,8 +543,8 @@ public class NovaImage extends AbstractImageSupport {
                     else if( s.equals("deleting") ) {
                         currentState = MachineImageState.PENDING;
                     }
-                    else if( s.equals("failed") ) {
-                        return null;
+                    else if( s.equals("killed") || s.equals("deleted") ) {
+                        currentState = MachineImageState.DELETED;
                     }
                     else {
                         logger.warn("toImage(): Unknown image status: " + s);

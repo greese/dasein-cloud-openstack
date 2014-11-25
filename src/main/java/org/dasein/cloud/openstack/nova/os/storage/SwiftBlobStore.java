@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2013 Dell, Inc.
+ * Copyright (C) 2009-2014 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -53,16 +53,14 @@ import org.dasein.util.uom.storage.Storage;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-public class SwiftBlobStore extends AbstractBlobStoreSupport {
+public class SwiftBlobStore extends AbstractBlobStoreSupport<NovaOpenStack> {
     static private final Logger logger = NovaOpenStack.getLogger(SwiftBlobStore.class, "std");
 
     static public final int                                       MAX_BUCKETS     = 100;
     static public final int                                       MAX_OBJECTS     = -1;
     static public final Storage<Byte>                             MAX_OBJECT_SIZE = new Storage<org.dasein.util.uom.storage.Byte>(5000000000L, Storage.BYTE);
 
-    private NovaOpenStack provider = null;
-    
-    SwiftBlobStore(@Nonnull NovaOpenStack provider) { this.provider = provider; }
+    SwiftBlobStore(@Nonnull NovaOpenStack provider) { super(provider); }
 
     @Override
     public boolean allowsNestedBuckets() throws CloudException, InternalException {
@@ -81,12 +79,12 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public @Nonnull Blob createBucket(@Nonnull String bucketName, boolean findFreeName) throws InternalException, CloudException {
-        APITrace.begin(provider, "Blob.createBucket");
+        APITrace.begin(getProvider(), "Blob.createBucket");
         try {
             if( bucketName.contains("/") ) {
                 throw new OperationNotSupportedException("Nested buckets are not supported");
             }
-            ProviderContext ctx = provider.getContext();
+            ProviderContext ctx = getProvider().getContext();
 
             if( ctx == null ) {
                 throw new InternalException("No context was set for this request");
@@ -144,10 +142,10 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
     }
 
     private void createBucket(@Nonnull String name) throws InternalException, CloudException {
-        APITrace.begin(provider, "Blob.createBucket");
+        APITrace.begin(getProvider(), "Blob.createBucket");
         try {
             try {
-                SwiftMethod method = new SwiftMethod(provider);
+                SwiftMethod method = new SwiftMethod(getProvider());
 
                 method.put(name);
             }
@@ -164,10 +162,10 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public boolean exists(@Nonnull String bucketName) throws InternalException, CloudException {
-        APITrace.begin(provider, "exists");
+        APITrace.begin(getProvider(), "exists");
         try {
             try {
-                SwiftMethod method = new SwiftMethod(provider);
+                SwiftMethod method = new SwiftMethod(getProvider());
 
                 for( String container : method.get(null) ) {
                     if( container.equals(bucketName) ) {
@@ -189,7 +187,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public Blob getBucket(@Nonnull String bucketName) throws InternalException, CloudException {
-        APITrace.begin(provider, "Blob.getBucket");
+        APITrace.begin(getProvider(), "Blob.getBucket");
         try {
             for( Blob blob : list(null) ) {
                 if( blob.isContainer() ) {
@@ -209,7 +207,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public Blob getObject(@Nullable String bucketName, @Nonnull String objectName) throws InternalException, CloudException {
-        APITrace.begin(provider, "Blob.getObject");
+        APITrace.begin(getProvider(), "Blob.getObject");
         try {
             if( bucketName == null ) {
                 return null;
@@ -236,7 +234,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public @Nullable Storage<org.dasein.util.uom.storage.Byte> getObjectSize(@Nullable String bucket, @Nullable String object) throws InternalException, CloudException {
-        APITrace.begin(provider, "Blob.getObjectSize");
+        APITrace.begin(getProvider(), "Blob.getObjectSize");
         try {
             if( bucket == null ) {
                 throw new CloudException("Requested object size for object in null bucket");
@@ -244,7 +242,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
             if( object == null ) {
                 return null;
             }
-            SwiftMethod method = new SwiftMethod(provider);
+            SwiftMethod method = new SwiftMethod(getProvider());
 
             Map<String,String> metaData = method.head(bucket, object);
 
@@ -314,7 +312,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     protected void get(@Nullable String bucket, @Nonnull String location, @Nonnull File toFile, @Nullable FileTransfer transfer) throws InternalException, CloudException {
-        APITrace.begin(provider, "Blob.get");
+        APITrace.begin(getProvider(), "Blob.get");
         try {
             if( bucket == null ) {
                 throw new OperationNotSupportedException("No such object: " + bucket + "/" + location);
@@ -324,7 +322,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
                     throw new InternalException("File already exists that cannot be overwritten.");
                 }
             }
-            SwiftMethod method = new SwiftMethod(provider);
+            SwiftMethod method = new SwiftMethod(getProvider());
             InputStream input;
 
             input = method.get(bucket, location);
@@ -398,9 +396,9 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        APITrace.begin(provider, "Blob.isSubscribed");
+        APITrace.begin(getProvider(), "Blob.isSubscribed");
         try {
-            AuthenticationContext ctx = provider.getAuthenticationContext();
+            AuthenticationContext ctx = getProvider().getAuthenticationContext();
             String endpoint = ctx.getStorageUrl();
 
             return (endpoint != null && endpoint.startsWith("http"));
@@ -412,7 +410,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public @Nonnull Collection<Blob> list(final @Nullable String bucket) throws CloudException, InternalException {
-        final ProviderContext ctx = provider.getContext();
+        final ProviderContext ctx = getProvider().getContext();
         PopulatorThread<Blob> populator;
 
         if( ctx == null ) {
@@ -423,11 +421,11 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
         if( regionId == null ) {
             throw new CloudException("No region ID was specified");
         }
-        provider.hold();
+        getProvider().hold();
         populator = new PopulatorThread<Blob>(new JiteratorPopulator<Blob>() {
             public void populate(@Nonnull Jiterator<Blob> iterator) throws CloudException, InternalException {
                 try {
-                    APITrace.begin(provider, "Blob.list");
+                    APITrace.begin(getProvider(), "Blob.list");
                     try {
                         list(regionId, bucket, iterator);
                     }
@@ -436,7 +434,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
                     }
                 }
                 finally {
-                    provider.release();
+                    getProvider().release();
                 }
             }
         });
@@ -460,7 +458,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
             logger.trace("enter - " + SwiftBlobStore.class.getName() + ".loadBuckets(" + regionId + "," + iterator + ")");
         }
         try {
-            SwiftMethod method = new SwiftMethod(provider);
+            SwiftMethod method = new SwiftMethod(getProvider());
             Collection<String> containers;
 
             try {
@@ -489,7 +487,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
             logger.trace("enter - " + SwiftBlobStore.class.getName() + ".loadFiles(" + bucketName + "," + iterator + ")");
         }
         try {
-            SwiftMethod method = new SwiftMethod(provider);
+            SwiftMethod method = new SwiftMethod(getProvider());
             Collection<String> files;
 
             try {
@@ -535,7 +533,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public void move(@Nullable String sourceBucket, @Nullable String object, @Nullable String targetBucket) throws InternalException, CloudException {
-        APITrace.begin(provider, "Blob.move");
+        APITrace.begin(getProvider(), "Blob.move");
         try {
             if( sourceBucket == null ) {
                 throw new CloudException("No source bucket was specified");
@@ -556,12 +554,12 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     protected void put(@Nullable String bucket, @Nonnull String object, @Nonnull File file) throws CloudException, InternalException {
-        APITrace.begin(provider, "Blob.put");
+        APITrace.begin(getProvider(), "Blob.put");
         try {
             if( bucket == null ) {
                 throw new OperationNotSupportedException("A bucket must be specified for Swift");
             }
-            SwiftMethod method = new SwiftMethod(provider);
+            SwiftMethod method = new SwiftMethod(getProvider());
 
             try {
                 method.put(bucket, object, null, new FileInputStream(file));
@@ -577,7 +575,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     protected void put(@Nullable String bucket, @Nonnull String object, @Nonnull String content) throws CloudException, InternalException {
-        APITrace.begin(provider, "Blob.put");
+        APITrace.begin(getProvider(), "Blob.put");
         try {
             try {
                 File tmp = File.createTempFile(object, ".txt");
@@ -609,9 +607,9 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public void removeBucket(@Nonnull String bucket) throws CloudException, InternalException {
-        APITrace.begin(provider, "Blob.removeBucket");
+        APITrace.begin(getProvider(), "Blob.removeBucket");
         try {
-            SwiftMethod method = new SwiftMethod(provider);
+            SwiftMethod method = new SwiftMethod(getProvider());
 
             method.delete(bucket);
         }
@@ -622,12 +620,12 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public void removeObject(@Nullable String bucket, @Nonnull String name) throws CloudException, InternalException {
-        APITrace.begin(provider, "Blob.removeObject");
+        APITrace.begin(getProvider(), "Blob.removeObject");
         try {
             if( bucket == null ) {
                 throw new OperationNotSupportedException("Swift does not support root objects");
             }
-            SwiftMethod method = new SwiftMethod(provider);
+            SwiftMethod method = new SwiftMethod(getProvider());
 
             method.delete(bucket, name);
         }
@@ -638,7 +636,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public @Nonnull String renameBucket(@Nonnull String oldName, @Nonnull String newName, boolean findFreeName) throws CloudException, InternalException {
-        APITrace.begin(provider, "Blob.renameBucket");
+        APITrace.begin(getProvider(), "Blob.renameBucket");
         try {
             Blob bucket = createBucket(newName, findFreeName);
 
@@ -678,7 +676,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public void renameObject(@Nullable String bucket, @Nonnull String object, @Nonnull String newName) throws CloudException, InternalException {
-        APITrace.begin(provider, "Blob.removeObject");
+        APITrace.begin(getProvider(), "Blob.removeObject");
         try {
             if( bucket == null ) {
                 throw new CloudException("No bucket was specified");
@@ -693,7 +691,7 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport {
 
     @Override
     public @Nonnull Blob upload(@Nonnull File source, @Nullable String bucket, @Nonnull String fileName) throws CloudException, InternalException {
-        APITrace.begin(provider, "Blob.upload");
+        APITrace.begin(getProvider(), "Blob.upload");
         try {
             if( bucket == null ) {
                 throw new OperationNotSupportedException("No bucket was specified for this request");
