@@ -916,11 +916,19 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     public void terminate(@Nonnull String vmId, @Nullable String explanation) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.terminate");
         try {
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            VirtualMachine vm = getVirtualMachine(vmId);
+
+            NovaMethod method = new NovaMethod(getProvider());
             long timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
 
             do {
                 try {
+                    Quantum quantum = getProvider().getNetworkServices().getVlanSupport();
+                    Iterable<String> portIds = quantum.listPorts(vm);
+                    // todo: delete ports
+                    for( String portId : portIds ) {
+                        quantum.removePort(portId);
+                    }
                     method.deleteServers("/servers", vmId);
                     return;
                 }
