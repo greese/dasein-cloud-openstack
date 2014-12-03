@@ -19,6 +19,7 @@
 
 package org.dasein.cloud.openstack.nova.os.network;
 
+import org.apache.http.HttpStatus;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
@@ -40,25 +41,19 @@ import org.dasein.cloud.network.SubnetCreateOptions;
 import org.dasein.cloud.network.SubnetState;
 import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.network.VLANState;
-import org.dasein.cloud.openstack.nova.os.NovaMethod;
-import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
-import org.dasein.cloud.openstack.nova.os.OpenStackProvider;
+import org.dasein.cloud.openstack.nova.os.*;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
+import org.dasein.util.uom.time.Day;
+import org.dasein.util.uom.time.TimePeriod;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Implements Quantum network support for OpenStack clouds with Quantum networking.
@@ -232,6 +227,53 @@ public class Quantum extends AbstractVLANSupport {
                     logger.error("Unable to understand create response: " + e.getMessage());
                     throw new CloudException(e);
                 }
+            }
+            logger.error("No port was created by the create attempt, and no error was returned");
+            throw new CloudException("No port was created");
+
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    public @Nonnull Iterable<String> listPorts(@Nonnull VirtualMachine vm) throws CloudException, InternalException {
+        APITrace.begin(getProvider(), "VLAN.listPorts");
+        try {
+            Subnet subnet = getSubnet(vm.getProviderSubnetId());
+
+            if( subnet == null ) {
+                // check is the id passed in is actually for a network
+                VLAN vlan = getVlan(vm.getProviderVlanId());
+                if (vlan != null) {
+                    throw new CloudException("Cannot launch into the network without a subnet");
+                }
+                throw new CloudException("Invalid id no network found for " + vm.getProviderVlanId());
+            }
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+
+            JSONObject result = null;
+            if (getNetworkType().equals(QuantumType.QUANTUM) ) {
+                result = method.getNetworks(getPortResource() + "?device_id="+vm.getProviderVirtualMachineId()+"&fields=id", null, false);
+            }
+            else {
+                result = method.getServers(getNetworkResource() + "/" + subnet.getProviderVlanId() + "/ports", null, false);
+            }
+            if( result != null && result.has("ports") ) {
+                List<String> portIds = new ArrayList<String>();
+                try {
+                    JSONArray ports = result.getJSONArray("ports");
+                    for( int i = 0; i < ports.length(); i++ ) {
+                        JSONObject port = ports.getJSONObject(i);
+                        if( port.has("id" ) ) {
+                            portIds.add(port.getString("id"));
+                        }
+                    }
+                } catch (JSONException e) {
+                    logger.error("Unable to understand create response: " + e.getMessage());
+                    throw new CloudException(e);
+                }
+                return portIds;
             }
             logger.error("No port was created by the create attempt, and no error was returned");
             throw new CloudException("No port was created");
@@ -722,6 +764,20 @@ public class Quantum extends AbstractVLANSupport {
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for networks in " + ob.toString());
             }
             return networks;
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    public void removePort(@Nonnull String portId) throws CloudException, InternalException {
+        APITrace.begin(getProvider(), "VLAN.removePort");
+        try {
+            if( !getNetworkType().equals(QuantumType.QUANTUM) ) {
+                throw new OperationNotSupportedException("Cannot remove port in an OpenStack network of type: " + getNetworkType());
+            }
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            method.deleteNetworks(getPortResource(), portId+".json");
         }
         finally {
             APITrace.end();

@@ -19,10 +19,15 @@
 
 package org.dasein.cloud.openstack.nova.os;
 
+import org.apache.http.HttpStatus;
 import org.dasein.cloud.CloudErrorType;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.openstack.nova.os.ext.hp.cdn.HPCDN;
+import org.dasein.cloud.util.Cache;
+import org.dasein.cloud.util.CacheLevel;
+import org.dasein.util.uom.time.Day;
+import org.dasein.util.uom.time.TimePeriod;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -55,6 +60,42 @@ public class NovaMethod extends AbstractMethod {
             endpoint = endpoint+"/";
         }
         delete(context.getAuthToken(), endpoint, resource + "/" + resourceId);
+    }
+
+    public @Nullable JSONObject getPorts(@Nonnull String resource, @Nonnull String resourceId) throws CloudException, InternalException {
+        AuthenticationContext context = provider.getAuthenticationContext();
+        String endpoint = context.getComputeUrl();
+
+        if( endpoint == null ) {
+            throw new CloudException("No compute URL has been established in " + context.getMyRegion());
+        }
+        if( resourceId != null ) {
+            resource = resource + "/" + resourceId;
+        }
+
+        try {
+            String response = getString(context.getAuthToken(), endpoint, resource);
+
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONObject(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return null; //todo?
+            }
+            else {
+                throw ex;
+            }
+        }
     }
     
     public @Nullable JSONObject getServers(@Nonnull String resource, @Nullable String resourceId, boolean suffix) throws CloudException, InternalException {
