@@ -85,6 +85,42 @@ public class NovaMethod extends AbstractMethod {
             }
         }
     }
+
+    public @Nullable JSONObject getPorts(@Nonnull String resource, @Nonnull String resourceId) throws CloudException, InternalException {
+        AuthenticationContext context = provider.getAuthenticationContext();
+        String endpoint = context.getComputeUrl();
+
+        if( endpoint == null ) {
+            throw new CloudException("No compute URL has been established in " + context.getMyRegion());
+        }
+        if( resourceId != null ) {
+            resource = resource + "/" + resourceId;
+        }
+
+        try {
+            String response = getString(context.getAuthToken(), endpoint, resource);
+
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONObject(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return null; //todo?
+            }
+            else {
+                throw ex;
+            }
+        }
+    }
     
     public @Nullable JSONObject getServers(@Nonnull String resource, @Nullable String resourceId, boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
