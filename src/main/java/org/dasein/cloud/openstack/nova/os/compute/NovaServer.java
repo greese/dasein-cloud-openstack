@@ -1167,7 +1167,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                             }
                         }
                     }
-                    if( vm.getProviderVlanId() == null && !name.equals("public") && !name.equals("private") && !name.equals("nova_fixed") ) {
+                    if( vm.getProviderVlanId() == null ) { // && !name.equals("public") && !name.equals("private") && !name.equals("nova_fixed") ) {
                         for( VLAN network : networks ) {
                             if( network.getName().equals(name) ) {
                                 vm.setProviderVlanId(network.getProviderVlanId());
