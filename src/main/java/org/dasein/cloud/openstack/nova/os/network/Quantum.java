@@ -227,16 +227,6 @@ public class Quantum extends AbstractVLANSupport {
     public @Nonnull Iterable<String> listPorts(@Nonnull VirtualMachine vm) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.listPorts");
         try {
-            Subnet subnet = getSubnet(vm.getProviderSubnetId());
-
-            if( subnet == null ) {
-                // check is the id passed in is actually for a network
-                VLAN vlan = getVlan(vm.getProviderVlanId());
-                if (vlan != null) {
-                    throw new CloudException("Cannot launch into the network without a subnet");
-                }
-                throw new CloudException("Invalid id no network found for " + vm.getProviderVlanId());
-            }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             JSONObject result = null;
@@ -244,7 +234,7 @@ public class Quantum extends AbstractVLANSupport {
                 result = method.getNetworks(getPortResource() + "?device_id="+vm.getProviderVirtualMachineId()+"&fields=id", null, false);
             }
             else {
-                result = method.getServers(getNetworkResource() + "/" + subnet.getProviderVlanId() + "/ports", null, false);
+                result = method.getServers(getNetworkResource() + "/" + vm.getProviderVlanId() + "/ports", null, false);
             }
             if( result != null && result.has("ports") ) {
                 List<String> portIds = new ArrayList<String>();
