@@ -219,6 +219,8 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     @Override
     public @Nonnull VirtualMachine launch(@Nonnull VMLaunchOptions options) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.launch");
+        VirtualMachine vm = null;
+        String portId = null;
         try {
             MachineImage targetImage = getProvider().getComputeServices().getImageSupport().getImage(options.getMachineImageId());
 
@@ -251,6 +253,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 }
                 json.put("flavorRef", getFlavorRef(options.getStandardProductId()));
             }
+
             if( options.getVlanId() != null && ((NovaOpenStack)getProvider()).isRackspace() ) {
                 ArrayList<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
                 HashMap<String,Object> vlan = new HashMap<String, Object>();
@@ -271,7 +274,8 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                             HashMap<String,Object> vlan = new HashMap<String, Object>();
 
                             try {
-                                vlan.put("port", support.createPort(options.getSubnetId(), options.getHostName(), options.getFirewallIds()));
+                                portId = support.createPort(options.getSubnetId(), options.getHostName(), options.getFirewallIds());
+                                vlan.put("port", portId);
                                 vlans.add(vlan);
                                 json.put("networks", vlans);
                             }
@@ -338,7 +342,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                     Collection<VLAN> nets = Collections.emptyList();
 
                     JSONObject server = result.getJSONObject("server");
-                    VirtualMachine vm = toVirtualMachine(server, ips, ips, nets);
+                    vm = toVirtualMachine(server, ips, ips, nets);
 
                     if( vm != null ) {
                         return vm;
@@ -357,6 +361,12 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
 
         }
         finally {
+            if( vm == null) {
+                Quantum quantum = getProvider().getNetworkServices().getVlanSupport();
+                if( quantum != null ) {
+                    quantum.removePort(portId);
+                }
+            }
             APITrace.end();
         }
     }
@@ -843,10 +853,11 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             do {
                 try {
                     Quantum quantum = getProvider().getNetworkServices().getVlanSupport();
-                    Iterable<String> portIds = quantum.listPorts(vm);
-                    // todo: delete ports
-                    for( String portId : portIds ) {
-                        quantum.removePort(portId);
+                    if( quantum != null ) {
+                        Iterable<String> portIds = quantum.listPorts(vm);
+                        for (String portId : portIds) {
+                            quantum.removePort(portId);
+                        }
                     }
                     method.deleteServers("/servers", vmId);
                     return;
