@@ -345,6 +345,17 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                     vm = toVirtualMachine(server, ips, ips, nets);
 
                     if( vm != null ) {
+                        String vmId = vm.getProviderVirtualMachineId();
+                        long timeout = System.currentTimeMillis() + 5 * 60 * 1000;
+                        while(( vm == null || vm.getCurrentState() == null ) && System.currentTimeMillis() < timeout ) {
+                            try {
+                                Thread.sleep(5000);
+                            } catch (InterruptedException ignore) {}
+                            vm = getVirtualMachine(vmId);
+                        }
+                        if( vm == null || vm.getCurrentState() == null ) {
+                            throw new CloudException("VM failed to launch with a meaningful status");
+                        }
                         return vm;
                     }
                 }
@@ -361,7 +372,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
 
         }
         finally {
-            if( vm == null) {
+            if( portId != null && (vm == null || vm.getCurrentState().equals(VmState.ERROR))) { //if launch fails or instance in error state - remove port
                 Quantum quantum = getProvider().getNetworkServices().getVlanSupport();
                 if( quantum != null ) {
                     quantum.removePort(portId);
@@ -976,7 +987,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         VirtualMachine vm = new VirtualMachine();
         String description = null;
 
-        vm.setCurrentState(VmState.RUNNING);
+//        vm.setCurrentState(VmState.RUNNING);
         vm.setArchitecture(Architecture.I64);
         vm.setClonable(false);
         vm.setCreationTimestamp(-1L);
@@ -1133,7 +1144,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 vm.setCurrentState(VmState.PENDING);
             }
         }
-        if( vm.getCurrentState().equals(VmState.RUNNING) && imaging ) {
+        if( vm.getCurrentState() == null && imaging ) {
             vm.setCurrentState(VmState.PENDING);
         }
         if( server.has("created") ) {
@@ -1271,8 +1282,8 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         if( vm.getDescription() == null ) {
             vm.setDescription(vm.getName());
         }
-        vm.setImagable(vm.getCurrentState().equals(VmState.RUNNING));
-        vm.setRebootable(vm.getCurrentState().equals(VmState.RUNNING));
+        vm.setImagable(vm.getCurrentState() == null);
+        vm.setRebootable(vm.getCurrentState() == null);
         if( vm.getPlatform().equals(Platform.UNKNOWN) ) {
             Platform p = Platform.guess(vm.getName() + " " + vm.getDescription());
 

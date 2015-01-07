@@ -247,14 +247,47 @@ public class Quantum extends AbstractVLANSupport {
                         }
                     }
                 } catch (JSONException e) {
-                    logger.error("Unable to understand create response: " + e.getMessage());
+                    logger.error("Unable to understand listPorts response: " + e.getMessage());
                     throw new CloudException(e);
                 }
                 return portIds;
             }
-            logger.error("No port was created by the create attempt, and no error was returned");
-            throw new CloudException("No port was created");
+            return Collections.EMPTY_LIST;
+        }
+        finally {
+            APITrace.end();
+        }
+    }
 
+    public @Nonnull Iterable<String> listPorts(@Nonnull String vlanId) throws CloudException, InternalException {
+        APITrace.begin(getProvider(), "VLAN.listPorts");
+        try {
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+
+            JSONObject result = null;
+            if (getNetworkType().equals(QuantumType.QUANTUM) ) {
+                result = method.getNetworks(getPortResource() + "?network_id="+vlanId/*vm.getProviderVirtualMachineId()*/+"&fields=id", null, false);
+            }
+            else {
+                result = method.getServers(getNetworkResource() + "/" + vlanId/*vm.getProviderVlanId()*/ + "/ports", null, false);
+            }
+            if( result != null && result.has("ports") ) {
+                List<String> portIds = new ArrayList<String>();
+                try {
+                    JSONArray ports = result.getJSONArray("ports");
+                    for( int i = 0; i < ports.length(); i++ ) {
+                        JSONObject port = ports.getJSONObject(i);
+                        if( port.has("id" ) ) {
+                            portIds.add(port.getString("id"));
+                        }
+                    }
+                } catch (JSONException e) {
+                    logger.error("Unable to understand listPorts response: " + e.getMessage());
+                    throw new CloudException(e);
+                }
+                return portIds;
+            }
+            return Collections.EMPTY_LIST;
         }
         finally {
             APITrace.end();
@@ -778,6 +811,11 @@ public class Quantum extends AbstractVLANSupport {
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             if (getNetworkType().equals(QuantumType.QUANTUM) ) {
+                Iterable<String> portIds = listPorts(vlanId);
+                for (String portId : portIds) {
+                    removePort(portId);
+                }
+
                 method.deleteNetworks(getNetworkResource(), vlanId);
             }
             else {
