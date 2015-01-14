@@ -188,7 +188,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 if( ob.has("server") ) {
                     JSONObject server = ob.getJSONObject("server");
                     VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6, networks);
-                        
+
                     if( vm != null ) {
                         return vm;
                     }
@@ -223,6 +223,22 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         String portId = null;
         try {
             MachineImage targetImage = getProvider().getComputeServices().getImageSupport().getImage(options.getMachineImageId());
+
+            //Additional LPAR Call
+            boolean isBareMetal = false;
+            try{
+                String lparMetadataKey = "hypervisor-flavor";
+                NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+                JSONObject ob = method.getServers("/images/" + options.getMachineImageId() + "/metadata", lparMetadataKey, true);
+                if(ob.has("metadata")){
+                    JSONObject metadata = ob.getJSONObject("metadata");
+                    if(metadata.has(lparMetadataKey) && metadata.getString(lparMetadataKey).equals("virtage"))isBareMetal = true;
+                }
+            }
+            catch(Exception ex){
+                //Something failed while checking Virtage metadata
+                logger.error("Failed to find Virtage metadata");
+            }
 
             if( targetImage == null ) {
                 throw new CloudException("No such machine image: " + options.getMachineImageId());
@@ -334,7 +350,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             }
             json.put("metadata", newMeta);
             wrapper.put("server", json);
-            JSONObject result = method.postServers("/servers", null, new JSONObject(wrapper), true);
+            JSONObject result = method.postServers(isBareMetal ? "/servers" : "/os-volumes_boot", null, new JSONObject(wrapper), true);
 
             if( result.has("server") ) {
                 try {
@@ -660,15 +676,15 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             try {
                 if( ob != null && ob.has("servers") ) {
                     JSONArray list = ob.getJSONArray("servers");
-                    
+
                     for( int i=0; i<list.length(); i++ ) {
                         JSONObject server = list.getJSONObject(i);
                         VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6, nets);
-                        
+
                         if( vm != null ) {
                             servers.add(vm);
                         }
-                        
+
                     }
                 }
             }
@@ -839,12 +855,12 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         try {
             HashMap<String,Object> json = new HashMap<String,Object>();
             HashMap<String,Object> action = new HashMap<String,Object>();
-            
+
             action.put("type", "HARD");
             json.put("reboot", action);
 
             NovaMethod method = new NovaMethod(((NovaOpenStack)getProvider()));
-            
+
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
         finally {
@@ -886,7 +902,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             APITrace.end();
         }
     }
-    
+
     private @Nullable VirtualMachineProduct toProduct(@Nullable JSONObject json) throws JSONException, InternalException, CloudException {
         if( json == null ) {
             return null;
