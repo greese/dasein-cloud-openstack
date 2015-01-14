@@ -188,7 +188,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 if( ob.has("server") ) {
                     JSONObject server = ob.getJSONObject("server");
                     VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6, networks);
-                        
+
                     if( vm != null ) {
                         return vm;
                     }
@@ -223,6 +223,22 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         String portId = null;
         try {
             MachineImage targetImage = getProvider().getComputeServices().getImageSupport().getImage(options.getMachineImageId());
+
+            //Additional LPAR Call
+            boolean isBareMetal = false;
+            try{
+                String lparMetadataKey = "hypervisor-flavor";
+                NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+                JSONObject ob = method.getServers("/images/" + options.getMachineImageId() + "/metadata", lparMetadataKey, true);
+                if(ob.has("metadata")){
+                    JSONObject metadata = ob.getJSONObject("metadata");
+                    if(metadata.has(lparMetadataKey) && metadata.getString(lparMetadataKey).equals("virtage"))isBareMetal = true;
+                }
+            }
+            catch(Exception ex){
+                //Something failed while checking Virtage metadata
+                logger.error("Failed to find Virtage metadata");
+            }
 
             if( targetImage == null ) {
                 throw new CloudException("No such machine image: " + options.getMachineImageId());
@@ -334,7 +350,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             }
             json.put("metadata", newMeta);
             wrapper.put("server", json);
-            JSONObject result = method.postServers("/servers", null, new JSONObject(wrapper), true);
+            JSONObject result = method.postServers(isBareMetal ? "/servers" : "/os-volumes_boot", null, new JSONObject(wrapper), true);
 
             if( result.has("server") ) {
                 try {
@@ -345,6 +361,17 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                     vm = toVirtualMachine(server, ips, ips, nets);
 
                     if( vm != null ) {
+                        String vmId = vm.getProviderVirtualMachineId();
+                        long timeout = System.currentTimeMillis() + 5 * 60 * 1000;
+                        while(( vm == null || vm.getCurrentState() == null ) && System.currentTimeMillis() < timeout ) {
+                            try {
+                                Thread.sleep(5000);
+                            } catch (InterruptedException ignore) {}
+                            vm = getVirtualMachine(vmId);
+                        }
+                        if( vm == null || vm.getCurrentState() == null ) {
+                            throw new CloudException("VM failed to launch with a meaningful status");
+                        }
                         return vm;
                     }
                 }
@@ -361,7 +388,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
 
         }
         finally {
-            if( vm == null) {
+            if( portId != null && (vm == null || vm.getCurrentState().equals(VmState.ERROR))) { //if launch fails or instance in error state - remove port
                 Quantum quantum = getProvider().getNetworkServices().getVlanSupport();
                 if( quantum != null ) {
                     quantum.removePort(portId);
@@ -649,15 +676,15 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             try {
                 if( ob != null && ob.has("servers") ) {
                     JSONArray list = ob.getJSONArray("servers");
-                    
+
                     for( int i=0; i<list.length(); i++ ) {
                         JSONObject server = list.getJSONObject(i);
                         VirtualMachine vm = toVirtualMachine(server, ipv4, ipv6, nets);
-                        
+
                         if( vm != null ) {
                             servers.add(vm);
                         }
-                        
+
                     }
                 }
             }
@@ -828,12 +855,12 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         try {
             HashMap<String,Object> json = new HashMap<String,Object>();
             HashMap<String,Object> action = new HashMap<String,Object>();
-            
+
             action.put("type", "HARD");
             json.put("reboot", action);
 
             NovaMethod method = new NovaMethod(((NovaOpenStack)getProvider()));
-            
+
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
         finally {
@@ -875,7 +902,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             APITrace.end();
         }
     }
-    
+
     private @Nullable VirtualMachineProduct toProduct(@Nullable JSONObject json) throws JSONException, InternalException, CloudException {
         if( json == null ) {
             return null;
@@ -976,7 +1003,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         VirtualMachine vm = new VirtualMachine();
         String description = null;
 
-        vm.setCurrentState(VmState.RUNNING);
+//        vm.setCurrentState(VmState.RUNNING);
         vm.setArchitecture(Architecture.I64);
         vm.setClonable(false);
         vm.setCreationTimestamp(-1L);
@@ -1133,7 +1160,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 vm.setCurrentState(VmState.PENDING);
             }
         }
-        if( vm.getCurrentState().equals(VmState.RUNNING) && imaging ) {
+        if( vm.getCurrentState() == null && imaging ) {
             vm.setCurrentState(VmState.PENDING);
         }
         if( server.has("created") ) {
@@ -1271,8 +1298,8 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         if( vm.getDescription() == null ) {
             vm.setDescription(vm.getName());
         }
-        vm.setImagable(vm.getCurrentState().equals(VmState.RUNNING));
-        vm.setRebootable(vm.getCurrentState().equals(VmState.RUNNING));
+        vm.setImagable(vm.getCurrentState() == null);
+        vm.setRebootable(vm.getCurrentState() == null);
         if( vm.getPlatform().equals(Platform.UNKNOWN) ) {
             Platform p = Platform.guess(vm.getName() + " " + vm.getDescription());
 
