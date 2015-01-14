@@ -26,28 +26,26 @@ import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 
 import javax.annotation.Nonnull;
 
-public class NovaComputeServices extends AbstractComputeServices {
-    private NovaOpenStack provider;
-    
-    public NovaComputeServices(@Nonnull NovaOpenStack provider) { this.provider = provider; }
+public class NovaComputeServices extends AbstractComputeServices<NovaOpenStack> {
+    public NovaComputeServices(@Nonnull NovaOpenStack provider) { super(provider); }
     
     @Override
     public @Nonnull NovaImage getImageSupport() {
-        return new NovaImage(provider);
+        return new NovaImage(getProvider());
     }
     
     @Override
     public @Nonnull NovaServer getVirtualMachineSupport() {
-        return new NovaServer(provider);
+        return new NovaServer(getProvider());
     }
 
     @Override
     public @Nonnull SnapshotSupport getSnapshotSupport() {
-        return new CinderSnapshot(provider);
+        return new CinderSnapshot(getProvider());
     }
 
     @Override
     public @Nonnull VolumeSupport getVolumeSupport() {
-        return new CinderVolume(provider);
+        return new CinderVolume(getProvider());
     }
 }
