@@ -586,6 +586,13 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
                         }
                     }
                 }
+                boolean bMinSize = false;
+                if(json.has("minDisk")){
+                    bMinSize = true;
+                    image.setTag("minDisk", json.getString("minDisk"));
+                }
+                if(!bMinSize)if(json.has("OS-EXT-IMG-SIZE:size"))image.setTag("minSize", json.getString("OS-EXT-IMG-SIZE:size"));
+
                 return image;
             }
             catch( JSONException e ) {
