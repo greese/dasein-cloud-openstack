@@ -227,18 +227,21 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             //Additional LPAR Call
             boolean isBareMetal = false;
             try{
-                String lparMetadataKey = "hypervisor-flavor";
+                String lparMetadataKey = "hypervisor_type";
+                String lpadMetadataValue = "Hitachi";
                 NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
-                JSONObject ob = method.getServers("/images/" + options.getMachineImageId() + "/metadata", lparMetadataKey, true);
+                JSONObject ob = method.getServers("/images/" + options.getMachineImageId() + "/metadata", lparMetadataKey, false);
                 if(ob.has("metadata")){
                     JSONObject metadata = ob.getJSONObject("metadata");
-                    if(metadata.has(lparMetadataKey) && metadata.getString(lparMetadataKey).equals("virtage"))isBareMetal = true;
+                    if(metadata.has(lparMetadataKey) && metadata.getString(lparMetadataKey).equals(lpadMetadataValue))isBareMetal = true;
                 }
             }
             catch(Exception ex){
-                //Something failed while checking Virtage metadata
-                logger.error("Failed to find Virtage metadata");
+                //Something failed while checking Hitachi LPAR metadata
+                logger.error("Failed to find Hitachi LPAR metadata");
             }
+            //TODO: TESTING
+            //isBareMetal = true;
 
             if( targetImage == null ) {
                 throw new CloudException("No such machine image: " + options.getMachineImageId());
@@ -337,6 +340,26 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 }
                 json.put("security_groups", firewalls);
             }
+
+            if(isBareMetal){
+                HashMap<String, String> blockDeviceMapping = new HashMap<String, String>();
+                blockDeviceMapping.put("device_name", "/dev/sdb1");
+                blockDeviceMapping.put("boot_index", "0");
+                blockDeviceMapping.put("uuid", targetImage.getProviderMachineImageId());
+                blockDeviceMapping.put("guest_format", "ephemeral");
+                String volumeSize = "";
+                if(targetImage.getTag("minDisk") != null) volumeSize = (String)targetImage.getTag("minDisk");
+                else{
+                    String minSize = (String)targetImage.getTag("minSize");
+                    volumeSize = roundUpToGB(Long.valueOf(minSize)) + "";
+                }
+                blockDeviceMapping.put("volume_size", volumeSize);
+                blockDeviceMapping.put("source_type", "image");
+                blockDeviceMapping.put("destination_type", "volume");
+                blockDeviceMapping.put("delete_on_termination", "True");
+                json.put("block_device_mapping_v2", blockDeviceMapping);
+            }
+
             if( !targetImage.getPlatform().equals(Platform.UNKNOWN) ) {
                 options.withMetaData("org.dasein.platform", targetImage.getPlatform().name());
             }
@@ -350,7 +373,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             }
             json.put("metadata", newMeta);
             wrapper.put("server", json);
-            JSONObject result = method.postServers(isBareMetal ? "/servers" : "/os-volumes_boot", null, new JSONObject(wrapper), true);
+            JSONObject result = method.postServers(isBareMetal ? "/os-volumes_boot" : "/servers", null, new JSONObject(wrapper), true);
 
             if( result.has("server") ) {
                 try {
@@ -396,6 +419,12 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             }
             APITrace.end();
         }
+    }
+
+    public static int roundUpToGB(Long size) {
+        int exp = (int) (Math.log(size) / Math.log(100));
+        Double round = Math.ceil(size / Math.pow(100, exp));
+        return round.intValue();
     }
 
     private @Nonnull Iterable<String> listFirewalls(@Nonnull String vmId, @Nonnull JSONObject server) throws InternalException, CloudException {
