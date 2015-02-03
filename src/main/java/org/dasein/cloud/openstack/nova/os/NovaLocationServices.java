@@ -19,6 +19,7 @@
 
 package org.dasein.cloud.openstack.nova.os;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Locale;
@@ -28,6 +29,9 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.dc.*;
 import org.dasein.cloud.util.APITrace;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import javax.annotation.Nonnull;
 
@@ -107,14 +111,49 @@ public class NovaLocationServices implements DataCenterServices {
             if( region == null ) {
                 throw new CloudException("No such region: " + providerRegionId);
             }
-            DataCenter dc = new DataCenter();
-                    
-            dc.setActive(true);
-            dc.setAvailable(true);
-            dc.setName(region.getProviderRegionId() + "-a");
-            dc.setProviderDataCenterId(region.getProviderRegionId() + "-a");
-            dc.setRegionId(providerRegionId);
-            return Collections.singletonList(dc);
+
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject aggregates = method.getResource("compute", "/os-aggregates", null, false);
+            if(aggregates != null && aggregates.has("aggregates")){
+                ArrayList<DataCenter> dataCenters = new ArrayList<DataCenter>();
+
+                try{
+                    JSONArray objs = aggregates.getJSONArray("aggregates");
+                    for(int i=0;i<objs.length();i++){
+                        JSONObject aggregate = objs.getJSONObject(i);
+                        if(aggregate.has("hosts")){
+                            JSONArray hosts = aggregate.getJSONArray("hosts");
+                            if(hosts.length() > 0){
+                                if(aggregate.has("metadata")){
+                                    JSONObject metadata = aggregate.getJSONObject("metadata");
+                                    if(metadata.has("availability_zone")){
+                                        DataCenter dc = new DataCenter();
+                                        dc.setActive(true);
+                                        dc.setAvailable(true);
+                                        dc.setName(metadata.getString("availability_zone"));
+                                        dc.setProviderDataCenterId(dc.getName());
+                                        dc.setRegionId(providerRegionId);
+                                        dataCenters.add(dc);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return dataCenters;
+                }
+                catch(JSONException ex){
+                    throw new CloudException("Something went wrong getting the Availability Zones");
+                }
+            }
+            else{
+                DataCenter dc = new DataCenter();
+                dc.setActive(true);
+                dc.setAvailable(true);
+                dc.setName(region.getProviderRegionId() + "-a");
+                dc.setProviderDataCenterId(region.getProviderRegionId() + "-a");
+                dc.setRegionId(providerRegionId);
+                return Collections.singletonList(dc);
+            }
         }
         finally {
             APITrace.end();
