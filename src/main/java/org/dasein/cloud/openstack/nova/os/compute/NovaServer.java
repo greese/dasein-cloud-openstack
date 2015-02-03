@@ -240,8 +240,6 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 //Something failed while checking Hitachi LPAR metadata
                 logger.error("Failed to find Hitachi LPAR metadata");
             }
-            //TODO: TESTING
-            //isBareMetal = true;
 
             if( targetImage == null ) {
                 throw new CloudException("No such machine image: " + options.getMachineImageId());
@@ -343,10 +341,10 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
 
             if(isBareMetal){
                 HashMap<String, String> blockDeviceMapping = new HashMap<String, String>();
-                blockDeviceMapping.put("device_name", "/dev/sdb1");
+                //blockDeviceMapping.put("device_name", "/dev/sdb1");
                 blockDeviceMapping.put("boot_index", "0");
                 blockDeviceMapping.put("uuid", targetImage.getProviderMachineImageId());
-                blockDeviceMapping.put("guest_format", "ephemeral");
+                //blockDeviceMapping.put("guest_format", "ephemeral");
                 String volumeSize = "";
                 if(targetImage.getTag("minDisk") != null) volumeSize = (String)targetImage.getTag("minDisk");
                 else{
@@ -1301,7 +1299,10 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 }
             }
             vm.setProviderRegionId(getContext().getRegionId());
-            vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
+            if(server.has("OS-EXT-AZ:availability_zone")){
+                vm.setProviderDataCenterId(server.getString("OS-EXT-AZ:availability_zone"));
+            }
+            else vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
             vm.setTerminationTimestamp(-1L);
             if( vm.getProviderVirtualMachineId() == null ) {
                 return null;
@@ -1316,7 +1317,10 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             }
         }
         vm.setProviderRegionId(getContext().getRegionId());
-        vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
+        if(server.has("OS-EXT-AZ:availability_zone")){
+            vm.setProviderDataCenterId(server.getString("OS-EXT-AZ:availability_zone"));
+        }
+        else vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
         vm.setTerminationTimestamp(-1L);
         if( vm.getProviderVirtualMachineId() == null ) {
             return null;
