@@ -86,7 +86,7 @@
       <dependency>
           <groupId>org.dasein</groupId>
           <artifactId>dasein-cloud-test</artifactId>
-          <version>2014.11.2-SNAPSHOT</version>
+          <version>2014.11.1</version>
           <scope>test</scope>
           <optional>false</optional>
       </dependency>
@@ -212,9 +212,9 @@
                     <value>${regionId}</value>
                 </property>
             </systemProperties>
-          <includes>
-              <include>**/TestSuite.java</include>
-          </includes>
+          <excludes>
+              <exclude>**/TestSuite.java</exclude>
+          </excludes>
         </configuration>
       </plugin>     
       <plugin>
