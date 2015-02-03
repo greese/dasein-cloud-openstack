@@ -907,7 +907,12 @@ public class HPRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenStack> {
             database.setName(name);
             database.setProductSize(flavor);
             database.setProviderDatabaseId(dbId);
-            database.setProviderDataCenterId(regionId + "-a");
+            database.setProviderRegionId(ctx.getRegionId());
+            //TODO: This needs to be tested
+            if(json.has("OS-EXT-AZ:availability_zone")){
+                database.setProviderDataCenterId(json.getString("OS-EXT-AZ:availability_zone"));
+            }
+            else database.setProviderDataCenterId(regionId + "-a");
             database.setProviderOwnerId(getTenantId());
             database.setProviderRegionId(regionId);
             return database;
