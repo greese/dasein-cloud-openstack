@@ -228,12 +228,12 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             boolean isBareMetal = false;
             try{
                 String lparMetadataKey = "hypervisor_type";
-                String lpadMetadataValue = "Hitachi";
+                String lparMetadataValue = "Hitachi";
                 NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
                 JSONObject ob = method.getServers("/images/" + options.getMachineImageId() + "/metadata", lparMetadataKey, false);
                 if(ob.has("metadata")){
                     JSONObject metadata = ob.getJSONObject("metadata");
-                    if(metadata.has(lparMetadataKey) && metadata.getString(lparMetadataKey).equals(lpadMetadataValue))isBareMetal = true;
+                    if(metadata.has(lparMetadataKey) && metadata.getString(lparMetadataKey).equals(lparMetadataValue))isBareMetal = true;
                 }
             }
             catch(Exception ex){
@@ -343,7 +343,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 HashMap<String, String> blockDeviceMapping = new HashMap<String, String>();
                 //blockDeviceMapping.put("device_name", "/dev/sdb1");
                 blockDeviceMapping.put("boot_index", "0");
-                blockDeviceMapping.put("uuid", targetImage.getProviderMachineImageId());
+                blockDeviceMapping.put("uuid", getProvider().getComputeServices().getImageSupport().getImageRef(options.getMachineImageId()));
                 //blockDeviceMapping.put("guest_format", "ephemeral");
                 String volumeSize = "";
                 if(targetImage.getTag("minDisk") != null) volumeSize = (String)targetImage.getTag("minDisk");
@@ -420,8 +420,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     }
 
     public static int roundUpToGB(Long size) {
-        int exp = (int) (Math.log(size) / Math.log(100));
-        Double round = Math.ceil(size / Math.pow(100, exp));
+        Double round = Math.ceil(size / Math.pow(2, 30));
         return round.intValue();
     }
 
