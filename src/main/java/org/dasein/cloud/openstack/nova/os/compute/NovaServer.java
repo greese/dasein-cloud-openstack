@@ -278,6 +278,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                                 vlan.put("port", portId);
                                 vlans.add(vlan);
                                 json.put("networks", vlans);
+                                options.withMetaData("org.dasein.portId", portId);
                             }
                             catch (CloudException e) {
                                 if (e.getHttpCode() != 403) {
@@ -854,9 +855,17 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 try {
                     Quantum quantum = getProvider().getNetworkServices().getVlanSupport();
                     if( quantum != null ) {
+                        String cachedPortId = (String) vm.getTag("org.dasein.portId");
                         Iterable<String> portIds = quantum.listPorts(vm);
                         for (String portId : portIds) {
                             quantum.removePort(portId);
+                            if (portId.equalsIgnoreCase(cachedPortId)) {
+                                cachedPortId = null;
+                            }
+                        }
+                        // if ports were detached, listPorts will not return any ports, diff method to be used
+                        if (cachedPortId != null) {
+                            quantum.removePort(cachedPortId);
                         }
                     }
                     method.deleteServers("/servers", vmId);
@@ -1020,6 +1029,10 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             else if( md.has("Server Label") ) {
                 description = md.getString("Server Label");
             }
+          /*if( md.has("org.dasein.portId") ) {
+                    portId = md.getString("org.dasein.PortId");
+              }
+            }*/
             if( md.has("org.dasein.platform") ) {
                 try {
                     vm.setPlatform(Platform.valueOf(md.getString("org.dasein.platform")));
