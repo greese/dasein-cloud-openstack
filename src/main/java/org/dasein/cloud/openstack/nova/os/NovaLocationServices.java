@@ -119,27 +119,38 @@ public class NovaLocationServices implements DataCenterServices {
 
                 try{
                     JSONArray objs = aggregates.getJSONArray("aggregates");
-                    for(int i=0;i<objs.length();i++){
-                        JSONObject aggregate = objs.getJSONObject(i);
-                        if(aggregate.has("hosts")){
-                            JSONArray hosts = aggregate.getJSONArray("hosts");
-                            if(hosts.length() > 0){
-                                if(aggregate.has("metadata")){
-                                    JSONObject metadata = aggregate.getJSONObject("metadata");
-                                    if(metadata.has("availability_zone")){
-                                        DataCenter dc = new DataCenter();
-                                        dc.setActive(true);
-                                        dc.setAvailable(true);
-                                        dc.setName(metadata.getString("availability_zone"));
-                                        dc.setProviderDataCenterId(dc.getName());
-                                        dc.setRegionId(providerRegionId);
-                                        dataCenters.add(dc);
+                    if(objs.length() > 0){
+                        for(int i=0;i<objs.length();i++){
+                            JSONObject aggregate = objs.getJSONObject(i);
+                            if(aggregate.has("hosts")){
+                                JSONArray hosts = aggregate.getJSONArray("hosts");
+                                if(hosts.length() > 0){
+                                    if(aggregate.has("metadata")){
+                                        JSONObject metadata = aggregate.getJSONObject("metadata");
+                                        if(metadata.has("availability_zone")){
+                                            DataCenter dc = new DataCenter();
+                                            dc.setActive(true);
+                                            dc.setAvailable(true);
+                                            dc.setName(metadata.getString("availability_zone"));
+                                            dc.setProviderDataCenterId(dc.getName());
+                                            dc.setRegionId(providerRegionId);
+                                            dataCenters.add(dc);
+                                        }
                                     }
                                 }
                             }
                         }
+                        return dataCenters;
                     }
-                    return dataCenters;
+                    else{
+                        DataCenter dc = new DataCenter();
+                        dc.setActive(true);
+                        dc.setAvailable(true);
+                        dc.setName(region.getProviderRegionId() + "-a");
+                        dc.setProviderDataCenterId(region.getProviderRegionId() + "-a");
+                        dc.setRegionId(providerRegionId);
+                        return Collections.singletonList(dc);
+                    }
                 }
                 catch(JSONException ex){
                     throw new CloudException("Something went wrong getting the Availability Zones");
