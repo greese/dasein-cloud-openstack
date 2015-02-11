@@ -120,6 +120,7 @@ public class CinderVolume extends AbstractVolumeSupport {
 
             json.put("display_name", options.getName());
             json.put("display_description", options.getDescription());
+            json.put("availability_zone", options.getDataCenterId());
 
             Storage<Gigabyte> size = options.getVolumeSize();
 
@@ -540,7 +541,9 @@ public class CinderVolume extends AbstractVolumeSupport {
         }
         try {
             String region = getContext().getRegionId();
-            String dataCenter = region + "-a";
+            String dataCenter = "";
+            if(json.has("availability_zone") && json.getString("availability_zone") != null && !json.getString("availability_zone").equals("")) dataCenter = json.getString("availability_zone");
+            else dataCenter = region + "-a";
 
             String volumeId = null;
 
