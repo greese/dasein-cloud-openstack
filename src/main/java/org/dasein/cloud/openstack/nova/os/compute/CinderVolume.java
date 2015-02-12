@@ -119,7 +119,7 @@ public class CinderVolume extends AbstractVolumeSupport {
 
             json.put("display_name", options.getName());
             json.put("display_description", options.getDescription());
-            json.put("availability_zone", options.getDataCenterId());
+            if(!options.getDataCenterId().equals(getProvider().getContext().getRegionId() + "-a")) json.put("availability_zone", options.getDataCenterId());
 
             Storage<Gigabyte> size = options.getVolumeSize();
 
