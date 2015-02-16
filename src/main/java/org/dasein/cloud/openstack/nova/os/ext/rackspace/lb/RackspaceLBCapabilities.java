@@ -109,6 +109,11 @@ public class RackspaceLBCapabilities extends AbstractCapabilities<NovaOpenStack>
     }
 
     @Override
+    public @Nonnull Requirement identifyHealthCheckOnCreateRequirement() throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
+    }
+
+    @Override
     public boolean isAddressAssignedByProvider() throws CloudException, InternalException {
         return true;
     }
