@@ -113,7 +113,14 @@ public class NovaLocationServices implements DataCenterServices {
             }
 
             NovaMethod method = new NovaMethod(provider);
-            JSONObject aggregates = method.getResource("compute", "/os-aggregates", null, false);
+            JSONObject aggregates = null;
+
+            try{
+                aggregates = method.getResource("compute", "/os-aggregates", null, false);
+            }
+            catch(Exception ex){
+                //The user likely has too few permissions to request aggregates
+            }
             if(aggregates != null && aggregates.has("aggregates")){
                 ArrayList<DataCenter> dataCenters = new ArrayList<DataCenter>();
 
