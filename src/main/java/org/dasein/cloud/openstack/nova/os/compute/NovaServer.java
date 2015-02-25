@@ -900,7 +900,9 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         APITrace.begin(getProvider(), "VM.terminate");
         try {
             VirtualMachine vm = getVirtualMachine(vmId);
-
+            if( vm == null) {
+                return; // do nothing, machine is already gone
+            }
             NovaMethod method = new NovaMethod(getProvider());
             long timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
 
@@ -1082,10 +1084,6 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             else if( md.has("Server Label") ) {
                 description = md.getString("Server Label");
             }
-          /*if( md.has("org.dasein.portId") ) {
-                    portId = md.getString("org.dasein.PortId");
-              }
-            }*/
             if( md.has("org.dasein.platform") ) {
                 try {
                     vm.setPlatform(Platform.valueOf(md.getString("org.dasein.platform")));
