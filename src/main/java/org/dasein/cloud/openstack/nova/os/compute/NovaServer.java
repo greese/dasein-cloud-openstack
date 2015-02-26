@@ -20,6 +20,8 @@
 package org.dasein.cloud.openstack.nova.os.compute;
 
 import java.io.UnsupportedEncodingException;
+import java.net.Inet4Address;
+import java.net.UnknownHostException;
 import java.util.*;
 
 import javax.annotation.Nonnull;
@@ -1251,11 +1253,17 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                                 VLANSupport support = services.getVlanSupport();
                                 Iterable<Subnet> subnets = support.listSubnets(network.getProviderVlanId());
                                 for (Subnet sub : subnets) {
-                                    SubnetUtils utils = new SubnetUtils(sub.getCidr());
+                                    try {
+                                        SubnetUtils utils = new SubnetUtils(sub.getCidr());
 
-                                    if (utils.getInfo().isInRange(subnet)) {
-                                        vm.setProviderSubnetId(sub.getProviderSubnetId());
-                                        break;
+                                        if( utils.getInfo().isInRange(subnet) ) {
+                                            vm.setProviderSubnetId(sub.getProviderSubnetId());
+                                            break;
+                                        }
+                                    }
+                                    catch( IllegalArgumentException arg ) {
+                                        logger.warn("Couldn't match against an invalid CIDR: "+sub.getCidr());
+                                        continue;
                                     }
                                 }
                                 break;
