@@ -19,12 +19,6 @@
 
 package org.dasein.cloud.openstack.nova.os.compute;
 
-import java.io.UnsupportedEncodingException;
-import java.util.*;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.net.util.SubnetUtils;
 import org.apache.http.HttpStatus;
@@ -51,9 +45,9 @@ import org.dasein.cloud.network.IpAddress;
 import org.dasein.cloud.network.IpAddressSupport;
 import org.dasein.cloud.network.NetworkServices;
 import org.dasein.cloud.network.RawAddress;
+import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.network.VLAN;
 import org.dasein.cloud.network.VLANSupport;
-import org.dasein.cloud.network.Subnet;
 import org.dasein.cloud.openstack.nova.os.NovaException;
 import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -72,6 +66,15 @@ import org.dasein.util.uom.time.TimePeriod;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Implements services supporting interaction with cloud virtual machines.
@@ -429,7 +432,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         try {
             if( server.has("security_groups") ) {
                 NetworkServices services = getProvider().getNetworkServices();
-                Collection<Firewall> firewalls = null;
+                Iterable<Firewall> firewalls = null;
 
                 if( services != null ) {
                     FirewallSupport support = services.getFirewallSupport();
@@ -1251,11 +1254,17 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                                 VLANSupport support = services.getVlanSupport();
                                 Iterable<Subnet> subnets = support.listSubnets(network.getProviderVlanId());
                                 for (Subnet sub : subnets) {
-                                    SubnetUtils utils = new SubnetUtils(sub.getCidr());
+                                    try {
+                                        SubnetUtils utils = new SubnetUtils(sub.getCidr());
 
-                                    if (utils.getInfo().isInRange(subnet)) {
-                                        vm.setProviderSubnetId(sub.getProviderSubnetId());
-                                        break;
+                                        if( utils.getInfo().isInRange(subnet) ) {
+                                            vm.setProviderSubnetId(sub.getProviderSubnetId());
+                                            break;
+                                        }
+                                    }
+                                    catch( IllegalArgumentException arg ) {
+                                        logger.warn("Couldn't match against an invalid CIDR: "+sub.getCidr());
+                                        continue;
                                     }
                                 }
                                 break;
