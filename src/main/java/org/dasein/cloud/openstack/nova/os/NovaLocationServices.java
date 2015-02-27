@@ -112,39 +112,6 @@ public class NovaLocationServices implements DataCenterServices {
         }
     }
 
-    private @Nullable String getDCNameFromHostAggregate() {
-        try {
-            NovaMethod method = new NovaMethod(provider);
-            JSONObject aggregates = method.getResource("compute", "/os-aggregates", null, false);
-            if( aggregates == null || !aggregates.has("aggregates") ) {
-                return null;
-            }
-            JSONArray objs = aggregates.getJSONArray("aggregates");
-            for( int i=0; i < objs.length(); i++ ) {
-                JSONObject aggregate = objs.getJSONObject(i);
-                if( !aggregate.has("hosts") ) {
-                    continue;
-                }
-                JSONArray hosts = aggregate.getJSONArray("hosts");
-                if( hosts.length() == 0 ) {
-                    continue;
-                }
-                if( !aggregate.has("metadata") ) {
-                    continue;
-                }
-
-                JSONObject metadata = aggregate.getJSONObject("metadata");
-                if( metadata.has("availability_zone") ) {
-                    return metadata.getString("availability_zone");
-                }
-            }
-        }
-        catch( Exception ex ) {
-            //The user likely has too few permissions to request aggregates
-        }
-        return null;
-    }
-
     private @Nonnull Collection<String> getDCNamesFromHosts() {
         try {
             Map<String, String> names = new HashMap<String, String>();
@@ -157,7 +124,7 @@ public class NovaLocationServices implements DataCenterServices {
             for( int i=0; i < objs.length(); i++ ) {
                 JSONObject host = objs.getJSONObject(i);
                 String az = host.getString("zone");
-                if( az == null || "internal".equalsIgnoreCase(az) ) {
+                if( az == null || az.isEmpty() || "internal".equalsIgnoreCase(az) ) {
                     continue;
                 }
                 names.put(az, az);
@@ -199,14 +166,7 @@ public class NovaLocationServices implements DataCenterServices {
             if( region == null ) {
                 throw new CloudException("No such region: " + providerRegionId);
             }
-            // look up the zone in the host aggregates
-            String hostAggregateZone = getDCNameFromHostAggregate();
-            if( hostAggregateZone != null ) {
-                dataCenters.add(constructDataCenter(hostAggregateZone, providerRegionId));
-                cache.put(provider.getContext(), dataCenters);
-                return dataCenters;
-            }
-            // if host aggregates is not configured, let's look in the hosts
+            // let's look in the hosts
             for( String hostZone : getDCNamesFromHosts() ) {
                 dataCenters.add(constructDataCenter(hostZone, providerRegionId));
             }
