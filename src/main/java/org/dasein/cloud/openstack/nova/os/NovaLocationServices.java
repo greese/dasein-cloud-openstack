@@ -22,18 +22,28 @@ package org.dasein.cloud.openstack.nova.os;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.dc.*;
 import org.dasein.cloud.util.APITrace;
+import org.dasein.cloud.util.Cache;
+import org.dasein.cloud.util.CacheLevel;
+import org.dasein.util.uom.time.Day;
+import org.dasein.util.uom.time.Minute;
+import org.dasein.util.uom.time.TimePeriod;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public class NovaLocationServices implements DataCenterServices {
     private NovaOpenStack provider;
@@ -102,76 +112,112 @@ public class NovaLocationServices implements DataCenterServices {
         }
     }
 
+    private @Nullable String getDCNameFromHostAggregate() {
+        try {
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject aggregates = method.getResource("compute", "/os-aggregates", null, false);
+            if( aggregates == null || !aggregates.has("aggregates") ) {
+                return null;
+            }
+            JSONArray objs = aggregates.getJSONArray("aggregates");
+            for( int i=0; i < objs.length(); i++ ) {
+                JSONObject aggregate = objs.getJSONObject(i);
+                if( !aggregate.has("hosts") ) {
+                    continue;
+                }
+                JSONArray hosts = aggregate.getJSONArray("hosts");
+                if( hosts.length() == 0 ) {
+                    continue;
+                }
+                if( !aggregate.has("metadata") ) {
+                    continue;
+                }
+
+                JSONObject metadata = aggregate.getJSONObject("metadata");
+                if( metadata.has("availability_zone") ) {
+                    return metadata.getString("availability_zone");
+                }
+            }
+        }
+        catch( Exception ex ) {
+            //The user likely has too few permissions to request aggregates
+        }
+        return null;
+    }
+
+    private @Nonnull Collection<String> getDCNamesFromHosts() {
+        try {
+            Map<String, String> names = new HashMap<String, String>();
+            NovaMethod method = new NovaMethod(provider);
+            JSONObject hosts = method.getResource("compute", "/os-hosts", null, false);
+            if( hosts == null || !hosts.has("hosts") ) {
+                return null;
+            }
+            JSONArray objs = hosts.getJSONArray("hosts");
+            for( int i=0; i < objs.length(); i++ ) {
+                JSONObject host = objs.getJSONObject(i);
+                String az = host.getString("zone");
+                if( az == null || "internal".equalsIgnoreCase(az) ) {
+                    continue;
+                }
+                names.put(az, az);
+            }
+            return names.values();
+        }
+        catch( Exception ex ) {
+            //The user likely has too few permissions to request aggregates
+        }
+        return Collections.emptyList();
+    }
+
+    private DataCenter constructDataCenter(String name, String providerRegionId) {
+        DataCenter dc = new DataCenter();
+        dc.setActive(true);
+        dc.setAvailable(true);
+        dc.setName(name);
+        dc.setProviderDataCenterId(name);
+        dc.setRegionId(providerRegionId);
+        return dc;
+    }
+
     @Override
     public Collection<DataCenter> listDataCenters(String providerRegionId) throws InternalException, CloudException {
         APITrace.begin(provider, "DC.listDataCenters");
         try {
+            Cache<DataCenter> cache = Cache.getInstance(provider, "datacenters", DataCenter.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(1, TimePeriod.MINUTE));
+            Iterable<DataCenter> cached = cache.get(provider.getContext());
+            List<DataCenter> dataCenters = new ArrayList<DataCenter>();
+            if( cached != null && cached.iterator().hasNext() ) {
+                Iterator<DataCenter> it = cached.iterator();
+                while( it.hasNext() ) {
+                    dataCenters.add(it.next());
+                }
+                return dataCenters;
+            }
+
             Region region = getRegion(providerRegionId);
-            
             if( region == null ) {
                 throw new CloudException("No such region: " + providerRegionId);
             }
-
-            NovaMethod method = new NovaMethod(provider);
-            JSONObject aggregates = null;
-
-            try{
-                aggregates = method.getResource("compute", "/os-aggregates", null, false);
+            // look up the zone in the host aggregates
+            String hostAggregateZone = getDCNameFromHostAggregate();
+            if( hostAggregateZone != null ) {
+                dataCenters.add(constructDataCenter(hostAggregateZone, providerRegionId));
+                cache.put(provider.getContext(), dataCenters);
+                return dataCenters;
             }
-            catch(Exception ex){
-                //The user likely has too few permissions to request aggregates
+            // if host aggregates is not configured, let's look in the hosts
+            for( String hostZone : getDCNamesFromHosts() ) {
+                dataCenters.add(constructDataCenter(hostZone, providerRegionId));
             }
-            if(aggregates != null && aggregates.has("aggregates")){
-                ArrayList<DataCenter> dataCenters = new ArrayList<DataCenter>();
-
-                try{
-                    JSONArray objs = aggregates.getJSONArray("aggregates");
-                    if(objs.length() > 0){
-                        for(int i=0;i<objs.length();i++){
-                            JSONObject aggregate = objs.getJSONObject(i);
-                            if(aggregate.has("hosts")){
-                                JSONArray hosts = aggregate.getJSONArray("hosts");
-                                if(hosts.length() > 0){
-                                    if(aggregate.has("metadata")){
-                                        JSONObject metadata = aggregate.getJSONObject("metadata");
-                                        if(metadata.has("availability_zone")){
-                                            DataCenter dc = new DataCenter();
-                                            dc.setActive(true);
-                                            dc.setAvailable(true);
-                                            dc.setName(metadata.getString("availability_zone"));
-                                            dc.setProviderDataCenterId(dc.getName());
-                                            dc.setRegionId(providerRegionId);
-                                            dataCenters.add(dc);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        return dataCenters;
-                    }
-                    else{
-                        DataCenter dc = new DataCenter();
-                        dc.setActive(true);
-                        dc.setAvailable(true);
-                        dc.setName(region.getProviderRegionId() + "-a");
-                        dc.setProviderDataCenterId(region.getProviderRegionId() + "-a");
-                        dc.setRegionId(providerRegionId);
-                        return Collections.singletonList(dc);
-                    }
-                }
-                catch(JSONException ex){
-                    throw new CloudException("Something went wrong getting the Availability Zones");
-                }
+            if( !dataCenters.isEmpty() ) {
+                cache.put(provider.getContext(), dataCenters);
+                return dataCenters;
             }
-            else{
-                DataCenter dc = new DataCenter();
-                dc.setActive(true);
-                dc.setAvailable(true);
-                dc.setName(region.getProviderRegionId() + "-a");
-                dc.setProviderDataCenterId(region.getProviderRegionId() + "-a");
-                dc.setRegionId(providerRegionId);
-                return Collections.singletonList(dc);
-            }
+            // if failed to get from the hosts, fallback to "<region>-a"
+            dataCenters.add(constructDataCenter(providerRegionId+"-a", providerRegionId));
+            cache.put(provider.getContext(), dataCenters);
+            return dataCenters;
         }
         finally {
             APITrace.end();
