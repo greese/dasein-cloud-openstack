@@ -166,7 +166,7 @@ public class NovaLocationServices implements DataCenterServices {
             if( region == null ) {
                 throw new CloudException("No such region: " + providerRegionId);
             }
-            // if host aggregates is not configured, let's look in the hosts
+            // let's look in the hosts
             for( String hostZone : getDCNamesFromHosts() ) {
                 dataCenters.add(constructDataCenter(hostZone, providerRegionId));
             }
