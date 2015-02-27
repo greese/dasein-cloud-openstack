@@ -922,8 +922,8 @@ public class Quantum extends AbstractVLANSupport {
                 }
             }
             Subnet subnet = Subnet.getInstance(vlan.getProviderOwnerId(), vlan.getProviderRegionId(), vlan.getProviderVlanId(), subnetId, SubnetState.AVAILABLE, name, description, cidr).supportingTraffic(traffic);
-            Iterable<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(vlan.getProviderRegionId());
-            subnet.constrainedToDataCenter(dc.iterator().next().getProviderDataCenterId());
+            //Iterable<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(vlan.getProviderRegionId());
+            //subnet.constrainedToDataCenter(dc.iterator().next().getProviderDataCenterId());
 
             if( json.has("allocation_pools") ) {
                 JSONArray p = json.getJSONArray("allocation_pools");
