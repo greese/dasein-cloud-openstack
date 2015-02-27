@@ -151,7 +151,7 @@ public class NovaLocationServices implements DataCenterServices {
     public Collection<DataCenter> listDataCenters(String providerRegionId) throws InternalException, CloudException {
         APITrace.begin(provider, "DC.listDataCenters");
         try {
-            Cache<DataCenter> cache = Cache.getInstance(provider, "datacenters", DataCenter.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(1, TimePeriod.MINUTE));
+            Cache<DataCenter> cache = Cache.getInstance(provider, "datacenters", DataCenter.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(10, TimePeriod.MINUTE));
             Iterable<DataCenter> cached = cache.get(provider.getContext());
             List<DataCenter> dataCenters = new ArrayList<DataCenter>();
             if( cached != null && cached.iterator().hasNext() ) {
