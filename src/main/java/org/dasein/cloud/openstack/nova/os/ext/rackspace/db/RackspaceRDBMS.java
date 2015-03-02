@@ -685,11 +685,7 @@ public class RackspaceRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenSt
             database.setName(name);
             database.setProductSize(flavor + ":" + size);
             database.setProviderDatabaseId(dbId);
-            //TODO: This needs to be tested
-            if(json.has("OS-EXT-AZ:availability_zone")){
-                database.setProviderDataCenterId(json.getString("OS-EXT-AZ:availability_zone"));
-            }
-            else database.setProviderDataCenterId(regionId + "-a");
+            database.setProviderDataCenterId(regionId + "-a");
             database.setProviderOwnerId(getTenantId());
             database.setProviderRegionId(regionId);
             return database;

@@ -1318,10 +1318,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 }
             }
             vm.setProviderRegionId(getContext().getRegionId());
-            if(server.has("OS-EXT-AZ:availability_zone")){
-                vm.setProviderDataCenterId(server.getString("OS-EXT-AZ:availability_zone"));
-            }
-            else vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
+            vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
             vm.setTerminationTimestamp(-1L);
             if( vm.getProviderVirtualMachineId() == null ) {
                 return null;
@@ -1336,10 +1333,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             }
         }
         vm.setProviderRegionId(getContext().getRegionId());
-        if(server.has("OS-EXT-AZ:availability_zone")){
-            vm.setProviderDataCenterId(server.getString("OS-EXT-AZ:availability_zone"));
-        }
-        else vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
+        vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
         vm.setTerminationTimestamp(-1L);
         if( vm.getProviderVirtualMachineId() == null ) {
             return null;
