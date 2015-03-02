@@ -922,8 +922,8 @@ public class Quantum extends AbstractVLANSupport {
                 }
             }
             Subnet subnet = Subnet.getInstance(vlan.getProviderOwnerId(), vlan.getProviderRegionId(), vlan.getProviderVlanId(), subnetId, SubnetState.AVAILABLE, name, description, cidr).supportingTraffic(traffic);
-            //Iterable<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(vlan.getProviderRegionId());
-            //subnet.constrainedToDataCenter(dc.iterator().next().getProviderDataCenterId());
+            Iterable<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(vlan.getProviderRegionId());
+            subnet.constrainedToDataCenter(dc.iterator().next().getProviderDataCenterId());
 
             if( json.has("allocation_pools") ) {
                 JSONArray p = json.getJSONArray("allocation_pools");
@@ -995,9 +995,9 @@ public class Quantum extends AbstractVLANSupport {
             v.setProviderOwnerId(getTenantId());
             v.setCurrentState(VLANState.AVAILABLE);
             v.setProviderRegionId(getContext().getRegionId());
-            //Collection<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(getContext().getRegionId());
-            //v.setProviderDataCenterId(dc.iterator().next().getProviderDataCenterId());
-            v.setVisibleScope(VisibleScope.ACCOUNT_REGION);
+            Collection<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(getContext().getRegionId());
+            v.setProviderDataCenterId(dc.iterator().next().getProviderDataCenterId());
+            //v.setVisibleScope(VisibleScope.ACCOUNT_REGION);
 
             if( network.has("id") ) {
                 v.setProviderVlanId(network.getString("id"));
