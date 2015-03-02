@@ -19,35 +19,21 @@
 
 package org.dasein.cloud.openstack.nova.os;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.dc.*;
 import org.dasein.cloud.util.APITrace;
-import org.dasein.cloud.util.Cache;
-import org.dasein.cloud.util.CacheLevel;
-import org.dasein.util.uom.time.Day;
-import org.dasein.util.uom.time.Minute;
-import org.dasein.util.uom.time.TimePeriod;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 public class NovaLocationServices implements DataCenterServices {
     private NovaOpenStack provider;
-    
+
     public NovaLocationServices(NovaOpenStack provider) { this.provider = provider; }
 
     private transient volatile NovaLocationCapabilities capabilities;
@@ -65,12 +51,12 @@ public class NovaLocationServices implements DataCenterServices {
         APITrace.begin(provider, "DC.getDataCenter");
         try {
             ProviderContext ctx = provider.getContext();
-            
+
             if( ctx == null ) {
                 throw new CloudException("No context exists for this request");
             }
             String regionId = ctx.getRegionId();
-            
+
             if( regionId == null ) {
                 throw new CloudException("No region is known for zones request");
             }
@@ -112,72 +98,23 @@ public class NovaLocationServices implements DataCenterServices {
         }
     }
 
-    private @Nonnull Collection<String> getDCNamesFromHosts() {
-        try {
-            Map<String, String> names = new HashMap<String, String>();
-            NovaMethod method = new NovaMethod(provider);
-            JSONObject hosts = method.getResource("compute", "/os-hosts", null, false);
-            if( hosts == null || !hosts.has("hosts") ) {
-                return null;
-            }
-            JSONArray objs = hosts.getJSONArray("hosts");
-            for( int i=0; i < objs.length(); i++ ) {
-                JSONObject host = objs.getJSONObject(i);
-                String az = host.getString("zone");
-                if( az == null || az.isEmpty() || "internal".equalsIgnoreCase(az) ) {
-                    continue;
-                }
-                names.put(az, az);
-            }
-            return names.values();
-        }
-        catch( Exception ex ) {
-            //The user likely has too few permissions to request aggregates
-        }
-        return Collections.emptyList();
-    }
-
-    private DataCenter constructDataCenter(String name, String providerRegionId) {
-        DataCenter dc = new DataCenter();
-        dc.setActive(true);
-        dc.setAvailable(true);
-        dc.setName(name);
-        dc.setProviderDataCenterId(name);
-        dc.setRegionId(providerRegionId);
-        return dc;
-    }
-
     @Override
     public Collection<DataCenter> listDataCenters(String providerRegionId) throws InternalException, CloudException {
         APITrace.begin(provider, "DC.listDataCenters");
         try {
-            Cache<DataCenter> cache = Cache.getInstance(provider, "datacenters", DataCenter.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(10, TimePeriod.MINUTE));
-            Iterable<DataCenter> cached = cache.get(provider.getContext());
-            List<DataCenter> dataCenters = new ArrayList<DataCenter>();
-            if( cached != null && cached.iterator().hasNext() ) {
-                Iterator<DataCenter> it = cached.iterator();
-                while( it.hasNext() ) {
-                    dataCenters.add(it.next());
-                }
-                return dataCenters;
-            }
-
             Region region = getRegion(providerRegionId);
+
             if( region == null ) {
                 throw new CloudException("No such region: " + providerRegionId);
             }
-            // let's look in the hosts
-            for( String hostZone : getDCNamesFromHosts() ) {
-                dataCenters.add(constructDataCenter(hostZone, providerRegionId));
-            }
-            if( !dataCenters.isEmpty() ) {
-                cache.put(provider.getContext(), dataCenters);
-                return dataCenters;
-            }
-            // if failed to get from the hosts, fallback to "<region>-a"
-            dataCenters.add(constructDataCenter(providerRegionId+"-a", providerRegionId));
-            cache.put(provider.getContext(), dataCenters);
-            return dataCenters;
+            DataCenter dc = new DataCenter();
+
+            dc.setActive(true);
+            dc.setAvailable(true);
+            dc.setName(region.getProviderRegionId() + "-a");
+            dc.setProviderDataCenterId(region.getProviderRegionId() + "-a");
+            dc.setRegionId(providerRegionId);
+            return Collections.singletonList(dc);
         }
         finally {
             APITrace.end();
@@ -189,7 +126,7 @@ public class NovaLocationServices implements DataCenterServices {
         APITrace.begin(provider, "DC.listRegions");
         try {
             AuthenticationContext ctx = provider.getAuthenticationContext();
-            
+
             return ctx.listRegions();
         }
         finally {
@@ -198,7 +135,7 @@ public class NovaLocationServices implements DataCenterServices {
     }
 
     @Override
-    public Collection<ResourcePool> listResourcePools(String providerDataCenterId) throws InternalException, CloudException {
+    public @Nonnull Collection<ResourcePool> listResourcePools(String providerDataCenterId) throws InternalException, CloudException {
         return Collections.emptyList();
     }
 
@@ -208,25 +145,22 @@ public class NovaLocationServices implements DataCenterServices {
     }
 
     @Override
-    public Collection<StoragePool> listStoragePools() throws InternalException, CloudException {
+    public @Nonnull Collection<StoragePool> listStoragePools() throws InternalException, CloudException {
         return Collections.emptyList();
     }
 
-    @Nonnull
     @Override
-    public StoragePool getStoragePool(String providerStoragePoolId) throws InternalException, CloudException {
+    public @Nonnull StoragePool getStoragePool(String providerStoragePoolId) throws InternalException, CloudException {
         return null;
     }
 
-    @Nonnull
     @Override
-    public Collection<Folder> listVMFolders() throws InternalException, CloudException {
+    public @Nonnull Collection<Folder> listVMFolders() throws InternalException, CloudException {
         return Collections.emptyList();
     }
 
-    @Nonnull
     @Override
-    public Folder getVMFolder(String providerVMFolderId) throws InternalException, CloudException {
+    public @Nonnull Folder getVMFolder(String providerVMFolderId) throws InternalException, CloudException {
         return null;
     }
 }
