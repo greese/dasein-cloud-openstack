@@ -995,7 +995,8 @@ public class Quantum extends AbstractVLANSupport {
             v.setProviderOwnerId(getTenantId());
             v.setCurrentState(VLANState.AVAILABLE);
             v.setProviderRegionId(getContext().getRegionId());
-            Collection<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(getContext().getRegionId());
+            // FIXME: either pick a correct AZ from network or not set at all
+            Iterable<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(getContext().getRegionId());
             v.setProviderDataCenterId(dc.iterator().next().getProviderDataCenterId());
             //v.setVisibleScope(VisibleScope.ACCOUNT_REGION);
 
