@@ -416,7 +416,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
 
         }
         finally {
-            if( portId != null && (vm == null || vm.getCurrentState().equals(VmState.ERROR))) { //if launch fails or instance in error state - remove port
+            if( portId != null && (vm == null || VmState.ERROR.equals(vm.getCurrentState())) ) { //if launch fails or instance in error state - remove port
                 Quantum quantum = getProvider().getNetworkServices().getVlanSupport();
                 if( quantum != null ) {
                     quantum.removePort(portId);
