@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc.
+ * Copyright (C) 2009-2015 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -74,6 +74,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -95,7 +96,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     }
 
     private @Nonnull String getTenantId() throws CloudException, InternalException {
-        return ((NovaOpenStack)getProvider()).getContext().getAccountNumber();
+        return getProvider().getContext().getAccountNumber();
     }
 
     private transient volatile NovaServerCapabilities capabilities;
@@ -117,11 +118,11 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             if( vm == null ) {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
-            HashMap<String,Object> json = new HashMap<String,Object>();
+            Map<String,Object> json = new HashMap<String,Object>();
 
             json.put("os-getConsoleOutput", new HashMap<String,Object>());
 
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
 
             String console = method.postServersForString("/servers", vmId, new JSONObject(json), true);
 
@@ -152,7 +153,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     public @Nullable VirtualMachine getVirtualMachine(@Nonnull String vmId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.getVirtualMachine");
         try {
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject ob = method.getServers("/servers", vmId, true);
 
             if( ob == null ) {
@@ -232,7 +233,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             try{
                 String lparMetadataKey = "hypervisor_type";
                 String lparMetadataValue = "Hitachi";
-                NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+                NovaMethod method = new NovaMethod(getProvider());
                 JSONObject ob = method.getServers("/images/" + options.getMachineImageId() + "/metadata", lparMetadataKey, false);
                 if(ob.has("metadata")){
                     JSONObject metadata = ob.getJSONObject("metadata");
@@ -247,9 +248,9 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             if( targetImage == null ) {
                 throw new CloudException("No such machine image: " + options.getMachineImageId());
             }
-            HashMap<String,Object> wrapper = new HashMap<String,Object>();
-            HashMap<String,Object> json = new HashMap<String,Object>();
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            Map<String,Object> wrapper = new HashMap<String,Object>();
+            Map<String,Object> json = new HashMap<String,Object>();
+            NovaMethod method = new NovaMethod(getProvider());
 
             json.put("name", options.getHostName());
             if( options.getUserData() != null ) {
@@ -260,7 +261,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                     throw new InternalException(e);
                 }
             }
-            if( ((NovaOpenStack)getProvider()).getMinorVersion() == 0 && ((NovaOpenStack)getProvider()).getMajorVersion() == 1 ) {
+            if( getProvider().getMinorVersion() == 0 && getProvider().getMajorVersion() == 1 ) {
                 json.put("imageId", String.valueOf(options.getMachineImageId()));
                 json.put("flavorId", options.getStandardProductId());
             }
@@ -269,29 +270,29 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                     json.put("imageRef", options.getMachineImageId());
                 }
                 else {
-                    json.put("imageRef", ((NovaOpenStack)getProvider()).getComputeServices().getImageSupport().getImageRef(options.getMachineImageId()));
+                    json.put("imageRef", getProvider().getComputeServices().getImageSupport().getImageRef(options.getMachineImageId()));
                 }
                 json.put("flavorRef", getFlavorRef(options.getStandardProductId()));
             }
 
-            if( options.getVlanId() != null && ((NovaOpenStack)getProvider()).isRackspace() ) {
-                ArrayList<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
-                HashMap<String,Object> vlan = new HashMap<String, Object>();
+            if( options.getVlanId() != null && getProvider().isRackspace() ) {
+                List<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
+                Map<String,Object> vlan = new HashMap<String, Object>();
 
                 vlan.put("uuid", options.getVlanId());
                 vlans.add(vlan);
                 json.put("networks", vlans);
             }
             else {
-                if( options.getSubnetId() != null && !((NovaOpenStack)getProvider()).isRackspace() ) {
-                    NovaNetworkServices services = ((NovaOpenStack)getProvider()).getNetworkServices();
+                if( options.getSubnetId() != null && !getProvider().isRackspace() ) {
+                    NovaNetworkServices services = getProvider().getNetworkServices();
 
                     if( services != null ) {
                         Quantum support = services.getVlanSupport();
 
                         if( support != null ) {
-                            ArrayList<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
-                            HashMap<String,Object> vlan = new HashMap<String, Object>();
+                            List<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
+                            Map<String,Object> vlan = new HashMap<String, Object>();
 
                             try {
                                 portId = support.createPort(options.getSubnetId(), options.getHostName(), options.getFirewallIds());
@@ -320,7 +321,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 json.put("key_name", options.getBootstrapKey());
             }
             if( options.getFirewallIds().length > 0 ) {
-                ArrayList<HashMap<String,Object>> firewalls = new ArrayList<HashMap<String,Object>>();
+                List<Map<String,Object>> firewalls = new ArrayList<Map<String,Object>>();
 
                 for( String id : options.getFirewallIds() ) {
                     NetworkServices services = getProvider().getNetworkServices();
@@ -334,7 +335,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                         }
                     }
                     if( firewall != null ) {
-                        HashMap<String,Object> fw = new HashMap<String, Object>();
+                        Map<String,Object> fw = new HashMap<String, Object>();
 
                         fw.put("name", firewall.getName());
                         firewalls.add(fw);
@@ -343,15 +344,17 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 json.put("security_groups", firewalls);
             }
 
-            if(isBareMetal){
-                HashMap<String, String> blockDeviceMapping = new HashMap<String, String>();
+            if( isBareMetal ) {
+                Map<String, String> blockDeviceMapping = new HashMap<String, String>();
                 //blockDeviceMapping.put("device_name", "/dev/sdb1");
                 blockDeviceMapping.put("boot_index", "0");
                 blockDeviceMapping.put("uuid", getProvider().getComputeServices().getImageSupport().getImageRef(options.getMachineImageId()));
                 //blockDeviceMapping.put("guest_format", "ephemeral");
                 String volumeSize = "";
-                if(targetImage.getTag("minDisk") != null) volumeSize = (String)targetImage.getTag("minDisk");
-                else{
+                if( targetImage.getTag("minDisk") != null ) {
+                    volumeSize = (String)targetImage.getTag("minDisk");
+                }
+                else {
                     String minSize = (String)targetImage.getTag("minSize");
                     volumeSize = roundUpToGB(Long.valueOf(minSize)) + "";
                 }
@@ -445,7 +448,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                     firewalls = Collections.emptyList();
                 }
                 JSONArray groups = server.getJSONArray("security_groups");
-                ArrayList<String> results = new ArrayList<String>();
+                List<String> results = new ArrayList<String>();
 
                 for( int i=0; i<groups.length(); i++ ) {
                     JSONObject group = groups.getJSONObject(i);
@@ -468,9 +471,9 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 return results;
             }
             else {
-                ArrayList<String> results = new ArrayList<String>();
+                List<String> results = new ArrayList<String>();
 
-                NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+                NovaMethod method = new NovaMethod(getProvider());
                 JSONObject ob = method.getServers("/os-security-groups/servers", vmId + "/os-security-groups", true);
 
                 if( ob != null ) {
@@ -499,7 +502,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     public @Nonnull Iterable<String> listFirewalls(@Nonnull String vmId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.listFirewalls");
         try {
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject ob = method.getServers("/servers", vmId, true);
 
             if( ob == null ) {
@@ -541,9 +544,9 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 return refs;
             }
 
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject ob = method.getServers("/flavors", null, true);
-            ArrayList<FlavorRef> flavors = new ArrayList<FlavorRef>();
+            List<FlavorRef> flavors = new ArrayList<FlavorRef>();
 
             try {
                 if( ob != null && ob.has("flavors") ) {
@@ -624,7 +627,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         }
         APITrace.begin(getProvider(), "VM.listProducts");
         try {
-            ArrayList<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();
+            List<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();
 
             for( FlavorRef flavor : listFlavors() ) {
                 if (options != null) {
@@ -647,9 +650,9 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     public @Nonnull Iterable<ResourceStatus> listVirtualMachineStatus() throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.listVirtualMachineStatus");
         try {
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject ob = method.getServers("/servers", null, true);
-            ArrayList<ResourceStatus> servers = new ArrayList<ResourceStatus>();
+            List<ResourceStatus> servers = new ArrayList<ResourceStatus>();
 
             try {
                 if( ob != null && ob.has("servers") ) {
@@ -681,9 +684,9 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     public @Nonnull Iterable<VirtualMachine> listVirtualMachines() throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.listVirtualMachines");
         try {
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject ob = method.getServers("/servers", null, true);
-            ArrayList<VirtualMachine> servers = new ArrayList<VirtualMachine>();
+            List<VirtualMachine> servers = new ArrayList<VirtualMachine>();
 
             Iterable<IpAddress> ipv4 = Collections.emptyList(), ipv6 = Collections.emptyList();
             Iterable<VLAN> nets = Collections.emptyList();
@@ -738,14 +741,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             if( vm == null ) {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
-            if( !supportsPauseUnpause(vm) ) {
+            if( !getCapabilities().supportsPause() ) {
                 throw new OperationNotSupportedException("Pause/unpause is not supported in " + getProvider().getCloudName());
             }
-            HashMap<String,Object> json = new HashMap<String,Object>();
+            Map<String,Object> json = new HashMap<String,Object>();
 
             json.put("pause", null);
 
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
@@ -763,14 +766,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             if( vm == null ) {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
-            if( !supportsSuspendResume(vm) ) {
+            if( !getCapabilities().supportsResume() ) {
                 throw new OperationNotSupportedException("Suspend/resume is not supported in " + getProvider().getCloudName());
             }
-            HashMap<String,Object> json = new HashMap<String,Object>();
+            Map<String,Object> json = new HashMap<String,Object>();
 
             json.put("resume", null);
 
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
@@ -788,14 +791,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             if( vm == null ) {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
-            if( !supportsStartStop(vm) ) {
+            if( !getCapabilities().supportsStart() ) {
                 throw new OperationNotSupportedException("Start/stop is not supported in " + getProvider().getCloudName());
             }
-            HashMap<String,Object> json = new HashMap<String,Object>();
+            Map<String,Object> json = new HashMap<String,Object>();
 
             json.put("os-start", null);
 
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
@@ -813,14 +816,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             if( vm == null ) {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
-            if( !supportsStartStop(vm) ) {
+            if( !getCapabilities().supportsStop() ) {
                 throw new OperationNotSupportedException("Start/stop is not supported in " + getProvider().getCloudName());
             }
-            HashMap<String,Object> json = new HashMap<String,Object>();
+            Map<String,Object> json = new HashMap<String,Object>();
 
             json.put("os-stop", null);
 
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
@@ -838,14 +841,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             if( vm == null ) {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
-            if( !supportsSuspendResume(vm) ) {
+            if( !getCapabilities().supportsSuspend() ) {
                 throw new OperationNotSupportedException("Suspend/resume is not supported in " + getProvider().getCloudName());
             }
-            HashMap<String,Object> json = new HashMap<String,Object>();
+            Map<String,Object> json = new HashMap<String,Object>();
 
             json.put("suspend", null);
 
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
@@ -863,14 +866,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             if( vm == null ) {
                 throw new CloudException("No such virtual machine: " + vmId);
             }
-            if( !supportsPauseUnpause(vm) ) {
+            if( !getCapabilities().supportsPause() ) {
                 throw new OperationNotSupportedException("Pause/unpause is not supported in " + getProvider().getCloudName());
             }
-            HashMap<String,Object> json = new HashMap<String,Object>();
+            Map<String,Object> json = new HashMap<String,Object>();
 
             json.put("unpause", null);
 
-            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            NovaMethod method = new NovaMethod(getProvider());
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
@@ -883,13 +886,13 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     public void reboot(@Nonnull String vmId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.reboot");
         try {
-            HashMap<String,Object> json = new HashMap<String,Object>();
-            HashMap<String,Object> action = new HashMap<String,Object>();
+            Map<String,Object> json = new HashMap<String,Object>();
+            Map<String,Object> action = new HashMap<String,Object>();
 
             action.put("type", "HARD");
             json.put("reboot", action);
 
-            NovaMethod method = new NovaMethod(((NovaOpenStack)getProvider()));
+            NovaMethod method = new NovaMethod((getProvider()));
 
             method.postServers("/servers", vmId, new JSONObject(json), true);
         }
@@ -1077,7 +1080,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         }
         JSONObject md = (server.has("metadata") && !server.isNull("metadata")) ? server.getJSONObject("metadata") : null;
 
-        HashMap<String,String> map = new HashMap<String,String>();
+        Map<String,String> map = new HashMap<String,String>();
         boolean imaging = false;
 
         if( md != null ) {
@@ -1204,15 +1207,15 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             vm.setCurrentState(VmState.PENDING);
         }
         if( server.has("created") ) {
-            vm.setCreationTimestamp(((NovaOpenStack)getProvider()).parseTimestamp(server.getString("created")));
+            vm.setCreationTimestamp(getProvider().parseTimestamp(server.getString("created")));
         }
         if( server.has("addresses") ) {
             JSONObject addrs = server.getJSONObject("addresses");
             String[] names = JSONObject.getNames(addrs);
 
             if( names != null && names.length > 0 ) {
-                ArrayList<RawAddress> pub = new ArrayList<RawAddress>();
-                ArrayList<RawAddress> priv = new ArrayList<RawAddress>();
+                List<RawAddress> pub = new ArrayList<RawAddress>();
+                List<RawAddress> priv = new ArrayList<RawAddress>();
 
                 for( String name : names ) {
                     JSONArray arr = addrs.getJSONArray(name);
@@ -1221,7 +1224,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                     for( int i=0; i<arr.length(); i++ ) {
                         RawAddress addr = null;
 
-                        if( ((NovaOpenStack)getProvider()).getMinorVersion() == 0 && ((NovaOpenStack)getProvider()).getMajorVersion() == 1 ) {
+                        if( getProvider().getMinorVersion() == 0 && getProvider().getMajorVersion() == 1 ) {
                             addr = new RawAddress(arr.getString(i).trim(), IPVersion.IPV4);
                         }
                         else {
@@ -1317,9 +1320,16 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                     }
                 }
             }
+            // FIXME: code duplication, see below
             vm.setProviderRegionId(getContext().getRegionId());
-            vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
+            if( server.has("OS-EXT-AZ:availability_zone") ) {
+                vm.setProviderDataCenterId(server.getString("OS-EXT-AZ:availability_zone"));
+            }
+            else {
+                vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
+            }
             vm.setTerminationTimestamp(-1L);
+            // FIXME: could we not check this earlier?
             if( vm.getProviderVirtualMachineId() == null ) {
                 return null;
             }
@@ -1333,8 +1343,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             }
         }
         vm.setProviderRegionId(getContext().getRegionId());
-        vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
+        if( server.has("OS-EXT-AZ:availability_zone") ) {
+            vm.setProviderDataCenterId(server.getString("OS-EXT-AZ:availability_zone"));
+        }
+        else {
+            vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
+        }
         vm.setTerminationTimestamp(-1L);
+        // FIXME: could we not check this earlier?
         if( vm.getProviderVirtualMachineId() == null ) {
             return null;
         }

@@ -279,6 +279,11 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
     }
 
     @Override
+    public boolean supportsClientRequestToken() throws InternalException, CloudException {
+        return false;
+    }
+
+    @Override
     public boolean supportsAlterVM() {
         return false;
     }

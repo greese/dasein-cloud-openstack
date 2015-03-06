@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc.
+ * Copyright (C) 2009-2015 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -1182,7 +1182,10 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
             return null;
         }
         try {
-            String[] dataCenterIds = new String[]{getContext().getRegionId() + "-a"};
+            String dc = null;
+            if( json.has("OS-EXT-AZ:availability_zone") ) {
+                dc = json.getString("OS-EXT-AZ:availability_zone");
+            }
             String owner = getTenantId();
             String regionId = getContext().getRegionId();
             String id = (json.has("id") && !json.isNull("id")) ? json.getString("id") : null;
@@ -1322,7 +1325,9 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
             }
             LoadBalancer lb = LoadBalancer.getInstance(owner, regionId, id, state, name, name + " [" + address + "]", LoadBalancerAddressType.IP, address,  ports).createdAt(created);
 
-            lb.operatingIn(dataCenterIds);
+            if( dc != null ) {
+                lb.operatingIn(dc);
+            }
             lb.supportingTraffic(IPVersion.IPV4);
             lb.withListeners(LbListener.getInstance(algorithm, LbPersistence.NONE, protocol, port, privatePort));
             if( !nodes.isEmpty() ) {
