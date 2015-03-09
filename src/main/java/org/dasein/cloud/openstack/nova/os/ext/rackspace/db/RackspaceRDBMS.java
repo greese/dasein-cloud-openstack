@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc.
+ * Copyright (C) 2009-2015 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -685,7 +685,13 @@ public class RackspaceRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenSt
             database.setName(name);
             database.setProductSize(flavor + ":" + size);
             database.setProviderDatabaseId(dbId);
-            database.setProviderDataCenterId(regionId + "-a");
+            // TODO: Test this
+            if( json.has("OS-EXT-AZ:availability_zone") ) {
+                database.setProviderDataCenterId(json.getString("OS-EXT-AZ:availability_zone"));
+            }
+            else {
+                database.setProviderDataCenterId(regionId + "-a");
+            }
             database.setProviderOwnerId(getTenantId());
             database.setProviderRegionId(regionId);
             return database;

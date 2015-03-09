@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc.
+ * Copyright (C) 2009-2015 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -908,7 +908,13 @@ public class HPRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenStack> {
             database.setProductSize(flavor);
             database.setProviderDatabaseId(dbId);
             database.setProviderRegionId(ctx.getRegionId());
-            database.setProviderDataCenterId(regionId + "-a");
+            // TODO: Test this
+            if( json.has("OS-EXT-AZ:availability_zone") ) {
+                database.setProviderDataCenterId(json.getString("OS-EXT-AZ:availability_zone"));
+            }
+            else {
+                database.setProviderDataCenterId(regionId + "-a");
+            }
             database.setProviderOwnerId(getTenantId());
             database.setProviderRegionId(regionId);
             return database;

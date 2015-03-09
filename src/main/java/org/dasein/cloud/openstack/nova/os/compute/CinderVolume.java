@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc.
+ * Copyright (C) 2009-2015 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -119,7 +119,10 @@ public class CinderVolume extends AbstractVolumeSupport {
 
             json.put("display_name", options.getName());
             json.put("display_description", options.getDescription());
-            //if(!options.getDataCenterId().equals(getProvider().getContext().getRegionId() + "-a")) json.put("availability_zone", options.getDataCenterId());
+            if( !options.getDataCenterId()
+                    .equals(getProvider().getContext().getRegionId() + "-a") ) {
+                json.put("availability_zone", options.getDataCenterId());
+            }
 
             Storage<Gigabyte> size = options.getVolumeSize();
 
@@ -539,17 +542,23 @@ public class CinderVolume extends AbstractVolumeSupport {
             return null;
         }
         try {
-            String region = getContext().getRegionId();
-            String dataCenter = region + "-a";
-
             String volumeId = null;
-
             if( json.has("id") ) {
                 volumeId = json.getString("id");
             }
             if( volumeId == null ) {
                 return null;
             }
+
+            String region = getContext().getRegionId();
+            String dataCenter;
+            if( json.has("availability_zone") && json.getString("availability_zone") != null && !json.getString("availability_zone").isEmpty() ) {
+                dataCenter = json.getString("availability_zone");
+            }
+            else {
+                dataCenter = region + "-a";
+            }
+
             String name = (json.has("displayName") ? json.getString("displayName") : null);
 
             if( name == null ) {

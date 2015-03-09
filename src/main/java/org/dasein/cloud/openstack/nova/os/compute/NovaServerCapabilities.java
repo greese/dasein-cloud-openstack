@@ -251,7 +251,7 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
 
     @Override
     public boolean isUserDataSupported() throws CloudException, InternalException {
-        return true;
+        return true; // you can only set userdata in OS, but you can't read.
     }
 
     @Override
@@ -275,6 +275,11 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
 
     @Override
     public boolean supportsSpotVirtualMachines() throws InternalException, CloudException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsClientRequestToken() throws InternalException, CloudException {
         return false;
     }
 
