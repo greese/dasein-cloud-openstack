@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc.
+ * Copyright (C) 2009-2015 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -102,6 +102,11 @@ public class NovaImageCapabilities extends AbstractCapabilities<NovaOpenStack> i
 
         Collections.addAll(values, ImageClass.values());
         return values;
+    }
+
+    @Override
+    public boolean imageCaptureDestroysVM() throws InternalException, CloudException{
+        return false;
     }
 
     @Nonnull

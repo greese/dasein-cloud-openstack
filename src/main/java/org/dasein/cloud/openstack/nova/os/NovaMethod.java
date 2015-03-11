@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc.
+ * Copyright (C) 2009-2015 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -93,12 +93,13 @@ public class NovaMethod extends AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No compute URL has been established in " + context.getMyRegion());
         }
+        String resourceUri = resource;
         if( resourceId != null ) {
-            resource = resource + "/" + resourceId;
+            resourceUri = resource + "/" + resourceId;
         }
 
         try {
-            String response = getString(context.getAuthToken(), endpoint, resource);
+            String response = getString(context.getAuthToken(), endpoint, resourceUri);
 
             if( response == null ) {
                 return null;
@@ -114,7 +115,7 @@ public class NovaMethod extends AbstractMethod {
             if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
                 Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
                 cache.clear();
-                return null; //todo?
+                return getPorts(resource, resourceId);
             }
             else {
                 throw ex;
@@ -129,14 +130,15 @@ public class NovaMethod extends AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No compute URL has been established in " + context.getMyRegion());
         }
+        String resourceUri = resource; // make a copy in case we need to retry with the original resource
         if( resourceId != null ) {
-            resource = resource + "/" + resourceId;
+            resourceUri = resource + "/" + resourceId;
         }
         else if( suffix ) {
-            resource = resource + "/detail";
+            resourceUri = resource + "/detail";
         }
         try {
-            String response = getString(context.getAuthToken(), endpoint, resource);
+            String response = getString(context.getAuthToken(), endpoint, resourceUri);
 
             if( response == null ) {
                 return null;
@@ -167,18 +169,19 @@ public class NovaMethod extends AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No network URL has been established in " + context.getMyRegion());
         }
+        String resourceUri = resource; // make a copy in case we need to retry with the original resource
         if( resourceId != null ) {
-            resource = resource + "/" + resourceId;
+            resourceUri = resource + "/" + resourceId;
         }
         else if( suffix ) {
-            resource = resource + "/detail";
+            resourceUri = resource + "/detail";
         }
 
-        if (resource != null && (!endpoint.endsWith("/") && !resource.startsWith("/"))) {
+        if (resourceUri != null && (!endpoint.endsWith("/") && !resourceUri.startsWith("/"))) {
             endpoint = endpoint+"/";
         }
         try {
-            String response = getString(context.getAuthToken(), endpoint, resource);
+            String response = getString(context.getAuthToken(), endpoint, resourceUri);
 
             if( response == null ) {
                 return null;
@@ -205,8 +208,9 @@ public class NovaMethod extends AbstractMethod {
     public @Nullable String postServersForString(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
 
+        String resourceUri = resource;
         if( resourceId != null ) {
-            resource = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
+            resourceUri = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
         }
         String computeEndpoint = context.getComputeUrl();
 
@@ -214,7 +218,7 @@ public class NovaMethod extends AbstractMethod {
             throw new CloudException("No compute endpoint exists");
         }
         try {
-            return postString(context.getAuthToken(), computeEndpoint, resource, body.toString());
+            return postString(context.getAuthToken(), computeEndpoint, resourceUri, body.toString());
         }
         catch (NovaException ex) {
             if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
@@ -231,8 +235,9 @@ public class NovaMethod extends AbstractMethod {
     public @Nullable JSONObject postServers(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
 
+        String resourceUri = resource;
         if( resourceId != null ) {
-            resource = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
+            resourceUri = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
         }
         String computeEndpoint = context.getComputeUrl();
 
@@ -240,7 +245,7 @@ public class NovaMethod extends AbstractMethod {
             throw new CloudException("No compute endpoint exists");
         }
         try {
-            String response = postString(context.getAuthToken(), computeEndpoint, resource, body.toString());
+            String response = postString(context.getAuthToken(), computeEndpoint, resourceUri, body.toString());
         
             if( response == null ) {
                 return null;
@@ -267,8 +272,9 @@ public class NovaMethod extends AbstractMethod {
     public @Nullable JSONObject postNetworks(@Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
 
+        String resourceUri = resource;
         if( resourceId != null ) {
-            resource = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
+            resourceUri = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
         }
         String endpoint = context.getNetworkUrl();
 
@@ -276,11 +282,11 @@ public class NovaMethod extends AbstractMethod {
             throw new CloudException("No network endpoint exists");
         }
 
-        if (resource != null && (!endpoint.endsWith("/") && !resource.startsWith("/"))) {
+        if (resourceUri != null && (!endpoint.endsWith("/") && !resourceUri.startsWith("/"))) {
             endpoint = endpoint+"/";
         }
         try {
-            String response = postString(context.getAuthToken(), endpoint, resource, body.toString());
+            String response = postString(context.getAuthToken(), endpoint, resourceUri, body.toString());
 
             if( response == null ) {
                 return null;

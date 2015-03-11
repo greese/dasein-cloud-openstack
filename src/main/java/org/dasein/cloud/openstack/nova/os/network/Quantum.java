@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc.
+ * Copyright (C) 2009-2015 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -258,18 +258,64 @@ public class Quantum extends AbstractVLANSupport {
             APITrace.end();
         }
     }
+    private @Nonnull Iterable<String> listPortsBySubnetId(@Nonnull String subnetId) throws CloudException, InternalException {
+        APITrace.begin(getProvider(), "VLAN.listPorts");
+        try {
+            NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
+            Subnet subnet = getSubnet(subnetId);
 
-    public @Nonnull Iterable<String> listPorts(@Nonnull String vlanId) throws CloudException, InternalException {
+            JSONObject result = null;
+            if (getNetworkType().equals(QuantumType.QUANTUM) ) {
+                result = method.getNetworks(getPortResource() + "?network_id=" + subnet.getProviderVlanId() + "&fields=id&fields=fixed_ips", null, false);
+            }
+            else {
+                result = method.getServers(getNetworkResource() + "/" + subnet.getProviderVlanId() + "/ports", null, false);
+            }
+            if( result != null && result.has("ports") ) {
+                List<String> portIds = new ArrayList<String>();
+                try {
+                    JSONArray ports = result.getJSONArray("ports");
+                    for( int i = 0; i < ports.length(); i++ ) {
+                        JSONObject port = ports.getJSONObject(i);
+                        boolean subnetFound = false;
+                        if( port.has("fixed_ips")){
+                            JSONArray ips = port.getJSONArray("fixed_ips");
+                            for( int j = 0; j < ips.length(); j++ ) {
+                                JSONObject fixedIp = ips.getJSONObject(j);
+                                if( fixedIp.has("subnet_id") && ( subnetId.equals(fixedIp.getString("subnet_id")) ) ) {
+                                    subnetFound = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if( port.has("id") && subnetFound ) {
+                            portIds.add(port.getString("id"));
+                        }
+                    }
+                } catch (JSONException e) {
+                    logger.error("Unable to understand listPorts response: " + e.getMessage());
+                    throw new CloudException(e);
+                }
+                return portIds;
+            }
+            return Collections.EMPTY_LIST;
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    private @Nonnull Iterable<String> listPortsByNetworkId(@Nonnull String vlanId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VLAN.listPorts");
         try {
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             JSONObject result = null;
             if (getNetworkType().equals(QuantumType.QUANTUM) ) {
-                result = method.getNetworks(getPortResource() + "?network_id="+vlanId/*vm.getProviderVirtualMachineId()*/+"&fields=id", null, false);
+                result = method.getNetworks(getPortResource() + "?network_id=" + vlanId + "&fields=id", null, false);
             }
             else {
-                result = method.getServers(getNetworkResource() + "/" + vlanId/*vm.getProviderVlanId()*/ + "/ports", null, false);
+                result = method.getServers(getNetworkResource() + "/" + vlanId + "/ports", null, false);
             }
             if( result != null && result.has("ports") ) {
                 List<String> portIds = new ArrayList<String>();
@@ -793,6 +839,10 @@ public class Quantum extends AbstractVLANSupport {
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             if (getNetworkType().equals(QuantumType.QUANTUM) ) {
+                Iterable<String> portIds = listPortsBySubnetId(subnetId);
+                for (String portId : portIds) {
+                    removePort(portId);
+                }
                 method.deleteNetworks(getSubnetResource(), subnetId);
             }
             else {
@@ -811,7 +861,7 @@ public class Quantum extends AbstractVLANSupport {
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
 
             if (getNetworkType().equals(QuantumType.QUANTUM) ) {
-                Iterable<String> portIds = listPorts(vlanId);
+                Iterable<String> portIds = listPortsByNetworkId(vlanId);
                 for (String portId : portIds) {
                     removePort(portId);
                 }
@@ -922,8 +972,9 @@ public class Quantum extends AbstractVLANSupport {
                 }
             }
             Subnet subnet = Subnet.getInstance(vlan.getProviderOwnerId(), vlan.getProviderRegionId(), vlan.getProviderVlanId(), subnetId, SubnetState.AVAILABLE, name, description, cidr).supportingTraffic(traffic);
-            Collection<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(vlan.getProviderRegionId());
-            subnet.constrainedToDataCenter(dc.iterator().next().getProviderDataCenterId());
+            // FIXME: REMOVE: subnets are not constrained to a dc in openstack
+            //            Iterable<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(vlan.getProviderRegionId());
+            //            subnet.constrainedToDataCenter(dc.iterator().next().getProviderDataCenterId());
 
             if( json.has("allocation_pools") ) {
                 JSONArray p = json.getJSONArray("allocation_pools");
@@ -995,9 +1046,10 @@ public class Quantum extends AbstractVLANSupport {
             v.setProviderOwnerId(getTenantId());
             v.setCurrentState(VLANState.AVAILABLE);
             v.setProviderRegionId(getContext().getRegionId());
-            Collection<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(getContext().getRegionId());
-            v.setProviderDataCenterId(dc.iterator().next().getProviderDataCenterId());
-            //v.setVisibleScope(VisibleScope.ACCOUNT_REGION);
+            // FIXME: REMOVE: vlans are not constrained to a DC in openstack
+            //            Iterable<DataCenter> dc = getProvider().getDataCenterServices().listDataCenters(getContext().getRegionId());
+            //            v.setProviderDataCenterId(dc.iterator().next().getProviderDataCenterId());
+            v.setVisibleScope(VisibleScope.ACCOUNT_REGION);
 
             if( network.has("id") ) {
                 v.setProviderVlanId(network.getString("id"));

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc.
+ * Copyright (C) 2009-2015 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -251,7 +251,7 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
 
     @Override
     public boolean isUserDataSupported() throws CloudException, InternalException {
-        return true;
+        return true; // you can only set userdata in OS, but you can't read.
     }
 
     @Override
@@ -275,6 +275,21 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
 
     @Override
     public boolean supportsSpotVirtualMachines() throws InternalException, CloudException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsClientRequestToken() throws InternalException, CloudException {
+        return false;
+    }
+
+    @Override
+    public boolean supportsCloudStoredShellKey() throws InternalException, CloudException{
+        return false;
+    }
+
+    @Override
+    public boolean isVMProductDCConstrained() throws InternalException, CloudException{
         return false;
     }
 

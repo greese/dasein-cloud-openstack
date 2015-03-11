@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2009-2014 Dell, Inc.
+ * Copyright (C) 2009-2015 Dell, Inc.
  * See annotations for authorship information
  *
  * ====================================================================
@@ -1486,17 +1486,18 @@ public abstract class AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No " + service + " URL has been established in " + context.getMyRegion());
         }
+        String resourceUri = resource;
         if( resource == null && resourceId == null ) {
-            resource = "/";
+            resourceUri = "/";
         }
         else if( resource == null ) {
-            resource = "/" + resourceId;
+            resourceUri = "/" + resourceId;
         }
         else if( resourceId != null ) {
-            resource = resource + "/" + resourceId;
+            resourceUri = resource + "/" + resourceId;
         }
         try {
-            return head(context.getAuthToken(), endpoint, resource);
+            return head(context.getAuthToken(), endpoint, resourceUri);
         }
         catch (NovaException ex) {
             if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
@@ -1839,8 +1840,9 @@ public abstract class AbstractMethod {
     public @Nullable JSONObject postString(@Nonnull String service, @Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
 
+        String resourceUri = resource;
         if( resourceId != null ) {
-            resource = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
+            resourceUri = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
         }
         String endpoint = context.getServiceUrl(service);
 
@@ -1848,7 +1850,7 @@ public abstract class AbstractMethod {
             throw new CloudException("No " + service + " endpoint exists");
         }
         try {
-            String response = postString(context.getAuthToken(), endpoint, resource, body.toString());
+            String response = postString(context.getAuthToken(), endpoint, resourceUri, body.toString());
             if( response == null ) {
                 return null;
             }
@@ -2198,17 +2200,18 @@ public abstract class AbstractMethod {
         if( endpoint == null ) {
             throw new CloudException("No " + service + " has been established in " + context.getMyRegion());
         }
+        String resourceUri = resource;
         if( resource == null && resourceId == null ) {
-            resource = "/";
+            resourceUri = "/";
         }
         else if( resource == null ) {
-            resource = "/" + resourceId;
+            resourceUri = "/" + resourceId;
         }
         else if( resourceId != null ) {
-            resource = resource + "/" + resourceId;
+            resourceUri = resource + "/" + resourceId;
         }
         try {
-            putHeaders(context.getAuthToken(), endpoint, resource, headers);
+            putHeaders(context.getAuthToken(), endpoint, resourceUri, headers);
         }
         catch (NovaException ex) {
             if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
