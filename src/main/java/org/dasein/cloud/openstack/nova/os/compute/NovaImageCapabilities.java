@@ -104,6 +104,11 @@ public class NovaImageCapabilities extends AbstractCapabilities<NovaOpenStack> i
         return values;
     }
 
+    @Override
+    public boolean imageCaptureDestroysVM() throws InternalException, CloudException{
+        return false;
+    }
+
     @Nonnull
     @Override
     public Iterable<MachineImageType> listSupportedImageTypes() throws CloudException, InternalException {
