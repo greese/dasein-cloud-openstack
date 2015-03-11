@@ -147,7 +147,7 @@
                         <exclude>**/LICENSE-APACHE.txt</exclude>
                     </excludes>
                     <properties>
-                        <year>2009-2014</year>
+                        <year>2009-2015</year>
                         <copyrightHolder>Dell, Inc.</copyrightHolder>
                     </properties>
                 </configuration>
@@ -213,9 +213,9 @@
                             <value>${regionId}</value>
                         </property>
                     </systemProperties>
-                    <includes>
-                        <include>**/TestSuite.java</include>
-                    </includes>
+                    <excludes>
+                        <exclude>**/TestSuite.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
             <plugin>
