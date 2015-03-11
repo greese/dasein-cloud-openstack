@@ -1,9 +1,8 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.dasein</groupId>
     <artifactId>dasein-cloud-openstack</artifactId>
-    <version>2015.03.1-SNAPSHOT</version>
+    <version>2015.03.1</version>
     <name>Dasein Cloud Nova</name>
     <description>Dasein Cloud implementation for the OpenStack APIs</description>
 
@@ -126,7 +125,7 @@
                         <link>http://www.dasein.org/api/dasein-utils/</link>
                     </links>
                     <stylesheetfile>dasein-javadoc.css</stylesheetfile>
-                    <footer/>
+                    <footer />
                 </configuration>
             </plugin>
             <plugin>
