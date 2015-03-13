@@ -19,6 +19,7 @@
 
 package org.dasein.cloud.openstack.nova.os.network;
 
+import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.log4j.Logger;
 import org.dasein.cloud.*;
@@ -823,6 +824,14 @@ public class Quantum extends AbstractVLANSupport {
             }
             NovaMethod method = new NovaMethod((NovaOpenStack)getProvider());
             method.deleteNetworks(getPortResource(), portId+".json");
+        }
+        catch( CloudException e ) {
+            if( e.getHttpCode() == HttpStatus.SC_NOT_FOUND ) {
+                logger.warn("Error while deleting port ["+portId+"], but it is probably fine");
+            }
+            else {
+                throw e;
+            }
         }
         finally {
             APITrace.end();
