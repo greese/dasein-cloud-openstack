@@ -21,12 +21,15 @@ package org.dasein.cloud.openstack.nova.os;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.http.HttpStatus;
+import org.apache.log4j.Logger;
 import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
 import org.dasein.util.uom.time.Day;
@@ -36,6 +39,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class SwiftMethod extends AbstractMethod {
+    static private final Logger logger = NovaOpenStack.getLogger(SwiftMethod.class, "std");
     public SwiftMethod(NovaOpenStack provider) { super(provider); }
         
     public void delete(@Nonnull String bucket) throws CloudException, InternalException {
@@ -234,5 +238,32 @@ public class SwiftMethod extends AbstractMethod {
                 throw ex;
             }
         }
+    }
+    
+    public void put(@Nonnull String bucket, @Nonnull String prefix, @Nonnull Tag ... tags) throws CloudException, InternalException {
+    	AuthenticationContext context = provider.getAuthenticationContext();
+    	String endpoint = context.getStorageUrl();
+
+    	if( endpoint == null ) {
+    		throw new CloudException("No storage endpoint exists for " + context.getMyRegion());
+    	}
+    	try {
+    		HashMap<String,String> customHeaders = new HashMap<String,String>();
+    		for (int i = 0; i < tags.length ; i++ ) {	
+    			customHeaders.put(prefix + tags[i].getKey(), tags[i].getValue() != null ? tags[i].getValue() : "");
+    		}
+    		putHeaders(context.getAuthToken(), endpoint, "/" + bucket, customHeaders);
+    		head( context.getAuthToken(), endpoint, "/" + bucket);
+    	}
+    	catch (NovaException ex) {
+    		if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+    			Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+    			cache.clear();
+    			put(bucket, prefix, tags);
+    		}
+    		else {
+    			logger.error("Error while updating the tags for bucket - " + bucket + ": " + ex.getMessage());
+    		}
+    	}
     }
 }
