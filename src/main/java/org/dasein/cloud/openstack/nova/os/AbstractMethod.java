@@ -958,7 +958,7 @@ public abstract class AbstractMethod {
             int code = response.getStatusLine().getStatusCode();
 
             std.debug("HTTP STATUS: " + code);
-            if( code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_OK) {
+            if( code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_OK ) {
                 std.error("delete(): Expected NO CONTENT for DELETE request, got " + code);
                 String data = null;
 
@@ -2444,7 +2444,7 @@ public abstract class AbstractMethod {
 
             std.debug("HTTP STATUS: " + code);
 
-            if( code != HttpStatus.SC_CREATED && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_OK) {
+            if( code != HttpStatus.SC_CREATED && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_OK ) {
                 std.error("putString(): Expected CREATED, ACCEPTED, or NO CONTENT for put request, got " + code);
                 String data = null;
 

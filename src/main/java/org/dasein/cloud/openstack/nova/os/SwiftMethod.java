@@ -253,7 +253,6 @@ public class SwiftMethod extends AbstractMethod {
     			customHeaders.put(prefix + tags[i].getKey(), tags[i].getValue() != null ? tags[i].getValue() : "");
     		}
     		putHeaders(context.getAuthToken(), endpoint, "/" + bucket, customHeaders);
-    		head( context.getAuthToken(), endpoint, "/" + bucket);
     	}
     	catch (NovaException ex) {
     		if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
