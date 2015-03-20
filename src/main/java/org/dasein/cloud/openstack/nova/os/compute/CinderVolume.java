@@ -26,6 +26,7 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractVolumeSupport;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
@@ -694,5 +695,59 @@ public class CinderVolume extends AbstractVolumeSupport {
         catch( JSONException e ) {
             throw new CloudException(e);
         }
+    }
+    
+    @Override
+    public void setTags(@Nonnull String volumeId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Volume.setTags");
+    	try {
+    		((NovaOpenStack) getProvider()).createTags( SERVICE, "/volumes", volumeId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void setTags(@Nonnull String[] volumeIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : volumeIds ) {
+    		setTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String volumeId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Volume.updateTags");
+    	try {
+    		((NovaOpenStack) getProvider()).updateTags( SERVICE, "/volumes", volumeId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String[] volumeIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : volumeIds ) {
+    		updateTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String volumeId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Volume.removeTags");
+    	try {
+    		((NovaOpenStack) getProvider()).removeTags( SERVICE, "/volumes", volumeId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String[] volumeIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : volumeIds ) {
+    		removeTags(id, tags);
+    	}
     }
 }

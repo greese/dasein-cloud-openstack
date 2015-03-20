@@ -28,6 +28,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.MachineImage;
@@ -1398,4 +1399,57 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         return vm;
     }
 
+    @Override
+    public void setTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Server.setTags");
+    	try {
+    		getProvider().createTags( SERVICE, "/servers", vmId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void setTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		setTags(id, tags);
+    	}
+    }
+
+    @Override
+    public void updateTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Server.updateTags");
+    	try {
+    		getProvider().updateTags( SERVICE, "/servers", vmId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void updateTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		updateTags(id, tags);
+    	}
+    }
+
+    @Override
+    public void removeTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Server.removeTags");
+    	try {
+    		getProvider().removeTags( SERVICE, "/servers", vmId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void removeTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		removeTags(id, tags);
+    	}
+    }
 }
