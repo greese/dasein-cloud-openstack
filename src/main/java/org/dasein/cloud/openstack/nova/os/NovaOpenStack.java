@@ -22,6 +22,8 @@ package org.dasein.cloud.openstack.nova.os;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 
@@ -37,6 +39,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.ContextRequirements;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.openstack.nova.os.compute.NovaComputeServices;
 import org.dasein.cloud.openstack.nova.os.ext.hp.HPPlatformServices;
 import org.dasein.cloud.openstack.nova.os.ext.rackspace.RackspacePlatformServices;
@@ -50,6 +53,7 @@ import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
 import org.dasein.util.uom.time.Day;
 import org.dasein.util.uom.time.TimePeriod;
+import org.json.JSONObject;
 
 public class NovaOpenStack extends AbstractCloud {
     static private final Logger logger = getLogger(NovaOpenStack.class, "std");
@@ -404,5 +408,61 @@ public class NovaOpenStack extends AbstractCloud {
         finally {
             APITrace.end();
         }
+    }
+    
+    public void createTags( String service, String resource, String resourceId, Tag... keyValuePairs ) throws CloudException, InternalException {
+    	APITrace.begin(this, "Cloud.createTags");
+    	try {
+    		try {
+    			NovaMethod method = new NovaMethod(this);
+    			HashMap<String,Object> json = new HashMap<String, Object>();
+    			Map<String, Object> newMeta = new HashMap<String, Object>();
+    			for (int i = 0; i < keyValuePairs.length; i++) {
+    				newMeta.put( keyValuePairs[i].getKey().toLowerCase(), keyValuePairs[i].getValue() != null ? keyValuePairs[i].getValue() : "");
+    			}
+    			json.put("metadata", newMeta);
+    			method.putString(service, resource, resourceId, new JSONObject(json), "metadata");
+    		} catch( Exception e ) {
+    			logger.error("Error while creating tags for " + resource + " - " + resourceId + ".", e);
+    		}
+    	} finally {
+    		APITrace.end();
+    	}
+    }
+    
+    public void updateTags( String service, String resource, String resourceId, Tag... keyValuePairs ) throws CloudException, InternalException {
+    	APITrace.begin(this, "Cloud.updateTags");
+    	try {
+    		try {
+    			NovaMethod method = new NovaMethod(this);
+    			HashMap<String,Object> json = new HashMap<String, Object>();
+    			Map<String, Object> newMeta = new HashMap<String, Object>();
+    			for (int i = 0; i < keyValuePairs.length; i++) {
+    				newMeta.put( keyValuePairs[i].getKey().toLowerCase(), keyValuePairs[i].getValue() != null ? keyValuePairs[i].getValue() : "");
+    			}
+    			json.put("metadata", newMeta);
+    			method.postString(service, resource, resourceId, "metadata", new JSONObject(json));
+    		} catch( Exception e ) {
+    			logger.error("Error while updating tags for " + resource + " - " + resourceId + ".", e);
+    		}
+    	} finally {
+    		APITrace.end();
+    	}
+    }
+    
+    public void removeTags( String service, String resource, String resourceId, Tag... keyValuePairs ) throws CloudException, InternalException {
+    	APITrace.begin(this, "Cloud.removeTags");
+    	try {
+    		try {
+    			NovaMethod method = new NovaMethod(this);
+    			for (int i = 0; i < keyValuePairs.length; i++) {
+    				method.deleteResource(service, resource + "/" + resourceId + "/metadata", keyValuePairs[i].getKey().toLowerCase(), null);
+    			}
+    		} catch( Exception e ) {
+    			logger.error("Error while removing tags from " + resource + " - " + resourceId + ".", e);
+    		}
+    	} finally {
+    		APITrace.end();
+    	}
     }
 }
