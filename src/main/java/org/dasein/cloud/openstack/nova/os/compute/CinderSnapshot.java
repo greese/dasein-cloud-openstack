@@ -25,6 +25,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractSnapshotSupport;
 import org.dasein.cloud.compute.Snapshot;
 import org.dasein.cloud.compute.SnapshotCapabilities;
@@ -442,5 +443,59 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
         catch( JSONException e ) {
             throw new CloudException(e);
         }
+    }
+    
+    @Override
+    public void setTags(@Nonnull String snapshotId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Snapshot.setTags");
+    	try {
+    		((NovaOpenStack) getProvider()).createTags( SERVICE, "/snapshots", snapshotId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void setTags(@Nonnull String[] snapshotIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : snapshotIds ) {
+    		setTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String snapshotId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Snapshot.updateTags");
+    	try {
+    		((NovaOpenStack) getProvider()).updateTags( SERVICE, "/snapshots", snapshotId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String[] snapshotIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : snapshotIds ) {
+    		updateTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String snapshotId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Snapshot.removeTags");
+    	try {
+    		((NovaOpenStack) getProvider()).removeTags( SERVICE, "/snapshots", snapshotId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String[] snapshotIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : snapshotIds ) {
+    		removeTags(id, tags);
+    	}
     }
 }
