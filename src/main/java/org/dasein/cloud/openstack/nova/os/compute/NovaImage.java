@@ -35,6 +35,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractImageSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.ComputeServices;
@@ -60,6 +61,7 @@ import org.json.JSONObject;
 
 public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
     static private final Logger logger = NovaOpenStack.getLogger(NovaImage.class, "std");
+    private static final String SERVICE = "compute";
 
     NovaImage(NovaOpenStack provider) {
         super(provider);
@@ -660,5 +662,59 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
             return null;
         }
         return new ResourceStatus(id, state);
+    }
+    
+    @Override
+    public void setTags(@Nonnull String imageId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    APITrace.begin(getProvider(), "Image.setTags");
+    try {
+    getProvider().createTags( SERVICE, "/images", imageId, tags);
+    }
+    finally {
+    APITrace.end();
+    }
+    }
+    
+    @Override
+    public void setTags(@Nonnull String[] imageIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : imageIds ) {
+    		setTags(id, tags);
+    	}
+    }
+
+    @Override
+    public void updateTags(@Nonnull String imageId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Image.updateTags");
+    	try {
+    		getProvider().updateTags( SERVICE, "/images", imageId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void updateTags(@Nonnull String[] imageIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : imageIds ) {
+    		updateTags(id, tags);
+    	}
+    }
+
+    @Override
+    public void removeTags(@Nonnull String imageId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Image.removeTags");
+    	try {
+    		getProvider().removeTags( SERVICE, "/images", imageId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void removeTags(@Nonnull String[] imageIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : imageIds ) {
+    		removeTags(id, tags);
+    	}
     }
 }

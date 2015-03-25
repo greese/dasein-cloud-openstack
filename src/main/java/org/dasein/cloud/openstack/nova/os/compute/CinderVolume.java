@@ -26,6 +26,7 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractVolumeSupport;
 import org.dasein.cloud.compute.Platform;
 import org.dasein.cloud.compute.Volume;
@@ -120,10 +121,10 @@ public class CinderVolume extends AbstractVolumeSupport {
 
             json.put("display_name", options.getName());
             json.put("display_description", options.getDescription());
-            if( !options.getDataCenterId()
+            /*if( !options.getDataCenterId()
                     .equals(getProvider().getContext().getRegionId() + "-a") ) {
                 json.put("availability_zone", options.getDataCenterId());
-            }
+            }*/
 
             Storage<Gigabyte> size = options.getVolumeSize();
 
@@ -552,13 +553,14 @@ public class CinderVolume extends AbstractVolumeSupport {
             }
 
             String region = getContext().getRegionId();
-            String dataCenter;
+            /*String dataCenter;
             if( json.has("availability_zone") && json.getString("availability_zone") != null && !json.getString("availability_zone").isEmpty() ) {
                 dataCenter = json.getString("availability_zone");
             }
             else {
                 dataCenter = region + "-a";
-            }
+            }*/
+            String dataCenter = region + "-a";
 
             String name = (json.has("displayName") ? json.getString("displayName") : null);
 
@@ -695,5 +697,59 @@ public class CinderVolume extends AbstractVolumeSupport {
         catch( JSONException e ) {
             throw new CloudException(e);
         }
+    }
+    
+    @Override
+    public void setTags(@Nonnull String volumeId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Volume.setTags");
+    	try {
+    		((NovaOpenStack) getProvider()).createTags( SERVICE, "/volumes", volumeId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void setTags(@Nonnull String[] volumeIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : volumeIds ) {
+    		setTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String volumeId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Volume.updateTags");
+    	try {
+    		((NovaOpenStack) getProvider()).updateTags( SERVICE, "/volumes", volumeId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String[] volumeIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : volumeIds ) {
+    		updateTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String volumeId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Volume.removeTags");
+    	try {
+    		((NovaOpenStack) getProvider()).removeTags( SERVICE, "/volumes", volumeId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String[] volumeIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : volumeIds ) {
+    		removeTags(id, tags);
+    	}
     }
 }

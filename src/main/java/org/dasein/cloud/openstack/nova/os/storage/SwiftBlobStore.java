@@ -35,6 +35,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ProviderContext;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.identity.ServiceAction;
 import org.dasein.cloud.openstack.nova.os.AuthenticationContext;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
@@ -721,4 +722,41 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport<NovaOpenStack> {
         //return NameRules.getInstance(1, 255, false, true, true, new char[] { '-', '.', ',', '#', '+' });
     }
 
+    @Override
+    public void updateTags(@Nonnull String bucketName, @Nonnull Tag ... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Bucket.updateTags");
+    	try {
+    		SwiftMethod method = new SwiftMethod(getProvider());
+    		method.put( bucketName , "X-Container-Meta-", tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void updateTags(@Nonnull String[] bucketNames, @Nonnull Tag ... tags) throws CloudException, InternalException {
+    	for( String id : bucketNames ) {
+    		updateTags(id, tags);
+    	}
+    }
+
+    @Override
+    public void removeTags(@Nonnull String bucketName, @Nonnull Tag ... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Bucket.removeTags");
+    	try {
+    		SwiftMethod method = new SwiftMethod(getProvider());
+    		method.put( bucketName , "X-Remove-Container-Meta-", tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void removeTags(@Nonnull String[] bucketNames, @Nonnull Tag ... tags) throws CloudException, InternalException {
+    	for( String id : bucketNames ) {
+    		removeTags(id, tags);
+    	}
+    }
 }

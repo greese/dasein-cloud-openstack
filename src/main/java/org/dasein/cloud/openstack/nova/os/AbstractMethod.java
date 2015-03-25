@@ -962,7 +962,7 @@ public abstract class AbstractMethod {
             int code = response.getStatusLine().getStatusCode();
 
             std.debug("HTTP STATUS: " + code);
-            if( code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_ACCEPTED ) {
+            if( code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_OK ) {
                 std.error("delete(): Expected NO CONTENT for DELETE request, got " + code);
                 String data = null;
 
@@ -2354,6 +2354,39 @@ public abstract class AbstractMethod {
         }
     }
     
+    public @Nullable JSONObject putString(@Nonnull String service, @Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body , String suffix) throws CloudException, InternalException {
+    	AuthenticationContext context = provider.getAuthenticationContext();
+    	if( resourceId != null ) {
+    		resource = resource + "/" + (suffix != null ? (resourceId + "/" + suffix) : resourceId);
+    	}
+    	String endpoint = context.getServiceUrl(service);
+    	if( endpoint == null ) {
+    		throw new CloudException("No " + service + " endpoint exists");
+    	}
+    	try {
+    		String response = putString(context.getAuthToken(), endpoint, resource, body.toString());
+    		if( response == null ) {
+    			return null;
+    		}
+    		try {
+    			return new JSONObject(response);
+    		}
+    		catch( JSONException e ) {
+    			throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+    		}
+    	}
+    	catch (NovaException ex) {
+    		if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+    			Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+    			cache.clear();
+    			return putString(service, resource, resourceId, body, suffix);
+    		}
+    		else {
+    			throw ex;
+    		}
+    	}
+    }
+    
     protected @Nullable String putString(@Nonnull String authToken, @Nonnull String endpoint, @Nonnull String resource, @Nullable String payload) throws CloudException, InternalException {
         Logger std = NovaOpenStack.getLogger(NovaOpenStack.class, "std");
         Logger wire = NovaOpenStack.getLogger(NovaOpenStack.class, "wire");
@@ -2415,7 +2448,7 @@ public abstract class AbstractMethod {
 
             std.debug("HTTP STATUS: " + code);
 
-            if( code != HttpStatus.SC_CREATED && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT ) {
+            if( code != HttpStatus.SC_CREATED && code != HttpStatus.SC_ACCEPTED && code != HttpStatus.SC_NO_CONTENT && code != HttpStatus.SC_OK ) {
                 std.error("putString(): Expected CREATED, ACCEPTED, or NO CONTENT for put request, got " + code);
                 String data = null;
 

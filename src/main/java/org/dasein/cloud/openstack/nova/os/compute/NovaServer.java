@@ -28,6 +28,7 @@ import org.dasein.cloud.CloudException;
 import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ResourceStatus;
+import org.dasein.cloud.Tag;
 import org.dasein.cloud.compute.AbstractVMSupport;
 import org.dasein.cloud.compute.Architecture;
 import org.dasein.cloud.compute.MachineImage;
@@ -1066,6 +1067,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         if( server.has("id") ) {
             vm.setProviderVirtualMachineId(server.getString("id"));
         }
+        else return null;
         if( server.has("name") ) {
             vm.setName(server.getString("name"));
         }
@@ -1320,19 +1322,6 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                     }
                 }
             }
-            // FIXME: code duplication, see below
-            vm.setProviderRegionId(getContext().getRegionId());
-            if( server.has("OS-EXT-AZ:availability_zone") ) {
-                vm.setProviderDataCenterId(server.getString("OS-EXT-AZ:availability_zone"));
-            }
-            else {
-                vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
-            }
-            vm.setTerminationTimestamp(-1L);
-            // FIXME: could we not check this earlier?
-            if( vm.getProviderVirtualMachineId() == null ) {
-                return null;
-            }
             if( vm.getProviderAssignedIpAddressId() == null ) {
                 for( IpAddress addr : ipv6 ) {
                     if( addr.getServerId().equals(vm.getProviderVirtualMachineId()) ) {
@@ -1343,17 +1332,8 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             }
         }
         vm.setProviderRegionId(getContext().getRegionId());
-        if( server.has("OS-EXT-AZ:availability_zone") ) {
-            vm.setProviderDataCenterId(server.getString("OS-EXT-AZ:availability_zone"));
-        }
-        else {
-            vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
-        }
+        vm.setProviderDataCenterId(vm.getProviderRegionId() + "-a");
         vm.setTerminationTimestamp(-1L);
-        // FIXME: could we not check this earlier?
-        if( vm.getProviderVirtualMachineId() == null ) {
-            return null;
-        }
         if( vm.getName() == null ) {
             vm.setName(vm.getProviderVirtualMachineId());
         }
@@ -1398,4 +1378,57 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         return vm;
     }
 
+    @Override
+    public void setTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Server.setTags");
+    	try {
+    		getProvider().createTags( SERVICE, "/servers", vmId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void setTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		setTags(id, tags);
+    	}
+    }
+
+    @Override
+    public void updateTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Server.updateTags");
+    	try {
+    		getProvider().updateTags( SERVICE, "/servers", vmId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void updateTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		updateTags(id, tags);
+    	}
+    }
+
+    @Override
+    public void removeTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Server.removeTags");
+    	try {
+    		getProvider().removeTags( SERVICE, "/servers", vmId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+
+    @Override
+    public void removeTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		removeTags(id, tags);
+    	}
+    }
 }
