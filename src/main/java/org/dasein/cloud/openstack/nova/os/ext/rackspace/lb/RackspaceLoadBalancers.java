@@ -1182,10 +1182,7 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
             return null;
         }
         try {
-            String dc = null;
-            if( json.has("OS-EXT-AZ:availability_zone") ) {
-                dc = json.getString("OS-EXT-AZ:availability_zone");
-            }
+            String dc = getContext().getRegionId() + "-a";
             String owner = getTenantId();
             String regionId = getContext().getRegionId();
             String id = (json.has("id") && !json.isNull("id")) ? json.getString("id") : null;

@@ -100,106 +100,23 @@ public class NovaLocationServices extends AbstractDataCenterServices<NovaOpenSta
         }
     }
 
-    private @Nonnull Collection<String> getCinderAvailabilityZones() {
-        try {
-            Map<String, String> names = new HashMap<String, String>();
-            NovaMethod method = new NovaMethod(getProvider());
-            JSONObject zones = method.getResource(CinderVolume.SERVICE, "/os-availability-zone", null, false);
-            if( zones == null || !zones.has("availabilityZoneInfo") ) {
-                return null;
-            }
-            JSONArray objs = zones.getJSONArray("availabilityZoneInfo");
-            for( int i = 0; i < objs.length(); i++ ) {
-                JSONObject zoneInfo = objs.getJSONObject(i);
-                String zoneName = zoneInfo.getString("zoneName");
-                JSONObject zoneState = zoneInfo.getJSONObject("zoneState");
-                boolean available = false;
-                if( zoneState != null && zoneState.has("available") ) {
-                    available = zoneState.getBoolean("available");
-                }
-                if( zoneName == null || zoneName.isEmpty() || "internal".equalsIgnoreCase(zoneName) || !available ) {
-                    continue;
-                }
-                names.put(zoneName, zoneName);
-            }
-            return names.values();
-        }
-        catch( Exception ex ) {
-            //The user likely has too few permissions to request hosts
-        }
-        return Collections.emptyList();
-    }
-
-    private @Nonnull Collection<String> getComputeAvailabilityZones() {
-        try {
-            Map<String, String> names = new HashMap<String, String>();
-            NovaMethod method = new NovaMethod(getProvider());
-            JSONObject hosts = method.getResource(NovaServer.SERVICE, "/os-hosts", null, false);
-            if( hosts == null || !hosts.has("hosts") ) {
-                return null;
-            }
-            JSONArray objs = hosts.getJSONArray("hosts");
-            for( int i = 0; i < objs.length(); i++ ) {
-                JSONObject host = objs.getJSONObject(i);
-                String az = host.getString("zone");
-                if( az == null || az.isEmpty() || "internal".equalsIgnoreCase(az) ) {
-                    continue;
-                }
-                names.put(az, az);
-            }
-            return names.values();
-        }
-        catch( Exception ex ) {
-            //The user likely has too few permissions to request hosts
-        }
-        return Collections.emptyList();
-    }
-
-    private DataCenter constructDataCenter(String name, String providerRegionId) {
-        DataCenter dc = new DataCenter(name, name, providerRegionId, true, true);
-        dc.setCompute(true);
-        dc.setStorage(false);
-        return dc;
-    }
-
     @Override
-    public Iterable<DataCenter> listDataCenters(String providerRegionId) throws InternalException, CloudException {
+    public Collection<DataCenter> listDataCenters(String providerRegionId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "DC.listDataCenters");
         try {
-            Cache<DataCenter> cache = Cache.getInstance(getProvider(), "datacenters", DataCenter.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Minute>(10, TimePeriod.MINUTE));
-            Iterable<DataCenter> cached = cache.get(getProvider().getContext());
-            List<DataCenter> dataCenters = new ArrayList<DataCenter>();
-            if( cached != null && cached.iterator().hasNext() ) {
-                return cached;
-            }
-
             Region region = getRegion(providerRegionId);
+
             if( region == null ) {
                 throw new CloudException("No such region: " + providerRegionId);
             }
-            Collection<String> cinderZones = getCinderAvailabilityZones();
-            // let's look in the hosts
-            for( String hostZone : getComputeAvailabilityZones() ) {
-                DataCenter dc = constructDataCenter(hostZone, providerRegionId);
-                for( String cinderZone : cinderZones ) {
-                    if( dc.getProviderDataCenterId().equalsIgnoreCase(cinderZone) ) {
-                        dc.setStorage(true);
-                        break;
-                    }
-                }
-                dataCenters.add(dc);
-            }
+            DataCenter dc = new DataCenter();
 
-            if( !dataCenters.isEmpty() ) {
-                cache.put(getProvider().getContext(), dataCenters);
-                return dataCenters;
-            }
-            // if failed to get from the hosts, fall back to "<region>-a"
-            DataCenter fakeDataCenter = constructDataCenter(providerRegionId+"-a", providerRegionId);
-            fakeDataCenter.setStorage(true);
-            dataCenters.add(fakeDataCenter);
-            cache.put(getProvider().getContext(), dataCenters);
-            return dataCenters;
+            dc.setActive(true);
+            dc.setAvailable(true);
+            dc.setName(region.getProviderRegionId() + "-a");
+            dc.setProviderDataCenterId(region.getProviderRegionId() + "-a");
+            dc.setRegionId(providerRegionId);
+            return Collections.singletonList(dc);
         }
         finally {
             APITrace.end();
