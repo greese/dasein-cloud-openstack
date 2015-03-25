@@ -210,6 +210,26 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     }
 
     @Override
+    public @Nonnull VirtualMachine alterVirtualMachineProduct(@Nonnull String virtualMachineId, @Nonnull String productId) throws InternalException, CloudException {
+        APITrace.begin(getProvider(), "VM.resize");
+        try {
+            Map<String,Object> json = new HashMap<String,Object>();
+            Map<String,Object> action = new HashMap<String,Object>();
+
+            action.put("flavorRef", productId);
+            json.put("resize", action);
+
+            NovaMethod method = new NovaMethod(getProvider());
+
+            method.postServers("/servers", virtualMachineId, new JSONObject(json), true);
+            return getVirtualMachine(virtualMachineId);
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
+    @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         APITrace.begin(getProvider(), "VM.isSubscribed");
         try {
