@@ -56,7 +56,7 @@ import java.util.Locale;
  * @version 2013.04 implemented new heirarchy for snapshot support
  * @since 2012.09.1
  */
-public class CinderSnapshot extends AbstractSnapshotSupport {
+public class CinderSnapshot extends AbstractSnapshotSupport<NovaOpenStack> {
     static private final Logger logger = NovaOpenStack.getLogger(CinderSnapshot.class, "std");
 
     static public final String SERVICE  = "volume";
@@ -129,11 +129,6 @@ public class CinderSnapshot extends AbstractSnapshotSupport {
             capabilities = new CinderSnapshotCapabilities((NovaOpenStack)getProvider());
         }
         return capabilities;
-    }
-
-    @Override
-    public @Nonnull String getProviderTermForSnapshot(@Nonnull Locale locale) {
-        return "snapshot";
     }
 
     @Override
