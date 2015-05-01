@@ -149,8 +149,4 @@ public class NovaImageCapabilities extends AbstractCapabilities<NovaOpenStack> i
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
         return true;
     }
-
-    @Override public boolean imageCaptureDestroysVM() throws CloudException, InternalException {
-        return false;
-    }
 }

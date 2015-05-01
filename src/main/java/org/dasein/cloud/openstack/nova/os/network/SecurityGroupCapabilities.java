@@ -68,7 +68,13 @@ public class SecurityGroupCapabilities extends AbstractCapabilities<NovaOpenStac
     }
 
     @Override
+    @Deprecated
     public @Nonnull Iterable<RuleTargetType> listSupportedDestinationTypes(boolean inVlan) throws InternalException, CloudException {
+        return listSupportedDestinationTypes(inVlan, Direction.INGRESS);
+    }
+
+    @Override
+    public @Nonnull Iterable<RuleTargetType> listSupportedDestinationTypes(boolean inVlan, Direction direction) throws InternalException, CloudException {
         if( inVlan ) {
             return Collections.emptyList();
         }
@@ -106,6 +112,10 @@ public class SecurityGroupCapabilities extends AbstractCapabilities<NovaOpenStac
         list.add(RuleTargetType.CIDR);
         list.add(RuleTargetType.GLOBAL);
         return list;
+    }
+
+    @Nonnull @Override public Iterable<RuleTargetType> listSupportedSourceTypes(boolean inVlan, Direction direction) throws InternalException, CloudException {
+        return null;
     }
 
     @Override
