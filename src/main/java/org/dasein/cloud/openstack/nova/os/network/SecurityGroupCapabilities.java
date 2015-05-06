@@ -75,7 +75,7 @@ public class SecurityGroupCapabilities extends AbstractCapabilities<NovaOpenStac
 
     @Override
     public @Nonnull Iterable<RuleTargetType> listSupportedDestinationTypes(boolean inVlan, Direction direction) throws InternalException, CloudException {
-        if( inVlan ) {
+        if( inVlan || direction.equals(Direction.EGRESS)) {
             return Collections.emptyList();
         }
         return Collections.singletonList(RuleTargetType.GLOBAL);
@@ -103,19 +103,20 @@ public class SecurityGroupCapabilities extends AbstractCapabilities<NovaOpenStac
     }
 
     @Override
+    @Deprecated
     public @Nonnull Iterable<RuleTargetType> listSupportedSourceTypes(boolean inVlan) throws InternalException, CloudException {
-        if( inVlan ) {
+       return listSupportedSourceTypes(inVlan, Direction.INGRESS);
+    }
+
+    @Nonnull @Override public Iterable<RuleTargetType> listSupportedSourceTypes(boolean inVlan, Direction direction) throws InternalException, CloudException {
+        if( inVlan  || direction.equals(Direction.EGRESS)) {
             return Collections.emptyList();
         }
-        ArrayList<RuleTargetType> list= new ArrayList<RuleTargetType>();
+        ArrayList<RuleTargetType> list = new ArrayList<RuleTargetType>();
 
         list.add(RuleTargetType.CIDR);
         list.add(RuleTargetType.GLOBAL);
         return list;
-    }
-
-    @Nonnull @Override public Iterable<RuleTargetType> listSupportedSourceTypes(boolean inVlan, Direction direction) throws InternalException, CloudException {
-        return null;
     }
 
     @Override
@@ -124,6 +125,7 @@ public class SecurityGroupCapabilities extends AbstractCapabilities<NovaOpenStac
     }
 
     @Override
+    @Nonnull
     public Requirement requiresVLAN() throws CloudException, InternalException {
         return Requirement.NONE;
     }
