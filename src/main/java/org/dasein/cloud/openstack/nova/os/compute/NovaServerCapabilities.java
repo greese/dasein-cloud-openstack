@@ -55,7 +55,7 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
 
     @Override
     public boolean canAlter(@Nonnull VmState fromState) throws CloudException, InternalException {
-        return false;
+        return VmState.RUNNING.equals(fromState) || VmState.STOPPED.equals(fromState);
     }
 
     @Override
@@ -146,7 +146,7 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
     @Nullable
     @Override
     public VMScalingCapabilities getVerticalScalingCapabilities() throws CloudException, InternalException {
-        return null;
+        return VMScalingCapabilities.getInstance(false, true, false);
     }
 
     @Nonnull
@@ -293,17 +293,9 @@ public class NovaServerCapabilities extends AbstractCapabilities<NovaOpenStack> 
         return false;
     }
 
-    @Override public boolean supportsCloudStoredShellKey() throws InternalException, CloudException {
-        return false;
-    }
-
-    @Override public boolean isVMProductDCConstrained() throws InternalException, CloudException {
-        return false;
-    }
-
     @Override
     public boolean supportsAlterVM() {
-        return false;
+        return true;
     }
 
     @Override

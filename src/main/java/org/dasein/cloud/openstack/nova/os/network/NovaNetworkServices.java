@@ -37,47 +37,45 @@ import javax.annotation.Nullable;
  * @version 2011.10
  * @version 2012.04.1 Added some intelligence around features Rackspace does not support
  */
-public class NovaNetworkServices extends AbstractNetworkServices {
-    private NovaOpenStack provider;
-
+public class NovaNetworkServices extends AbstractNetworkServices<NovaOpenStack> {
     public NovaNetworkServices(@Nonnull NovaOpenStack cloud) {
-        provider = cloud;
+        super(cloud);
     }
 
     @Override
     public @Nullable DNSSupport getDnsSupport() {
-        if( provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
-            return new RackspaceCloudDNS(provider);
+        if( getProvider().getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
+            return new RackspaceCloudDNS(getProvider());
         }
         return null;
     }
 
     @Override
     public @Nullable NovaSecurityGroup getFirewallSupport() {
-        if( provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
+        if( getProvider().getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
             return null;
         }
-        return new NovaSecurityGroup(provider);
+        return new NovaSecurityGroup(getProvider());
     }
 
     @Override
     public @Nullable NovaFloatingIP getIpAddressSupport() {
-        if( provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
+        if( getProvider().getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
             return null;
         }
-        return new NovaFloatingIP(provider);
+        return new NovaFloatingIP(getProvider());
     }
 
     @Override
     public @Nullable LoadBalancerSupport getLoadBalancerSupport() {
-        if( provider.getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
-            return new RackspaceLoadBalancers(provider);
+        if( getProvider().getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
+            return new RackspaceLoadBalancers(getProvider());
         }
         return null;
     }
 
     @Override
     public @Nullable Quantum getVlanSupport() {
-        return new Quantum(provider);
+        return new Quantum(getProvider());
     }
 }
