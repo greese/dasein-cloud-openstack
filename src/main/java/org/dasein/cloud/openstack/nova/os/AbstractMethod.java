@@ -249,8 +249,8 @@ public abstract class AbstractMethod {
             catch( UnsupportedEncodingException e ) {
                 throw new InternalException(e);
             }
-            try { wire.debug(EntityUtils.toString(post.getEntity())); }
-            catch( IOException ignore ) { }
+            /*try { wire.debug(EntityUtils.toString(post.getEntity())); }
+            catch( IOException ignore ) { }*/
 
             wire.debug("");
 
