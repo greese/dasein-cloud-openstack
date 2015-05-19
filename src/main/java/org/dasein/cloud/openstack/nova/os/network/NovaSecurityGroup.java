@@ -264,7 +264,7 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
             JSONObject ob = method.getServers("/os-security-groups", firewallId, false);
 
             if( ob == null ) {
-                return null;
+                return Collections.emptyList();
             }
             try {
                 if( ob.has("security_group") ) {
@@ -375,7 +375,7 @@ public class NovaSecurityGroup extends AbstractFirewallSupport {
                 logger.error("getRules(): Unable to identify expected values in JSON: " + e.getMessage());
                 throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for security groups");
             }
-            return null;
+            return Collections.emptyList();
         }
         finally {
             APITrace.end();
