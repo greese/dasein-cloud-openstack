@@ -212,6 +212,10 @@
                             <name>regionId</name>
                             <value>${regionId}</value>
                         </property>
+                        <property>
+                            <name>test.machineImage</name>
+                            <value>${test.machineImage}</value>
+                        </property>
                     </systemProperties>
                     <includes>
                         <include>**/TestSuite.java</include>

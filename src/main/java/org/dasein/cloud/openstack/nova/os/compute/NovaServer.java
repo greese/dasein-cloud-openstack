@@ -210,6 +210,20 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         }
     }
 
+    private @Nonnull String getServerStatus(@Nonnull String virtualMachineId) throws InternalException, CloudException {
+        APITrace.begin(getProvider(), "VM.getVmStatus");
+        try {
+            final JSONObject ob = new NovaMethod(getProvider()).getServers("/servers", virtualMachineId, true);
+            return ob.getJSONObject("server").getString("status");
+        }
+        catch( JSONException e ) {
+            throw new CloudException(e);
+        }
+        finally {
+            APITrace.end();
+        }
+    }
+
     @Override
     public @Nonnull VirtualMachine alterVirtualMachineProduct(@Nonnull String virtualMachineId, @Nonnull String productId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.resize");
@@ -223,6 +237,19 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
             NovaMethod method = new NovaMethod(getProvider());
 
             method.postServers("/servers", virtualMachineId, new JSONObject(json), true);
+            String status;
+            while( "resize".equalsIgnoreCase(status = getServerStatus(virtualMachineId)) ) {
+                try {
+                    Thread.sleep(5000L);
+                }
+                catch( InterruptedException e ) {
+                }
+            }
+            if( "verify_resize".equalsIgnoreCase(status) ) {
+                json.clear();
+                json.put("confirmResize", null);
+                method.postServers("/servers", virtualMachineId, new JSONObject(json), true);
+            }
             return getVirtualMachine(virtualMachineId);
         }
         finally {
