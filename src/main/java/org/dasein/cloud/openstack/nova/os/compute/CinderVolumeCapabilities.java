@@ -117,6 +117,7 @@ public class CinderVolumeCapabilities extends AbstractCapabilities<NovaOpenStack
         return ((getProvider()).isHP() ? Requirement.NONE : Requirement.OPTIONAL);
     }
 
+
     @Override
     public boolean isVolumeSizeDeterminedByProduct() throws InternalException, CloudException {
         return false;
