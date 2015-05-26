@@ -6,92 +6,118 @@ import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Locale;
 
 /**
  * Created by mariapavlova on 22/04/2015.
  */
 public class LoadBalancerCapabilitiesImpl extends AbstractCapabilities<NovaOpenStack> implements LoadBalancerCapabilities {
-    @Nonnull @Override public LoadBalancerAddressType getAddressType() throws CloudException, InternalException {
-        return null;
-    }
     public LoadBalancerCapabilitiesImpl(@Nonnull NovaOpenStack cloud) {
         super(cloud);
     }
 
-    @Override public int getMaxPublicPorts() throws CloudException, InternalException {
-        return 0;
+    @Override
+    public @Nonnull LoadBalancerAddressType getAddressType() throws CloudException, InternalException {
+        return LoadBalancerAddressType.IP;
     }
 
-    @Nonnull @Override public String getProviderTermForLoadBalancer(@Nonnull Locale locale) {
+    @Override
+    public int getMaxPublicPorts() throws CloudException, InternalException {
+        return 1;
+    }
+
+    @Override
+    public @Nonnull String getProviderTermForLoadBalancer(@Nonnull Locale locale) {
+        return "pool";
+    }
+
+    @Override
+    public @Nullable VisibleScope getLoadBalancerVisibleScope() {
         return null;
     }
 
-    @Nullable @Override public VisibleScope getLoadBalancerVisibleScope() {
-        return null;
-    }
-
-    @Override public boolean healthCheckRequiresLoadBalancer() throws CloudException, InternalException {
+    @Override
+    public boolean healthCheckRequiresLoadBalancer() throws CloudException, InternalException {
         return false;
     }
 
-    @Override public Requirement healthCheckRequiresName() throws CloudException, InternalException {
-        return null;
+    @Override
+    public @Nonnull Requirement healthCheckRequiresName() throws CloudException, InternalException {
+        return Requirement.NONE;
     }
 
-    @Nonnull @Override public Requirement identifyEndpointsOnCreateRequirement() throws CloudException, InternalException {
-        return null;
+    @Override
+    public @Nonnull Requirement identifyEndpointsOnCreateRequirement() throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
     }
 
-    @Nonnull @Override public Requirement identifyListenersOnCreateRequirement() throws CloudException, InternalException {
-        return null;
+    @Override
+    public @Nonnull Requirement identifyListenersOnCreateRequirement() throws CloudException, InternalException {
+        return Requirement.REQUIRED;
     }
 
-    @Nonnull @Override public Requirement identifyVlanOnCreateRequirement() throws CloudException, InternalException {
-        return null;
+    @Override
+    public @Nonnull Requirement identifyVlanOnCreateRequirement() throws CloudException, InternalException {
+        return Requirement.REQUIRED;
     }
 
-    @Nonnull @Override public Requirement identifyHealthCheckOnCreateRequirement() throws CloudException, InternalException {
-        return null;
+    @Override
+    public @Nonnull Requirement identifyHealthCheckOnCreateRequirement() throws CloudException, InternalException {
+        return Requirement.OPTIONAL;
     }
 
-    @Override public boolean isAddressAssignedByProvider() throws CloudException, InternalException {
+    @Override
+    public boolean isAddressAssignedByProvider() throws CloudException, InternalException {
+        return true;
+    }
+
+    @Override
+    public boolean isDataCenterLimited() throws CloudException, InternalException {
         return false;
     }
 
-    @Override public boolean isDataCenterLimited() throws CloudException, InternalException {
-        return false;
+    @Override
+    public @Nonnull Iterable<LbAlgorithm> listSupportedAlgorithms() throws CloudException, InternalException {
+        return Arrays.asList(LbAlgorithm.LEAST_CONN, LbAlgorithm.ROUND_ROBIN, LbAlgorithm.SOURCE);
     }
 
-    @Nonnull @Override public Iterable<LbAlgorithm> listSupportedAlgorithms() throws CloudException, InternalException {
-        return null;
+    @Override
+    public @Nonnull Iterable<LbEndpointType> listSupportedEndpointTypes() throws CloudException, InternalException {
+        return Arrays.asList(LbEndpointType.IP);
     }
 
-    @Nonnull @Override public Iterable<LbEndpointType> listSupportedEndpointTypes() throws CloudException, InternalException {
-        return null;
+    @Override
+    public @Nonnull Iterable<IPVersion> listSupportedIPVersions() throws CloudException, InternalException {
+        return Arrays.asList(IPVersion.IPV4, IPVersion.IPV6);
     }
 
-    @Nonnull @Override public Iterable<IPVersion> listSupportedIPVersions() throws CloudException, InternalException {
-        return null;
+    @Override
+    public @Nonnull Iterable<LbPersistence> listSupportedPersistenceOptions() throws CloudException, InternalException {
+        return Arrays.asList(LbPersistence.COOKIE, LbPersistence.SUBNET, LbPersistence.NONE);
     }
 
-    @Nonnull @Override public Iterable<LbPersistence> listSupportedPersistenceOptions() throws CloudException, InternalException {
-        return null;
+    @Override
+    public @Nonnull Iterable<LbProtocol> listSupportedProtocols() throws CloudException, InternalException {
+        // CAVEAT: HTTPS is excluded for now since there's no way in Neutron API to manage SSL certificates.
+        // LBaaS is supposed to address that through Barbican, but as of time of write this was not available
+        // or configured in our Juno stack.
+        return Arrays.asList(LbProtocol.HTTP, LbProtocol.RAW_TCP);
     }
 
-    @Nonnull @Override public Iterable<LbProtocol> listSupportedProtocols() throws CloudException, InternalException {
-        return null;
+    @Override
+    public boolean supportsAddingEndpoints() throws CloudException, InternalException {
+        return true;
     }
 
-    @Override public boolean supportsAddingEndpoints() throws CloudException, InternalException {
-        return false;
+    @Override
+    public boolean supportsMonitoring() throws CloudException, InternalException {
+        return true;
     }
 
-    @Override public boolean supportsMonitoring() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override public boolean supportsMultipleTrafficTypes() throws CloudException, InternalException {
+    @Override
+    public boolean supportsMultipleTrafficTypes() throws CloudException, InternalException {
         return false;
     }
 }
