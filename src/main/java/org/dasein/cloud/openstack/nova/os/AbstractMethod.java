@@ -888,21 +888,19 @@ public abstract class AbstractMethod {
         }
     }
 
-    public void deleteResource(@Nonnull String service, @Nonnull String resource, @Nonnull String resourceId, String suffix) throws CloudException, InternalException {
+    public void deleteResource(@Nonnull final String service, @Nonnull final String resource, @Nonnull final String resourceId, @Nullable final String suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getServiceUrl(service);
 
         if( endpoint == null ) {
             throw new CloudException("No " + service + " endpoint exists");
         }
-        if( suffix == null ) {
-            resource = resource + "/" + resourceId;
-        }
-        else {
-            resource = resource + "/" + resourceId + "/" + suffix;
+        String resourceUri = resource + "/" + resourceId;
+        if( suffix != null ) {
+            resourceUri = resource + "/" + resourceId + "/" + suffix;
         }
         try {
-            delete(context.getAuthToken(), endpoint, resource);
+            delete(context.getAuthToken(), endpoint, resourceUri);
         }
         catch (NovaException ex) {
             if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
@@ -916,7 +914,7 @@ public abstract class AbstractMethod {
         }
     }
     
-    protected void delete(@Nonnull String authToken, @Nonnull String endpoint, @Nonnull String resource) throws CloudException, InternalException {
+    protected void delete(@Nonnull final String authToken, @Nonnull final String endpoint, @Nonnull final String resource) throws CloudException, InternalException {
         Logger std = NovaOpenStack.getLogger(NovaOpenStack.class, "std");
         Logger wire = NovaOpenStack.getLogger(NovaOpenStack.class, "wire");
         
@@ -1012,54 +1010,19 @@ public abstract class AbstractMethod {
         }
     }
 
-    public @Nullable JSONArray getList(@Nonnull String service, @Nonnull String resource, boolean suffix) throws CloudException, InternalException {
+    public @Nullable String[] getItemList(@Nonnull final String service, @Nonnull final String resource, final boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getServiceUrl(service);
 
         if( endpoint == null ) {
             throw new CloudException("No " + service + " URL has been established in " + context.getMyRegion());
         }
+        String resourceUri = resource;
         if( suffix ) {
-            resource = resource + "/detail";
-        }
-
-        try {
-            String response = getString(context.getAuthToken(), endpoint, resource);
-
-            if( response == null ) {
-                return null;
-            }
-            try {
-                return new JSONArray(response);
-            }
-            catch( JSONException e ) {
-                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
-            }
-        }
-        catch (NovaException ex) {
-            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
-                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
-                cache.clear();
-                return getList(service, resource, suffix);
-            }
-            else {
-                throw ex;
-            }
-        }
-    }
-
-    public @Nullable String[] getItemList(@Nonnull String service, @Nonnull String resource, boolean suffix) throws CloudException, InternalException {
-        AuthenticationContext context = provider.getAuthenticationContext();
-        String endpoint = context.getServiceUrl(service);
-
-        if( endpoint == null ) {
-            throw new CloudException("No " + service + " URL has been established in " + context.getMyRegion());
-        }
-        if( suffix ) {
-            resource = resource + "/detail";
+            resourceUri += "/detail";
         }
         try {
-            String response = getString(context.getAuthToken(), endpoint, resource);
+            String response = getString(context.getAuthToken(), endpoint, resourceUri);
 
             if( response == null ) {
                 return null;
@@ -1089,27 +1052,27 @@ public abstract class AbstractMethod {
         }
     }
     
-    public @Nullable JSONObject getResource(@Nonnull String service, @Nonnull String resource, @Nullable String resourceId, boolean suffix) throws CloudException, InternalException {
+    public @Nullable JSONObject getResource(@Nonnull final String service, @Nonnull final String resource, @Nullable final String resourceId, final boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getServiceUrl(service);
 
         if( endpoint == null ) {
             throw new CloudException("No " + service + " URL has been established in " + context.getMyRegion());
         }
+        String resourceUri = resource;
         if( resourceId != null ) {
             if( resourceId.startsWith("?") ) {
-                resource = resource + resourceId;
-
+                resourceUri += resourceId;
             }
             else {
-                resource = resource + "/" + resourceId;
+                resourceUri += "/" + resourceId;
             }
         }
         else if( suffix ) {
-            resource = resource + "/detail";
+            resourceUri += "/detail";
         }
         try {
-            String response = getString(context.getAuthToken(), endpoint, resource);
+            String response = getString(context.getAuthToken(), endpoint, resourceUri);
 
             if( response == null ) {
                 return null;
@@ -1479,7 +1442,7 @@ public abstract class AbstractMethod {
         return client;
     }
 
-    public @Nullable Map<String,String> headResource(@Nonnull String service, @Nullable String resource, @Nullable String resourceId) throws CloudException, InternalException {
+    public @Nullable Map<String,String> headResource(@Nonnull final String service, @Nullable final String resource, @Nullable final String resourceId) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getServiceUrl(service);
 
@@ -1494,7 +1457,7 @@ public abstract class AbstractMethod {
             resourceUri = "/" + resourceId;
         }
         else if( resourceId != null ) {
-            resourceUri = resource + "/" + resourceId;
+            resourceUri += "/" + resourceId;
         }
         try {
             return head(context.getAuthToken(), endpoint, resourceUri);
@@ -1608,7 +1571,7 @@ public abstract class AbstractMethod {
         }
     }
 
-    public void postResourceHeaders(String service, String resource, String resourceId, Map<String,String> headers) throws CloudException, InternalException {
+    public void postResourceHeaders(final String service, final String resource, final String resourceId, final Map<String,String> headers) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getServiceUrl(service);
 
@@ -1805,7 +1768,7 @@ public abstract class AbstractMethod {
         }
     }
 
-    public @Nullable JSONObject postString(@Nonnull String service, @Nonnull String resource, @Nullable String resourceId, @Nonnull String extra, @Nonnull JSONObject body) throws CloudException, InternalException {
+    public @Nullable JSONObject postString(@Nonnull final String service, @Nonnull final String resource, @Nullable final String resourceId, @Nonnull final String extra, @Nonnull final JSONObject body) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getServiceUrl(service);
         
@@ -1837,12 +1800,12 @@ public abstract class AbstractMethod {
         }
     }
     
-    public @Nullable JSONObject postString(@Nonnull String service, @Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body, boolean suffix) throws CloudException, InternalException {
+    public @Nullable JSONObject postString(@Nonnull final String service, @Nonnull final String resource, @Nullable final String resourceId, @Nonnull final JSONObject body, final boolean suffix) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
 
         String resourceUri = resource;
         if( resourceId != null ) {
-            resourceUri = resource + "/" + (suffix ? (resourceId + "/action") : resourceId);
+            resourceUri += "/" + (suffix ? (resourceId + "/action") : resourceId);
         }
         String endpoint = context.getServiceUrl(service);
 
@@ -2193,7 +2156,7 @@ public abstract class AbstractMethod {
         }
     }
 
-    public void putResourceHeaders(@Nonnull String service, @Nullable String resource, @Nullable String resourceId, @Nonnull Map<String,String> headers) throws CloudException, InternalException {
+    public void putResourceHeaders(@Nonnull final String service, @Nullable final String resource, @Nullable final String resourceId, @Nonnull final Map<String,String> headers) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getServiceUrl(service);
 
@@ -2208,7 +2171,7 @@ public abstract class AbstractMethod {
             resourceUri = "/" + resourceId;
         }
         else if( resourceId != null ) {
-            resourceUri = resource + "/" + resourceId;
+            resourceUri += "/" + resourceId;
         }
         try {
             putHeaders(context.getAuthToken(), endpoint, resourceUri, headers);
@@ -2354,17 +2317,18 @@ public abstract class AbstractMethod {
         }
     }
     
-    public @Nullable JSONObject putString(@Nonnull String service, @Nonnull String resource, @Nullable String resourceId, @Nonnull JSONObject body , String suffix) throws CloudException, InternalException {
+    public @Nullable JSONObject putString(@Nonnull final String service, @Nonnull final String resource, @Nullable final String resourceId, @Nonnull final JSONObject body , final String suffix) throws CloudException, InternalException {
     	AuthenticationContext context = provider.getAuthenticationContext();
+        String resourceUri = resource;
     	if( resourceId != null ) {
-    		resource = resource + "/" + (suffix != null ? (resourceId + "/" + suffix) : resourceId);
+    		resourceUri += "/" + (suffix != null ? (resourceId + "/" + suffix) : resourceId);
     	}
     	String endpoint = context.getServiceUrl(service);
     	if( endpoint == null ) {
     		throw new CloudException("No " + service + " endpoint exists");
     	}
     	try {
-    		String response = putString(context.getAuthToken(), endpoint, resource, body.toString());
+    		String response = putString(context.getAuthToken(), endpoint, resourceUri, body.toString());
     		if( response == null ) {
     			return null;
     		}

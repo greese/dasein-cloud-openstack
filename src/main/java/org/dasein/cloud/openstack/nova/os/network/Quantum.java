@@ -457,9 +457,11 @@ public class Quantum extends AbstractVLANSupport {
                 try {
                     JSONObject ob = result.getJSONObject("network");
                     VLAN vlan = toVLAN(result.getJSONObject("network"));
-
                     if( vlan == null ) {
                         throw new CloudException("No matching network was generated from " + ob.toString());
+                    }
+                    if( getNetworkType().equals(QuantumType.QUANTUM) && cidr != null ) {
+                        createSubnet(SubnetCreateOptions.getInstance(vlan.getProviderVlanId(), cidr, name + "-subnet", "Auto-created subnet"));
                     }
                     return vlan;
                 }
