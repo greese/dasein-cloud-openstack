@@ -117,8 +117,9 @@ public class CinderVolumeCapabilities extends AbstractCapabilities<NovaOpenStack
         return ((getProvider()).isHP() ? Requirement.NONE : Requirement.OPTIONAL);
     }
 
-    @Nonnull @Override public Requirement getDeviceIdOnAttachRequirement() throws InternalException, CloudException {
-        return Requirement.NONE;
+    @Override
+    public @Nonnull Requirement getDeviceIdOnAttachRequirement() throws InternalException, CloudException {
+        return Requirement.NONE; // TODO: FIND OUT!
     }
 
     @Override

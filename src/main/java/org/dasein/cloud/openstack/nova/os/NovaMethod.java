@@ -163,6 +163,10 @@ public class NovaMethod extends AbstractMethod {
     }
 
     public @Nullable JSONObject getNetworks(@Nonnull final String resource, @Nullable final String resourceId, final boolean suffix) throws CloudException, InternalException {
+        return getNetworks(resource, resourceId, suffix, null);
+    }
+
+    public @Nullable JSONObject getNetworks(@Nonnull final String resource, @Nullable final String resourceId, final boolean suffix, final String query) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
         String endpoint = context.getNetworkUrl();
 
@@ -176,7 +180,9 @@ public class NovaMethod extends AbstractMethod {
         else if( suffix ) {
             resourceUri += "/detail";
         }
-
+        if( query != null ) {
+            resourceUri += query;
+        }
         if (resourceUri != null && (!endpoint.endsWith("/") && !resourceUri.startsWith("/"))) {
             endpoint = endpoint+"/";
         }
@@ -197,7 +203,7 @@ public class NovaMethod extends AbstractMethod {
             if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
                 Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
                 cache.clear();
-                return getNetworks(resource, resourceId, suffix);
+                return getNetworks(resource, resourceId, suffix, query);
             }
             else {
                 throw ex;
@@ -269,12 +275,12 @@ public class NovaMethod extends AbstractMethod {
         }
     }
 
-    public @Nullable JSONObject postNetworks(@Nonnull final String resource, @Nullable final String resourceId, @Nonnull final JSONObject body, final boolean suffix) throws CloudException, InternalException {
+    public @Nullable JSONObject postNetworks(@Nonnull final String resource, @Nullable final String resourceId, @Nonnull final JSONObject body, @Nullable final String action) throws CloudException, InternalException {
         AuthenticationContext context = provider.getAuthenticationContext();
 
         String resourceUri = resource;
         if( resourceId != null ) {
-            resourceUri += "/" + (suffix ? (resourceId + "/action") : resourceId);
+            resourceUri = resource + "/" + (action != null ? (resourceId + "/" + action) : resourceId);
         }
         String endpoint = context.getNetworkUrl();
 
@@ -302,12 +308,57 @@ public class NovaMethod extends AbstractMethod {
             if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
                 Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
                 cache.clear();
-                return postNetworks(resource, resourceId, body, suffix);
+                return postNetworks(resource, resourceId, body, action);
             }
             else {
                 throw ex;
             }
         }
+    }
+
+    public @Nullable JSONObject putNetworks(@Nonnull final String resource, @Nullable final String resourceId, @Nonnull final JSONObject body, final String action) throws CloudException, InternalException {
+        AuthenticationContext context = provider.getAuthenticationContext();
+
+        String resourceUri = resource;
+        if( resourceId != null ) {
+            resourceUri = resource + "/" + (action != null ? (resourceId + "/" + action) : resourceId);
+        }
+        String endpoint = context.getNetworkUrl();
+
+        if( endpoint == null ) {
+            throw new CloudException("No network endpoint exists");
+        }
+
+        if (resourceUri != null && (!endpoint.endsWith("/") && !resourceUri.startsWith("/"))) {
+            endpoint = endpoint+"/";
+        }
+        try {
+            String response = putString(context.getAuthToken(), endpoint, resourceUri, body.toString());
+
+            if( response == null ) {
+                return null;
+            }
+            try {
+                return new JSONObject(response);
+            }
+            catch( JSONException e ) {
+                throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", response);
+            }
+        }
+        catch (NovaException ex) {
+            if (ex.getHttpCode() == HttpStatus.SC_UNAUTHORIZED) {
+                Cache<AuthenticationContext> cache = Cache.getInstance(provider, "authenticationContext", AuthenticationContext.class, CacheLevel.REGION_ACCOUNT, new TimePeriod<Day>(1, TimePeriod.DAY));
+                cache.clear();
+                return putNetworks(resource, resourceId, body, action);
+            }
+            else {
+                throw ex;
+            }
+        }
+    }
+
+    public @Nullable JSONObject postNetworks(@Nonnull final String resource, @Nullable final String resourceId, @Nonnull final JSONObject body, final boolean suffix) throws CloudException, InternalException {
+        return postNetworks(resource, resourceId, body, suffix ? "action" : null);
     }
 
     public @Nullable String getHPCDN(@Nullable final String resourceId) throws CloudException, InternalException {

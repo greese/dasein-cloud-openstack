@@ -71,7 +71,8 @@ public class NovaNetworkServices extends AbstractNetworkServices<NovaOpenStack> 
         if( getProvider().getCloudProvider().equals(OpenStackProvider.RACKSPACE) ) {
             return new RackspaceLoadBalancers(getProvider());
         }
-        return null;
+        return new LoadBalancerSupportImpl(getProvider());
+
     }
 
     @Override
