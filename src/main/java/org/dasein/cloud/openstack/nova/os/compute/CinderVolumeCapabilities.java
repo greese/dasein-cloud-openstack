@@ -119,6 +119,11 @@ public class CinderVolumeCapabilities extends AbstractCapabilities<NovaOpenStack
 
 
     @Override
+    public @Nonnull Requirement getDeviceIdOnAttachRequirement() throws InternalException, CloudException {
+        return Requirement.NONE; // TODO: FIND OUT!
+    }
+
+    @Override
     public boolean isVolumeSizeDeterminedByProduct() throws InternalException, CloudException {
         return false;
     }

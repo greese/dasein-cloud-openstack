@@ -666,13 +666,13 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
     
     @Override
     public void setTags(@Nonnull String imageId, @Nonnull Tag... tags) throws CloudException, InternalException {
-    APITrace.begin(getProvider(), "Image.setTags");
-    try {
-    getProvider().createTags( SERVICE, "/images", imageId, tags);
-    }
-    finally {
-    APITrace.end();
-    }
+    	APITrace.begin(getProvider(), "Image.setTags");
+    	try {
+    		getProvider().createTags( SERVICE, "/images", imageId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
     }
     
     @Override
@@ -681,7 +681,7 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
     		setTags(id, tags);
     	}
     }
-
+    
     @Override
     public void updateTags(@Nonnull String imageId, @Nonnull Tag... tags) throws CloudException, InternalException {
     	APITrace.begin(getProvider(), "Image.updateTags");
@@ -692,14 +692,14 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
     		APITrace.end();
     	}
     }
-
+    
     @Override
     public void updateTags(@Nonnull String[] imageIds, @Nonnull Tag... tags) throws CloudException, InternalException {
     	for( String id : imageIds ) {
     		updateTags(id, tags);
     	}
     }
-
+    
     @Override
     public void removeTags(@Nonnull String imageId, @Nonnull Tag... tags) throws CloudException, InternalException {
     	APITrace.begin(getProvider(), "Image.removeTags");
@@ -710,7 +710,7 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
     		APITrace.end();
     	}
     }
-
+    
     @Override
     public void removeTags(@Nonnull String[] imageIds, @Nonnull Tag... tags) throws CloudException, InternalException {
     	for( String id : imageIds ) {

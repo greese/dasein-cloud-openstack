@@ -24,13 +24,13 @@ import org.dasein.cloud.storage.AbstractStorageServices;
 
 import javax.annotation.Nonnull;
 
-public class SwiftStorageServices extends AbstractStorageServices {
-    private NovaOpenStack provider;
-    
-    public SwiftStorageServices(@Nonnull NovaOpenStack provider) { this.provider = provider; }
+public class SwiftStorageServices extends AbstractStorageServices<NovaOpenStack> {
+    public SwiftStorageServices(NovaOpenStack provider) {
+        super(provider);
+    }
 
     @Override
     public @Nonnull SwiftBlobStore getOnlineStorageSupport() {
-        return new SwiftBlobStore(provider);
+        return new SwiftBlobStore(getProvider());
     }
 }

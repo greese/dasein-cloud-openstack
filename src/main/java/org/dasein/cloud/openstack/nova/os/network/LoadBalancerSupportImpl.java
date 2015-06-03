@@ -434,7 +434,6 @@ public class LoadBalancerSupportImpl extends AbstractLoadBalancerSupport<NovaOpe
         }
     }
 
-    @Override
     public void detatchHealthCheck(@Nonnull String loadBalancerId, @Nonnull String providerLBHealthCheckId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "LB.deleteHealthMonitor");
         try {
@@ -751,11 +750,12 @@ public class LoadBalancerSupportImpl extends AbstractLoadBalancerSupport<NovaOpe
         return null;
     }
 
-    private LoadBalancer toLoadBalancer(JSONObject lb, List<JSONObject> listeners, List<JSONObject> members) throws JSONException, InternalException, CloudException {
+    private LoadBalancer toLoadBalancer(JSONObject lb, List<JSONObject> listeners, List<JSONObject> members) throws JSONException, InternalException {
         String ownerId = lb.optString("tenant_id");
         String regionId = getContext().getRegionId();
         String lbId = lb.getString("id");
-        LoadBalancerState state = "ACTIVE".equalsIgnoreCase(lb.getString("status")) ? LoadBalancerState.ACTIVE : LoadBalancerState.PENDING;
+        LoadBalancerState state = "ACTIVE".equalsIgnoreCase(lb.getString("status"))
+                ? LoadBalancerState.ACTIVE : LoadBalancerState.PENDING;
         String name = lb.getString("name");
         String description = lb.getString("description");
         LoadBalancerAddressType addressType = LoadBalancerAddressType.IP;

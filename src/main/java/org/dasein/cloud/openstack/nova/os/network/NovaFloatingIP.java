@@ -29,6 +29,7 @@ import org.dasein.cloud.ProviderContext;
 import org.dasein.cloud.Requirement;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.identity.ServiceAction;
+import org.dasein.cloud.network.AbstractIpAddressSupport;
 import org.dasein.cloud.network.AddressType;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.IpAddress;
@@ -53,6 +54,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -66,17 +68,16 @@ import java.util.concurrent.Future;
  * @version 2012.04.1 Added some intelligence around features Rackspace does not support
  * @version 2013.02 updated to 2013.02 model
  */
-public class NovaFloatingIP implements IpAddressSupport {
+public class NovaFloatingIP extends AbstractIpAddressSupport<NovaOpenStack> {
     static private final Logger logger = NovaOpenStack.getLogger(NovaFloatingIP.class, "std");
 
     static public final String QUANTIUM_TARGET = "/floating-ips";
     static public final String NOVA_TARGET     = "/os-floating-ips";
 
-    private NovaOpenStack provider;
     static private final ExecutorService threadPool = Executors.newFixedThreadPool(10);
     
     NovaFloatingIP(NovaOpenStack cloud) {
-        provider = cloud;
+        super(cloud);
     }
 
     private String getEndpoint() {
@@ -85,7 +86,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public void assign(@Nonnull String addressId, @Nonnull String serverId) throws InternalException, CloudException {
-        APITrace.begin(provider, "IpAddress.assign");
+        APITrace.begin(getProvider(), "IpAddress.assign");
         try {
             HashMap<String,Object> json = new HashMap<String,Object>();
             HashMap<String,Object> action = new HashMap<String,Object>();
@@ -98,7 +99,7 @@ public class NovaFloatingIP implements IpAddressSupport {
             action.put("address",addr.getRawAddress().getIpAddress());
             json.put("addFloatingIp", action);
 
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
 
             method.postServers("/servers", serverId, new JSONObject(json), true);
         }
@@ -122,22 +123,16 @@ public class NovaFloatingIP implements IpAddressSupport {
     @Override
     public IPAddressCapabilities getCapabilities() throws CloudException, InternalException {
         if( capabilities == null ) {
-            capabilities = new FloatingIPCapabilities(provider);
+            capabilities = new FloatingIPCapabilities(getProvider());
         }
         return capabilities;
     }
 
     @Override
     public @Nullable IpAddress getIpAddress(@Nonnull String addressId) throws InternalException, CloudException {
-        APITrace.begin(provider, "IpAddress.getIpAddress");
+        APITrace.begin(getProvider(), "IpAddress.getIpAddress");
         try {
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                logger.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject ob = method.getServers(getEndpoint(), addressId, false);
 
             if( ob == null ) {
@@ -146,7 +141,7 @@ public class NovaFloatingIP implements IpAddressSupport {
             try {
                 if( ob.has("floating_ip") ) {
                     JSONObject json = ob.getJSONObject("floating_ip");
-                    IpAddress addr = toIP(ctx, json);
+                    IpAddress addr = toIP(json);
 
                     if( addr != null ) {
                         return addr;
@@ -210,9 +205,9 @@ public class NovaFloatingIP implements IpAddressSupport {
     }
 
     private boolean verifySupport() throws InternalException, CloudException {
-        APITrace.begin(provider, "IpAddress.verifySupport");
+        APITrace.begin(getProvider(), "IpAddress.verifySupport");
         try {
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
 
             try {
                 method.getServers(getEndpoint(), null, false);
@@ -233,12 +228,12 @@ public class NovaFloatingIP implements IpAddressSupport {
     @SuppressWarnings("SimplifiableIfStatement")
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
-        APITrace.begin(provider, "IpAddress.isSubscribed");
+        APITrace.begin(getProvider(), "IpAddress.isSubscribed");
         try {
-            if( provider.getMajorVersion() > 1 && provider.getComputeServices().getVirtualMachineSupport().isSubscribed() ) {
+            if( getProvider().getMajorVersion() > 1 && getProvider().getComputeServices().getVirtualMachineSupport().isSubscribed() ) {
                 return verifySupport();
             }
-            if( provider.getMajorVersion() == 1 && provider.getMinorVersion() >= 1  &&  provider.getComputeServices().getVirtualMachineSupport().isSubscribed() ) {
+            if( getProvider().getMajorVersion() == 1 && getProvider().getMinorVersion() >= 1  &&  getProvider().getComputeServices().getVirtualMachineSupport().isSubscribed() ) {
                 return verifySupport();
             }
             return false;
@@ -260,7 +255,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public @Nonnull Iterable<IpAddress> listIpPool(@Nonnull IPVersion version, boolean unassignedOnly) throws InternalException, CloudException {
-        APITrace.begin(provider, "IpAddress.listIpPool");
+        APITrace.begin(getProvider(), "IpAddress.listIpPool");
         try {
             Future<Iterable<IpAddress>> ipPoolFuture = listIpPoolConcurrently(version, unassignedOnly);
             return ipPoolFuture.get();
@@ -277,13 +272,13 @@ public class NovaFloatingIP implements IpAddressSupport {
             if( !getVersions().contains(version) ) {
                 return Collections.emptyList();
             }
-            ProviderContext ctx = provider.getContext();
+            ProviderContext ctx = getProvider().getContext();
 
             if( ctx == null ) {
                 logger.error("No context exists for this request");
                 throw new InternalException("No context exists for this request");
             }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject ob = method.getServers(getEndpoint(), null, false);
             ArrayList<IpAddress> addresses = new ArrayList<IpAddress>();
 
@@ -346,13 +341,7 @@ public class NovaFloatingIP implements IpAddressSupport {
             if( !getVersions().contains(version) ) {
                 return Collections.emptyList();
             }
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                logger.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject ob = method.getServers(getEndpoint(), null, false);
             ArrayList<IpAddress> addresses = new ArrayList<IpAddress>();
 
@@ -364,7 +353,7 @@ public class NovaFloatingIP implements IpAddressSupport {
                         JSONObject json = list.getJSONObject(i);
 
                         try {
-                            IpAddress addr = toIP(ctx, json);
+                            IpAddress addr = toIP(json);
 
                             if( addr != null ) {
                                 if( !unassignedOnly || addr.getServerId() == null ) {
@@ -390,17 +379,12 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public @Nonnull Iterable<ResourceStatus> listIpPoolStatus(@Nonnull IPVersion version) throws InternalException, CloudException {
-        APITrace.begin(provider, "IpAddress.listIpPoolStatus");
+        APITrace.begin(getProvider(), "IpAddress.listIpPoolStatus");
         try {
             if( !getVersions().contains(version) ) {
                 return Collections.emptyList();
             }
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                throw new InternalException("No context exists for this request");
-            }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject ob = method.getServers(getEndpoint(), null, false);
             ArrayList<ResourceStatus> addresses = new ArrayList<ResourceStatus>();
 
@@ -464,15 +448,9 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public void releaseFromPool(@Nonnull String addressId) throws InternalException, CloudException {
-        APITrace.begin(provider, "IpAddress.releaseFromPool");
+        APITrace.begin(getProvider(), "IpAddress.releaseFromPool");
         try {
-            ProviderContext ctx = provider.getContext();
-
-            if( ctx == null ) {
-                logger.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
             long timeout = System.currentTimeMillis() + CalendarWrapper.HOUR;
 
             do {
@@ -496,7 +474,7 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public void releaseFromServer(@Nonnull String addressId) throws InternalException, CloudException {
-        APITrace.begin(provider, "IpAddress.releaseFromServer");
+        APITrace.begin(getProvider(), "IpAddress.releaseFromServer");
         try {
             HashMap<String,Object> json = new HashMap<String,Object>();
             HashMap<String,Object> action = new HashMap<String,Object>();
@@ -514,7 +492,7 @@ public class NovaFloatingIP implements IpAddressSupport {
             action.put("address", addr.getRawAddress().getIpAddress());
             json.put("removeFloatingIp", action);
 
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
 
             method.postServers("/servers", serverId, new JSONObject(json), true);
         }
@@ -524,7 +502,7 @@ public class NovaFloatingIP implements IpAddressSupport {
     }
 
     private Iterable<String> listPools() throws CloudException, InternalException {
-        NovaMethod method = new NovaMethod(provider);
+        NovaMethod method = new NovaMethod(getProvider());
         JSONObject ob = method.getServers("/os-floating-ip-pools", null, false);
         ArrayList<String> pools = new ArrayList<String>();
         ArrayList<String> tmp = new ArrayList<String>();
@@ -586,30 +564,25 @@ public class NovaFloatingIP implements IpAddressSupport {
     }
 
     private @Nonnull String request(@Nonnull IPVersion version, @Nullable String pool) throws InternalException, CloudException {
-        APITrace.begin(provider, "IpAddress.request");
+        APITrace.begin(getProvider(), "IpAddress.request");
         try {
             if( !getVersions().contains(version) ) {
                 throw new OperationNotSupportedException("Cannot request an IPv6 IP address at this time");
             }
-            ProviderContext ctx = provider.getContext();
 
-            if( ctx == null ) {
-                logger.error("No context exists for this request");
-                throw new InternalException("No context exists for this request");
-            }
-            HashMap<String,Object> wrapper = new HashMap<String,Object>();
+            Map<String,Object> wrapper = new HashMap<String,Object>();
 
             if( pool != null ) {
                 wrapper.put("pool", pool);
             }
 
-            NovaMethod method = new NovaMethod(provider);
+            NovaMethod method = new NovaMethod(getProvider());
             JSONObject result = method.postServers(getEndpoint(), null, new JSONObject(wrapper), false);
 
             if( result != null && result.has("floating_ip") ) {
                 try {
                     JSONObject ob = result.getJSONObject("floating_ip");
-                    IpAddress addr = toIP(ctx, ob);
+                    IpAddress addr = toIP(ob);
 
                     if( addr != null ) {
                         return addr.getProviderIpAddressId();
@@ -634,12 +607,12 @@ public class NovaFloatingIP implements IpAddressSupport {
 
     @Override
     public @Nonnull String requestForVLAN(@Nonnull IPVersion version) throws InternalException, CloudException {
-        throw new OperationNotSupportedException(provider.getCloudName() + " does not support static IP addresses for VLANs");
+        throw new OperationNotSupportedException(getProvider().getCloudName() + " does not support static IP addresses for VLANs");
     }
 
     @Override
     public @Nonnull String requestForVLAN(@Nonnull IPVersion version, @Nonnull String vlanId) throws InternalException, CloudException {
-        throw new OperationNotSupportedException(provider.getCloudName() + " does not support static IP addresses for VLANs");
+        throw new OperationNotSupportedException(getProvider().getCloudName() + " does not support static IP addresses for VLANs");
     }
 
     @Override
@@ -652,11 +625,11 @@ public class NovaFloatingIP implements IpAddressSupport {
         return false;
     }
 
-    private IpAddress toIP(ProviderContext ctx, JSONObject json) throws JSONException {
+    private IpAddress toIP(JSONObject json) throws JSONException, InternalException {
         if(json == null ) {
             return null;
         }
-        String regionId = ctx.getRegionId();
+        String regionId = getContext().getRegionId();
 
         IpAddress address = new IpAddress();
 

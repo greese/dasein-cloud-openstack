@@ -42,6 +42,7 @@ import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.openstack.nova.os.SwiftMethod;
 import org.dasein.cloud.storage.AbstractBlobStoreSupport;
 import org.dasein.cloud.storage.Blob;
+import org.dasein.cloud.storage.BlobStoreCapabilities;
 import org.dasein.cloud.storage.FileTransfer;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.NamingConstraints;
@@ -62,6 +63,17 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport<NovaOpenStack> {
     static public final Storage<Byte>                             MAX_OBJECT_SIZE = new Storage<org.dasein.util.uom.storage.Byte>(5000000000L, Storage.BYTE);
 
     SwiftBlobStore(@Nonnull NovaOpenStack provider) { super(provider); }
+
+    private transient volatile SwiftBlobStoreCapabilities capabilities;
+
+    @Nonnull
+    @Override
+    public BlobStoreCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new SwiftBlobStoreCapabilities(getProvider());
+        }
+        return capabilities;
+    }
 
     @Override
     public boolean allowsNestedBuckets() throws CloudException, InternalException {
@@ -720,6 +732,44 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport<NovaOpenStack> {
     public @Nonnull NamingConstraints getObjectNameRules() throws CloudException, InternalException {
         return NamingConstraints.getAlphaNumeric(1, 255).lowerCaseOnly().limitedToLatin1().constrainedBy(new char[] { '-', '.', ',', '#', '+' });
         //return NameRules.getInstance(1, 255, false, true, true, new char[] { '-', '.', ',', '#', '+' });
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String bucketName, @Nonnull Tag ... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Bucket.updateTags");
+    	try {
+    		SwiftMethod method = new SwiftMethod(getProvider());
+    		method.put( bucketName , "X-Container-Meta-", tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String[] bucketNames, @Nonnull Tag ... tags) throws CloudException, InternalException {
+    	for( String id : bucketNames ) {
+    		updateTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String bucketName, @Nonnull Tag ... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Bucket.removeTags");
+    	try {
+    		SwiftMethod method = new SwiftMethod(getProvider());
+    		method.put( bucketName , "X-Remove-Container-Meta-", tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String[] bucketNames, @Nonnull Tag ... tags) throws CloudException, InternalException {
+    	for( String id : bucketNames ) {
+    		removeTags(id, tags);
+    	}
     }
 
     @Override

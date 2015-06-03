@@ -1424,6 +1424,60 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         }
         return vm;
     }
+    
+    @Override
+    public void setTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Server.setTags");
+    	try {
+    		getProvider().createTags( SERVICE, "/servers", vmId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void setTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		setTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Server.updateTags");
+    	try {
+    		getProvider().updateTags( SERVICE, "/servers", vmId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void updateTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		updateTags(id, tags);
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	APITrace.begin(getProvider(), "Server.removeTags");
+    	try {
+    		getProvider().removeTags( SERVICE, "/servers", vmId, tags);
+    	}
+    	finally {
+    		APITrace.end();
+    	}
+    }
+    
+    @Override
+    public void removeTags(@Nonnull String[] vmIds, @Nonnull Tag... tags) throws CloudException, InternalException {
+    	for( String id : vmIds ) {
+    		removeTags(id, tags);
+    	}
+    }
 
     @Override
     public void setTags(@Nonnull String vmId, @Nonnull Tag... tags) throws CloudException, InternalException {

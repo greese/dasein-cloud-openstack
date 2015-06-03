@@ -31,18 +31,17 @@ import javax.annotation.Nullable;
  * @since 2011.10
  * @version 2011.10
  */
-public class NovaIdentityServices extends AbstractIdentityServices {
-    private NovaOpenStack provider;
+public class NovaIdentityServices extends AbstractIdentityServices<NovaOpenStack> {
 
     public NovaIdentityServices(@Nonnull NovaOpenStack cloud) {
-        provider = cloud;
+        super(cloud);
     }
 
     @Override
     public @Nullable NovaKeypair getShellKeySupport() {
-        if( provider.getProviderName().equals("Rackspace") ) {
+        if( getProvider().getProviderName().equals("Rackspace") ) {
             return null;
         }
-        return new NovaKeypair(provider);
+        return new NovaKeypair(getProvider());
     }
 }

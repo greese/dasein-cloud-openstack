@@ -31,20 +31,19 @@ import org.dasein.cloud.platform.CDNSupport;
  * @since 2012.04.1
  * @version 2012.04.1
  */
-public class HPPlatformServices extends AbstractPlatformServices {
-    private NovaOpenStack provider;
+public class HPPlatformServices extends AbstractPlatformServices<NovaOpenStack> {
     
     public HPPlatformServices(NovaOpenStack provider) {
-        this.provider = provider;
+        super(provider);
     }
 
     @Override
     public CDNSupport getCDNSupport() {
-        return new HPCDN(provider);
+        return new HPCDN(getProvider());
     }
 
     @Override
     public HPRDBMS getRelationalDatabaseSupport() {
-        return new HPRDBMS(provider);
+        return new HPRDBMS(getProvider());
     }
 }

@@ -39,7 +39,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 public class SwiftMethod extends AbstractMethod {
-    static private final Logger logger = NovaOpenStack.getLogger(SwiftMethod.class, "std");
+	static private final Logger logger = NovaOpenStack.getLogger(SwiftMethod.class, "std");
     public SwiftMethod(NovaOpenStack provider) { super(provider); }
         
     public void delete(@Nonnull String bucket) throws CloudException, InternalException {
@@ -243,13 +243,12 @@ public class SwiftMethod extends AbstractMethod {
     public void put(@Nonnull String bucket, @Nonnull String prefix, @Nonnull Tag ... tags) throws CloudException, InternalException {
     	AuthenticationContext context = provider.getAuthenticationContext();
     	String endpoint = context.getStorageUrl();
-
     	if( endpoint == null ) {
     		throw new CloudException("No storage endpoint exists for " + context.getMyRegion());
     	}
     	try {
     		HashMap<String,String> customHeaders = new HashMap<String,String>();
-    		for (int i = 0; i < tags.length ; i++ ) {	
+    		for (int i = 0; i < tags.length ; i++ ) {
     			customHeaders.put(prefix + tags[i].getKey(), tags[i].getValue() != null ? tags[i].getValue() : "");
     		}
     		putHeaders(context.getAuthToken(), endpoint, "/" + bucket, customHeaders);

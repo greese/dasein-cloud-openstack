@@ -31,20 +31,19 @@ import org.dasein.cloud.platform.RelationalDatabaseSupport;
  * @since 2012.04.1
  * @version 2012.04.1
  */
-public class RackspacePlatformServices extends AbstractPlatformServices {
-    private NovaOpenStack provider;
+public class RackspacePlatformServices extends AbstractPlatformServices<NovaOpenStack> {
 
     public RackspacePlatformServices(NovaOpenStack provider) {
-        this.provider = provider;
+        super(provider);
     }
 
     @Override
     public RackspaceCDN getCDNSupport() {
-        return new RackspaceCDN(provider);
+        return new RackspaceCDN(getProvider());
     }
 
     @Override
     public RelationalDatabaseSupport getRelationalDatabaseSupport() {
-        return new RackspaceRDBMS(provider);
+        return new RackspaceRDBMS(getProvider());
     }
 }

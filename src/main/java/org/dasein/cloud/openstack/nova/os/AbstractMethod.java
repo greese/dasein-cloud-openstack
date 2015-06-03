@@ -2350,7 +2350,7 @@ public abstract class AbstractMethod {
     		}
     	}
     }
-    
+
     protected @Nullable String putString(@Nonnull String authToken, @Nonnull String endpoint, @Nonnull String resource, @Nullable String payload) throws CloudException, InternalException {
         Logger std = NovaOpenStack.getLogger(NovaOpenStack.class, "std");
         Logger wire = NovaOpenStack.getLogger(NovaOpenStack.class, "wire");

@@ -459,7 +459,7 @@ public class NovaOpenStack extends AbstractCloud {
     				method.deleteResource(service, resource + "/" + resourceId + "/metadata", keyValuePairs[i].getKey().toLowerCase(), null);
     			}
     		} catch( Exception e ) {
-    			logger.error("Error while removing tags for " + resource + " - " + resourceId + ".", e);
+    			logger.error("Error while removing tags from " + resource + " - " + resourceId + ".", e);
     		}
     	} finally {
     		APITrace.end();
