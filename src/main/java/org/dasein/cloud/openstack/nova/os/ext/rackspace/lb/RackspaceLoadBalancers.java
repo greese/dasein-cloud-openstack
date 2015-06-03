@@ -278,36 +278,6 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         }
     }
 
-    @SuppressWarnings("deprecation")
-    @Override
-    @Deprecated
-    public @Nonnull String create(@Nonnull String name, @Nonnull String description, @Nullable String addressId, @Nullable String[] dataCenterIds, @Nullable LbListener[] listeners, @Nullable String[] serverIds, @Nullable String[] subnetIds, @Nullable LbType type) throws CloudException, InternalException {
-        LoadBalancerCreateOptions options;
-
-        if( addressId == null ) {
-            options = LoadBalancerCreateOptions.getInstance(name, description);
-        }
-        else {
-            options = LoadBalancerCreateOptions.getInstance(name, description, addressId);
-        }
-        if( dataCenterIds != null ) {
-            options.limitedTo(dataCenterIds);
-        }
-        if( listeners != null ) {
-            options.havingListeners(listeners);
-        }
-        if( serverIds != null ) {
-            options.withVirtualMachines(serverIds);
-        }
-        if (subnetIds != null) {
-            options.withProviderSubnetIds(subnetIds);
-        }
-        if (type != null) {
-            options.asType(type);
-        }
-        return createLoadBalancer(options);
-    }
-
     @Override
     public @Nonnull String createLoadBalancer(@Nonnull LoadBalancerCreateOptions options) throws CloudException, InternalException {
         APITrace.begin(provider, "LB.create");
@@ -511,11 +481,6 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         }
     }
 
-    @Override
-    public @Nonnull LoadBalancerAddressType getAddressType() throws CloudException, InternalException {
-        return LoadBalancerAddressType.IP;
-    }
-
     private transient volatile RackspaceLBCapabilities capabilities;
     @Nonnull
     @Override
@@ -524,16 +489,6 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
             capabilities = new RackspaceLBCapabilities(provider);
         }
         return capabilities;
-    }
-
-    @Override
-    public int getMaxPublicPorts() throws CloudException, InternalException {
-        return 1;
-    }
-
-    @Override
-    public @Nonnull String getProviderTermForLoadBalancer(@Nonnull Locale locale) {
-        return "load balancer";
     }
 
     @Override
@@ -768,86 +723,6 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         }
     }
 
-    static private transient Collection<LbAlgorithm> supportedAlgorithms;
-    
-    @Override
-    public @Nonnull Iterable<LbAlgorithm> listSupportedAlgorithms() throws CloudException, InternalException {
-        if( supportedAlgorithms == null ) {
-            ArrayList<LbAlgorithm> algorithms = new ArrayList<LbAlgorithm>();
-            
-            algorithms.add(LbAlgorithm.ROUND_ROBIN);
-            algorithms.add(LbAlgorithm.LEAST_CONN);
-            supportedAlgorithms = Collections.unmodifiableList(algorithms);
-        }
-        return supportedAlgorithms;
-    }
-
-    @Override
-    public @Nonnull Iterable<IPVersion> listSupportedIPVersions() throws CloudException, InternalException {
-        return Collections.singletonList(IPVersion.IPV4);
-    }
-
-    @Override
-    public @Nonnull Iterable<LbProtocol> listSupportedProtocols() throws CloudException, InternalException {
-        Cache<LbProtocol> cache = Cache.getInstance(getProvider(), "lbProtocols", LbProtocol.class, CacheLevel.REGION_ACCOUNT);
-        Iterable<LbProtocol> protocols = cache.get(getContext());
-
-        if( protocols != null ) {
-            return protocols;
-        }
-        NovaMethod method = new NovaMethod(provider);
-        JSONObject ob = method.getResource(SERVICE, RESOURCE, "protocols", false);
-
-        if( ob == null || !ob.has("protocols") || ob.isNull("protocols")) {
-            return Collections.singletonList(LbProtocol.RAW_TCP);
-        }
-        ArrayList<LbProtocol> list = new ArrayList<LbProtocol>();
-
-        list.add(LbProtocol.RAW_TCP);
-        try {
-            JSONArray matches = ob.getJSONArray("protocols");
-
-            for( int i=0; i<matches.length(); i++ ) {
-                JSONObject p = matches.getJSONObject(i);
-                String name = (p.has("name") && !p.isNull("name")) ? p.getString("name") : null;
-
-                if( name != null ) {
-                    if( name.equalsIgnoreCase("http") ) {
-                        list.add(LbProtocol.HTTP);
-                    }
-                    else if( name.equalsIgnoreCase("https") ) {
-                        list.add(LbProtocol.HTTPS);
-                    }
-                }
-            }
-        }
-        catch( JSONException e ) {
-            throw new CloudException("Unable to parse protocols from Rackspace: " + e.getMessage());
-        }
-        cache.put(getContext(), list);
-        return list;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyEndpointsOnCreateRequirement() throws CloudException, InternalException {
-        return Requirement.REQUIRED;
-    }
-
-    @Override
-    public @Nonnull Requirement identifyListenersOnCreateRequirement() throws CloudException, InternalException {
-        return Requirement.REQUIRED;
-    }
-
-    @Override
-    public boolean isAddressAssignedByProvider() throws CloudException, InternalException {
-        return true;
-    }
-
-    @Override
-    public boolean isDataCenterLimited() throws CloudException, InternalException {
-        return false;
-    }
-
     @Override
     public boolean isSubscribed() throws CloudException, InternalException {
         return (provider.testContext() != null);
@@ -902,13 +777,6 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         finally {
             APITrace.end();
         }
-    }
-
-    @SuppressWarnings("deprecation")
-    @Override
-    @Deprecated
-    public void remove(@Nonnull String loadBalancerId) throws CloudException, InternalException {
-        removeLoadBalancer(loadBalancerId);
     }
 
     @Override
@@ -1159,22 +1027,6 @@ public class RackspaceLoadBalancers extends AbstractLoadBalancerSupport<NovaOpen
         finally {
             APITrace.end();
         }
-    }
-
-
-    @Override
-    public boolean supportsAddingEndpoints() throws CloudException, InternalException {
-        return true;
-    }
-
-    @Override
-    public boolean supportsMonitoring() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public boolean supportsMultipleTrafficTypes() throws CloudException, InternalException {
-        return false;
     }
 
     private @Nullable LoadBalancer toLoadBalancer(@Nullable JSONObject json, @Nullable Iterable<VirtualMachine> possibleNodes) throws InternalException, CloudException {

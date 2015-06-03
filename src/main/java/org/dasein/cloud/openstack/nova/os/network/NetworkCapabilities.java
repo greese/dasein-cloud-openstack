@@ -23,6 +23,7 @@ import org.dasein.cloud.*;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.network.IPVersion;
 import org.dasein.cloud.network.VLANCapabilities;
+import org.dasein.cloud.util.NamingConstraints;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -155,5 +156,8 @@ public class NetworkCapabilities extends AbstractCapabilities<NovaOpenStack> imp
         return false;
     }
 
-
+    @Override
+    public NamingConstraints getVlanNamingConstraints(){
+        return NamingConstraints.getAlphaNumeric(1, 100);
+    }
 }

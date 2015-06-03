@@ -22,6 +22,7 @@ package org.dasein.cloud.openstack.nova.os.compute;
 import org.dasein.cloud.*;
 import org.dasein.cloud.compute.SnapshotCapabilities;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.NamingConstraints;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -74,5 +75,10 @@ public class CinderSnapshotCapabilities extends AbstractCapabilities<NovaOpenSta
     @Override
     public boolean supportsSnapshotSharingWithPublic() throws InternalException, CloudException {
         return false;
+    }
+
+    @Override
+    public NamingConstraints getSnapshotNamingConstraints(){
+        return NamingConstraints.getAlphaNumeric(0, 255);
     }
 }

@@ -434,7 +434,6 @@ public class LoadBalancerSupportImpl extends AbstractLoadBalancerSupport<NovaOpe
         }
     }
 
-    @Override
     public void detatchHealthCheck(@Nonnull String loadBalancerId, @Nonnull String providerLBHealthCheckId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "LB.deleteHealthMonitor");
         try {

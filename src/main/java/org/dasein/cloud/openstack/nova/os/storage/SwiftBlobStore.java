@@ -42,6 +42,7 @@ import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.openstack.nova.os.SwiftMethod;
 import org.dasein.cloud.storage.AbstractBlobStoreSupport;
 import org.dasein.cloud.storage.Blob;
+import org.dasein.cloud.storage.BlobStoreCapabilities;
 import org.dasein.cloud.storage.FileTransfer;
 import org.dasein.cloud.util.APITrace;
 import org.dasein.cloud.util.NamingConstraints;
@@ -62,6 +63,17 @@ public class SwiftBlobStore extends AbstractBlobStoreSupport<NovaOpenStack> {
     static public final Storage<Byte>                             MAX_OBJECT_SIZE = new Storage<org.dasein.util.uom.storage.Byte>(5000000000L, Storage.BYTE);
 
     SwiftBlobStore(@Nonnull NovaOpenStack provider) { super(provider); }
+
+    private transient volatile SwiftBlobStoreCapabilities capabilities;
+
+    @Nonnull
+    @Override
+    public BlobStoreCapabilities getCapabilities() throws CloudException, InternalException {
+        if( capabilities == null ) {
+            capabilities = new SwiftBlobStoreCapabilities(getProvider());
+        }
+        return capabilities;
+    }
 
     @Override
     public boolean allowsNestedBuckets() throws CloudException, InternalException {

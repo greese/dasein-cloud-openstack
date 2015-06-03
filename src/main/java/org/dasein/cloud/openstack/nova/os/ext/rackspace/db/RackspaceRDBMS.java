@@ -252,70 +252,6 @@ public class RackspaceRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenSt
         finally {
             APITrace.end();
         }
-    } 
-    
-    @Override
-    public Iterable<DatabaseProduct> getDatabaseProducts(DatabaseEngine forEngine) throws CloudException, InternalException {
-        APITrace.begin(getProvider(), "RDBMS.getDatabaseProducts");
-        try {
-            if( DatabaseEngine.MYSQL.equals(forEngine) ) {
-                Logger std = NovaOpenStack.getLogger(RackspaceRDBMS.class, "std");
-
-                if( std.isTraceEnabled() ) {
-                    std.trace("ENTER: " + RackspaceRDBMS.class.getName() + ".getDatabaseProducts()");
-                }
-                try {
-                    ProviderContext ctx = getProvider().getContext();
-
-                    if( ctx == null ) {
-                        std.error("No context exists for this request");
-                        throw new InternalException("No context exists for this request");
-                    }
-                    NovaMethod method = new NovaMethod(getProvider());
-
-                    JSONObject json = method.getResource(SERVICE, "/flavors", null, false);
-
-                    List<DatabaseProduct> products = new ArrayList<DatabaseProduct>();
-
-                    if( json != null && json.has("flavors") ) {
-                        try {
-                            JSONArray flavors = json.getJSONArray("flavors");
-
-                            for( int i=0; i<flavors.length(); i++ ) {
-                                JSONObject flavor = flavors.getJSONObject(i);
-
-                                if( flavor != null ) {
-                                    for( int size : new int[] { 2, 5, 10, 20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 150}) { //150 is max size , 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 } ) {
-                                       DatabaseProduct product = toProduct(ctx, size, flavor);
-
-                                        if( product != null ) {
-                                            products.add(product);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        catch( JSONException e ) {
-                            std.error("getDatabaseProducts(): Unable to identify expected values in JSON: " + e.getMessage());
-                            e.printStackTrace();
-                            throw new CloudException(CloudErrorType.COMMUNICATION, 200, "invalidJson", "Missing JSON element for flavors in " + json.toString());
-                        }
-                    }
-                    return products;
-                }
-                finally {
-                    if( std.isTraceEnabled() ) {
-                        std.trace("exit - " + RackspaceRDBMS.class.getName() + ".getDatabaseProducts()");
-                    }
-                }
-            }
-            else {
-                return Collections.emptyList();
-            }
-        }
-        finally {
-            APITrace.end();
-        }
     }
 
     @Override
@@ -433,16 +369,6 @@ public class RackspaceRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenSt
         finally {
             APITrace.end();
         }
-    }
-            
-    @Override
-    public String getProviderTermForDatabase(Locale locale) {
-        return "database";
-    }
-
-    @Override
-    public String getProviderTermForSnapshot(Locale locale) {
-        return "snapshot";
     }
 
     @Override

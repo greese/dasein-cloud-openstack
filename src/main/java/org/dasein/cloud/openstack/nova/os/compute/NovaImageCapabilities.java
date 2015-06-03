@@ -26,6 +26,7 @@ import org.dasein.cloud.compute.MachineImageFormat;
 import org.dasein.cloud.compute.MachineImageType;
 import org.dasein.cloud.compute.VmState;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.NamingConstraints;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -148,5 +149,10 @@ public class NovaImageCapabilities extends AbstractCapabilities<NovaOpenStack> i
     @Override
     public boolean supportsPublicLibrary(@Nonnull ImageClass cls) throws CloudException, InternalException {
         return true;
+    }
+
+    @Override
+    public NamingConstraints getImageNamingConstraints(){
+        return NamingConstraints.getAlphaNumeric(1, 100);
     }
 }

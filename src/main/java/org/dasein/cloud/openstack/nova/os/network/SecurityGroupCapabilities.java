@@ -22,6 +22,7 @@ package org.dasein.cloud.openstack.nova.os.network;
 import org.dasein.cloud.*;
 import org.dasein.cloud.network.*;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.NamingConstraints;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -143,5 +144,10 @@ public class SecurityGroupCapabilities extends AbstractCapabilities<NovaOpenStac
     @Override
     public boolean supportsFirewallDeletion() throws CloudException, InternalException {
         return true;
+    }
+
+    @Override
+    public NamingConstraints getFirewallNamingConstraints(){
+        return NamingConstraints.getAlphaNumeric(1, 100);
     }
 }
