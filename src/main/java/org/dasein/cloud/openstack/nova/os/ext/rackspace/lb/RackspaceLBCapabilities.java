@@ -31,6 +31,7 @@ import org.dasein.cloud.openstack.nova.os.NovaMethod;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
 import org.dasein.cloud.util.Cache;
 import org.dasein.cloud.util.CacheLevel;
+import org.dasein.cloud.util.NamingConstraints;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -213,6 +214,16 @@ public class RackspaceLBCapabilities extends AbstractCapabilities<NovaOpenStack>
 
     @Override
     public boolean supportsMultipleTrafficTypes() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public @Nonnull NamingConstraints getLoadBalancerNamingConstraints(){
+        return NamingConstraints.getAlphaNumeric(1, 100);
+    }
+
+    @Override
+    public boolean supportsSslCertificateStore(){
         return false;
     }
 }

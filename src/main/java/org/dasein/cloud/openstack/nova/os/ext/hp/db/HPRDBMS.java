@@ -298,9 +298,8 @@ public class HPRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenStack> {
             }
         }
         return null;
-    } 
-    
-    @Override
+    }
+
     public Iterable<DatabaseProduct> getDatabaseProducts(DatabaseEngine forEngine) throws CloudException, InternalException {
         if( DatabaseEngine.MYSQL.equals(forEngine) ) {
             Logger std = NovaOpenStack.getLogger(HPRDBMS.class, "std");
@@ -476,16 +475,6 @@ public class HPRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenStack> {
     }
 
     @Override
-    public String getProviderTermForDatabase(Locale locale) {
-        return "database";
-    }
-
-    @Override
-    public String getProviderTermForSnapshot(Locale locale) {
-        return "snapshot";
-    }
-
-    @Override
     public DatabaseSnapshot getSnapshot(String providerDbSnapshotId) throws CloudException, InternalException {
         APITrace.begin(getProvider(), "RDBMS.getSnapshot");
         try {
@@ -526,31 +515,6 @@ public class HPRDBMS extends AbstractRelationalDatabaseSupport<NovaOpenStack> {
         finally {
             APITrace.end();
         }
-    }
-
-    @Override
-    public boolean isSupportsFirewallRules() {
-        return false;
-    }
-
-    @Override
-    public boolean isSupportsHighAvailability() throws CloudException, InternalException {
-        return false;
-    }
-
-    @Override
-    public boolean isSupportsLowAvailability() throws CloudException, InternalException {
-        return true;
-    }
-
-    @Override
-    public boolean isSupportsMaintenanceWindows() {
-        return false;
-    }
-
-    @Override
-    public boolean isSupportsSnapshots() {
-        return true;
     }
 
     @Override

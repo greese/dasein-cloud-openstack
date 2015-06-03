@@ -3,6 +3,7 @@ package org.dasein.cloud.openstack.nova.os.network;
 import org.dasein.cloud.*;
 import org.dasein.cloud.network.*;
 import org.dasein.cloud.openstack.nova.os.NovaOpenStack;
+import org.dasein.cloud.util.NamingConstraints;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -118,6 +119,16 @@ public class LoadBalancerCapabilitiesImpl extends AbstractCapabilities<NovaOpenS
 
     @Override
     public boolean supportsMultipleTrafficTypes() throws CloudException, InternalException {
+        return false;
+    }
+
+    @Override
+    public @Nonnull NamingConstraints getLoadBalancerNamingConstraints(){
+        return NamingConstraints.getAlphaNumeric(1, 100);
+    }
+
+    @Override
+    public boolean supportsSslCertificateStore(){
         return false;
     }
 }
