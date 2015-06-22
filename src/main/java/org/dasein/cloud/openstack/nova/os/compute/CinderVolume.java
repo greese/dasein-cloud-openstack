@@ -520,7 +520,7 @@ public class CinderVolume extends AbstractVolumeSupport {
                     state = VolumeState.PENDING;
                 }
                 else if( status.equalsIgnoreCase("error") ) {
-                    state = VolumeState.PENDING;
+                    state = VolumeState.ERROR;
                 }
                 else if( status.equals("in-use") ) {
                     state = VolumeState.AVAILABLE;
@@ -639,7 +639,7 @@ public class CinderVolume extends AbstractVolumeSupport {
                     currentState = VolumeState.PENDING;
                 }
                 else if( status.equalsIgnoreCase("error") ) {
-                    currentState = VolumeState.PENDING;
+                    currentState = VolumeState.ERROR;
                 }
                 else if( status.equals("in-use") ) {
                     currentState = VolumeState.AVAILABLE;

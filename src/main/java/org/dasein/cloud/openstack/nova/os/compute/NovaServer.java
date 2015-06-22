@@ -29,16 +29,7 @@ import org.dasein.cloud.InternalException;
 import org.dasein.cloud.OperationNotSupportedException;
 import org.dasein.cloud.ResourceStatus;
 import org.dasein.cloud.Tag;
-import org.dasein.cloud.compute.AbstractVMSupport;
-import org.dasein.cloud.compute.Architecture;
-import org.dasein.cloud.compute.MachineImage;
-import org.dasein.cloud.compute.Platform;
-import org.dasein.cloud.compute.VMLaunchOptions;
-import org.dasein.cloud.compute.VirtualMachine;
-import org.dasein.cloud.compute.VirtualMachineCapabilities;
-import org.dasein.cloud.compute.VirtualMachineProduct;
-import org.dasein.cloud.compute.VirtualMachineProductFilterOptions;
-import org.dasein.cloud.compute.VmState;
+import org.dasein.cloud.compute.*;
 import org.dasein.cloud.network.Firewall;
 import org.dasein.cloud.network.FirewallSupport;
 import org.dasein.cloud.network.IPVersion;
@@ -669,6 +660,14 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
 
     @Nonnull
     @Override
+    public Iterable<VirtualMachineProduct> listProducts(@Nonnull String machineImageId, @Nonnull VirtualMachineProductFilterOptions options) throws InternalException, CloudException {
+        // all OS products are dual architecture so it doesn't matter which arch to choose
+        return listProducts(options, Architecture.I64);
+    }
+
+
+    @Nonnull
+    @Override
     public Iterable<VirtualMachineProduct> listProducts(@Nullable VirtualMachineProductFilterOptions options, @Nullable Architecture architecture) throws InternalException, CloudException {
         if( architecture != null && !architecture.equals(Architecture.I32) && !architecture.equals(Architecture.I64) ) {
             return Collections.emptyList();
@@ -1025,6 +1024,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         if( product.getDescription() == null ) {
             product.setDescription(product.getName());
         }
+        product.setArchitectures(Architecture.I32, Architecture.I64);
         return product;
     }
 
