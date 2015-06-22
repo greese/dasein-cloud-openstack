@@ -48,13 +48,13 @@ import java.util.*;
  *
  * ENTITY MAP:
  *
- * OS Pool -> Dasein LoadBalancer
+ * OS Pool -&gt; Dasein LoadBalancer
  *
- * OS VIP -> Dasein LbListener
+ * OS VIP -&gt; Dasein LbListener
  *
- * OS Member -> Dasein LoadBalancerEndpoint
+ * OS Member -&gt; Dasein LoadBalancerEndpoint
  *
- * OS Health Monitor -> Dasein LB Health Check
+ * OS Health Monitor -&gt; Dasein LB Health Check
  *
  */
 public class LoadBalancerSupportImpl extends AbstractLoadBalancerSupport<NovaOpenStack> {
