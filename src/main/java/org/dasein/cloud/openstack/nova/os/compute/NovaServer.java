@@ -58,6 +58,7 @@ import org.dasein.util.uom.time.TimePeriod;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.omg.PortableInterceptor.ACTIVE;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -129,9 +130,9 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
     public @Nullable VirtualMachineProduct getProduct(@Nonnull String productId) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.getProduct");
         try {
-            for( VirtualMachineProduct product : listProducts(Architecture.I64) ) {
-                if( product.getProviderProductId().equals(productId) ) {
-                    return product;
+            for( FlavorRef flavor : listFlavors() ) {
+                if( flavor.product.getProviderProductId().equals(productId) ) {
+                    return flavor.product;
                 }
             }
             return null;
@@ -241,7 +242,12 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 json.put("confirmResize", null);
                 method.postServers("/servers", virtualMachineId, new JSONObject(json), true);
             }
-            return getVirtualMachine(virtualMachineId);
+            VirtualMachine vm = getVirtualMachine(virtualMachineId);
+                if( status.equals("ACTIVE") && !(vm.getProductId().equals(productId)) ) {
+                    throw new CloudException("Failed to resize VM from " + getProduct(vm.getProductId()).getName()
+                            + " to " + getProduct(productId).getName());
+                }
+            return vm;
         }
         finally {
             APITrace.end();
@@ -314,7 +320,7 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
                 json.put("flavorRef", getFlavorRef(options.getStandardProductId()));
             }
 
-            if( options.getVlanId() != null && getProvider().isRackspace() ) {
+            if( options.getVlanId() != null ) {
                 List<Map<String,Object>> vlans = new ArrayList<Map<String, Object>>();
                 Map<String,Object> vlan = new HashMap<String, Object>();
 
@@ -658,20 +664,8 @@ public class NovaServer extends AbstractVMSupport<NovaOpenStack> {
         return null;
     }
 
-    @Nonnull
     @Override
-    public Iterable<VirtualMachineProduct> listProducts(@Nonnull String machineImageId, @Nonnull VirtualMachineProductFilterOptions options) throws InternalException, CloudException {
-        // all OS products are dual architecture so it doesn't matter which arch to choose
-        return listProducts(options, Architecture.I64);
-    }
-
-
-    @Nonnull
-    @Override
-    public Iterable<VirtualMachineProduct> listProducts(@Nullable VirtualMachineProductFilterOptions options, @Nullable Architecture architecture) throws InternalException, CloudException {
-        if( architecture != null && !architecture.equals(Architecture.I32) && !architecture.equals(Architecture.I64) ) {
-            return Collections.emptyList();
-        }
+    public @Nonnull Iterable<VirtualMachineProduct> listProducts(@Nonnull String machineImageId, @Nullable VirtualMachineProductFilterOptions options) throws InternalException, CloudException {
         APITrace.begin(getProvider(), "VM.listProducts");
         try {
             List<VirtualMachineProduct> products = new ArrayList<VirtualMachineProduct>();
