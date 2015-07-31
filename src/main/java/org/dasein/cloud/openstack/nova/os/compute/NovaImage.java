@@ -539,7 +539,7 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
                     if( s.equals("saving") ) {
                         currentState = MachineImageState.PENDING;
                     }
-                    else if( s.equals("active") || s.equals("queued") || s.equals("preparing") ) {
+                    else if( s.equals("active")  ) {
                         currentState = MachineImageState.ACTIVE;
                     }
                     else if( s.equals("deleting") ) {
@@ -549,6 +549,7 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
                         currentState = MachineImageState.DELETED;
                     }
                     else {
+                        // everything else including 'queued' and 'preparing'
                         logger.warn("toImage(): Unknown image status: " + s);
                         currentState = MachineImageState.PENDING;
                     }
@@ -638,10 +639,10 @@ public class NovaImage extends AbstractImageSupport<NovaOpenStack> {
             if( json.has("status") ) {
                 String s = json.getString("status").toLowerCase();
 
-                if( s.equals("saving") ) {
+                if( s.equals("saving") || s.equals("queued") || s.equals("preparing") ) {
                     state = MachineImageState.PENDING;
                 }
-                else if( s.equals("active") || s.equals("queued") || s.equals("preparing") ) {
+                else if( s.equals("active")  ) {
                     state = MachineImageState.ACTIVE;
                 }
                 else if( s.equals("deleting") ) {
